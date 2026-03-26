@@ -1,0 +1,28 @@
+name = "cdmstores-backend"
+main = "src/index.ts"
+compatibility_date = "2024-12-01"
+compatibility_flags = ["nodejs_compat"]
+
+# Banco de dados D1
+[[d1_databases]]
+binding = "DB"
+database_name = "cdmstores"
+database_id = "a22156d2-037a-400d-9408-d064020b4ca8"
+
+# Variáveis de ambiente
+[env.production]
+vars = { ENVIRONMENT = "production" }
+
+[env.development]
+vars = { ENVIRONMENT = "development" }
+
+# Variáveis secretas (use wrangler secret put)
+# wrangler secret put STRIPE_SECRET_KEY
+# wrangler secret put STRIPE_WEBHOOK_SECRET
+# wrangler secret put CJ_API_KEY
+# wrangler secret put CJ_API_SECRET
+
+# CORS para seu domínio
+[[routes]]
+pattern = "cdmstores.com/api/*"
+zone_name = "cdmstores.com"

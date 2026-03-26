@@ -1,0 +1,512 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Meu Perfil - CDM Stores</title>
+    <link rel="stylesheet" href="./css/global.css">
+    <link rel="stylesheet" href="./css/mobile.css">
+    <style>
+        .profile-container {
+            max-width: 1200px;
+            margin: 2rem auto;
+            padding: 2rem;
+            background: linear-gradient(135deg, rgba(0,175,255,0.05) 0%, rgba(155,77,255,0.05) 100%);
+            border-radius: 12px;
+            border: 1px solid rgba(0,175,255,0.2);
+        }
+
+        .profile-header {
+            text-align: center;
+            margin-bottom: 2rem;
+            padding-bottom: 2rem;
+            border-bottom: 2px solid rgba(0,175,255,0.3);
+        }
+
+        .profile-avatar {
+            width: 120px;
+            height: 120px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #00AFFF 0%, #9B4DFF 100%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 3rem;
+            margin: 0 auto 1rem;
+            overflow: hidden;
+            border: 3px solid #00AFFF;
+        }
+
+        .profile-avatar img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .profile-header h1 {
+            color: #333;
+            margin: 0;
+            font-size: 1.8rem;
+        }
+
+        .profile-header p {
+            color: #666;
+            margin: 0.5rem 0 0 0;
+        }
+
+        .profile-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 2rem;
+            margin-bottom: 2rem;
+        }
+
+        @media (max-width: 768px) {
+            .profile-grid {
+                grid-template-columns: 1fr;
+            }
+            .profile-container {
+                margin: 1rem;
+                padding: 1rem;
+            }
+        }
+
+        .profile-section {
+            background: white;
+            padding: 1.5rem;
+            border-radius: 8px;
+            border: 1px solid rgba(0,175,255,0.2);
+        }
+
+        .profile-section h2 {
+            color: #00AFFF;
+            font-size: 1.1rem;
+            margin: 0 0 1.5rem 0;
+            border-bottom: 2px solid #00AFFF;
+            padding-bottom: 0.5rem;
+        }
+
+        .form-group {
+            margin-bottom: 1rem;
+        }
+
+        .form-group label {
+            display: block;
+            color: #333;
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+            font-size: 0.9rem;
+        }
+
+        .form-group input,
+        .form-group textarea {
+            width: 100%;
+            padding: 0.75rem;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 0.95rem;
+            font-family: inherit;
+            transition: border-color 0.3s;
+        }
+
+        .form-group input:focus,
+        .form-group textarea:focus {
+            outline: none;
+            border-color: #00AFFF;
+            box-shadow: 0 0 0 3px rgba(0,175,255,0.1);
+        }
+
+        .form-group input[type="file"] {
+            padding: 0.5rem;
+        }
+
+        .btn-group {
+            display: flex;
+            gap: 1rem;
+            margin-top: 1.5rem;
+        }
+
+        .btn {
+            flex: 1;
+            padding: 0.75rem 1.5rem;
+            border: none;
+            border-radius: 6px;
+            font-size: 0.95rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #00AFFF 0%, #0088CC 100%);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0,175,255,0.4);
+        }
+
+        .btn-secondary {
+            background: transparent;
+            color: #00AFFF;
+            border: 2px solid #00AFFF;
+        }
+
+        .btn-secondary:hover {
+            background: rgba(0,175,255,0.1);
+        }
+
+        .btn-danger {
+            background: #ff6b6b;
+            color: white;
+        }
+
+        .btn-danger:hover {
+            background: #ff5252;
+        }
+
+        .profile-info {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1rem;
+            margin-top: 1.5rem;
+        }
+
+        .info-item {
+            padding: 1rem;
+            background: rgba(0,175,255,0.05);
+            border-radius: 4px;
+            border-left: 3px solid #00AFFF;
+        }
+
+        .info-label {
+            color: #999;
+            font-size: 0.8rem;
+            text-transform: uppercase;
+            margin-bottom: 0.25rem;
+        }
+
+        .info-value {
+            color: #333;
+            font-weight: 600;
+            font-size: 1rem;
+        }
+
+        .loading {
+            text-align: center;
+            color: #00AFFF;
+            padding: 2rem;
+        }
+
+        .error {
+            background: #ffe0e0;
+            color: #c92a2a;
+            padding: 1rem;
+            border-radius: 4px;
+            margin-bottom: 1rem;
+            border-left: 4px solid #c92a2a;
+        }
+
+        .success {
+            background: #e0ffe0;
+            color: #2a7f2a;
+            padding: 1rem;
+            border-radius: 4px;
+            margin-bottom: 1rem;
+            border-left: 4px solid #2a7f2a;
+        }
+
+        .tabs {
+            display: flex;
+            gap: 1rem;
+            margin-bottom: 1.5rem;
+            border-bottom: 2px solid #eee;
+        }
+
+        .tab-btn {
+            padding: 1rem;
+            background: none;
+            border: none;
+            color: #999;
+            cursor: pointer;
+            font-weight: 600;
+            border-bottom: 3px solid transparent;
+            transition: all 0.3s;
+        }
+
+        .tab-btn.active {
+            color: #00AFFF;
+            border-bottom-color: #00AFFF;
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+    </style>
+</head>
+<body>
+    <header class="navbar">
+        <div class="navbar-container">
+            <div class="navbar-brand">
+                <a href="/" style="text-decoration: none; color: inherit;">
+                    <h1>CDM Stores 🛍️</h1>
+                </a>
+            </div>
+            <nav class="navbar-menu">
+                <a href="/" class="nav-link">Home</a>
+                <a href="/#products" class="nav-link">Produtos</a>
+                <a href="#" onclick="openChat()" class="nav-link">🤖</a>
+                <span id="nav-auth-placeholder"></span>
+            </nav>
+        </div>
+    </header>
+
+    <div class="profile-container">
+        <div id="alerts"></div>
+
+        <div class="profile-header">
+            <div class="profile-avatar">
+                <img id="avatarImg" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Ctext x='12' y='16' font-size='16' fill='white' text-anchor='middle'%3E👤%3C/text%3E%3C/svg%3E" alt="Avatar">
+            </div>
+            <h1 id="profileName">Carregando...</h1>
+            <p id="profileEmail">-</p>
+        </div>
+
+        <div class="tabs">
+            <button class="tab-btn active" onclick="switchTab('perfil')">Perfil</button>
+            <button class="tab-btn" onclick="switchTab('senha')">Alterar Senha</button>
+        </div>
+
+        <!-- TAB: Perfil -->
+        <div id="perfil" class="tab-content active">
+            <div class="profile-grid">
+                <div class="profile-section">
+                    <h2>📋 Informações Pessoais</h2>
+                    <form id="profileForm">
+                        <div class="form-group">
+                            <label>Nome</label>
+                            <input type="text" id="inputName" placeholder="Seu nome completo" required>
+                        </div>
+                        <div class="form-group">
+                            <label>Email</label>
+                            <input type="email" id="inputEmail" placeholder="seu@email.com" disabled>
+                        </div>
+                        <div class="form-group">
+                            <label>Telefone</label>
+                            <input type="tel" id="inputPhone" placeholder="(11) 99999-9999">
+                        </div>
+                        <div class="form-group">
+                            <label>Avatar (URL)</label>
+                            <input type="url" id="inputAvatar" placeholder="https://example.com/avatar.jpg">
+                        </div>
+                        <div class="btn-group">
+                            <button type="submit" class="btn btn-primary">💾 Salvar Alterações</button>
+                            <button type="button" class="btn btn-secondary" onclick="reloadProfile()">↻ Descartar</button>
+                        </div>
+                    </form>
+                </div>
+
+                <div class="profile-section">
+                    <h2>📊 Resumo da Conta</h2>
+                    <div class="profile-info">
+                        <div class="info-item">
+                            <div class="info-label">Status</div>
+                            <div class="info-value" id="infoStatus">-</div>
+                        </div>
+                        <div class="info-item">
+                            <div class="info-label">Email Verificado</div>
+                            <div class="info-value" id="infoVerified">-</div>
+                        </div>
+                        <div class="info-item">
+                            <div class="info-label">Membro desde</div>
+                            <div class="info-value" id="infoCreated">-</div>
+                        </div>
+                        <div class="info-item">
+                            <div class="info-label">Último acesso</div>
+                            <div class="info-value" id="infoLastLogin">-</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- TAB: Alterar Senha -->
+        <div id="senha" class="tab-content">
+            <div style="max-width: 500px;">
+                <div class="profile-section">
+                    <h2>🔐 Alterar Senha</h2>
+                    <form id="passwordForm">
+                        <div class="form-group">
+                            <label>Senha Atual</label>
+                            <input type="password" id="currentPassword" placeholder="Digite sua senha atual" required>
+                        </div>
+                        <div class="form-group">
+                            <label>Nova Senha</label>
+                            <input type="password" id="newPassword" placeholder="Nova senha (mín. 8 caracteres)" required>
+                        </div>
+                        <div class="form-group">
+                            <label>Confirmar Nova Senha</label>
+                            <input type="password" id="confirmPassword" placeholder="Confirme a nova senha" required>
+                        </div>
+                        <div class="btn-group">
+                            <button type="submit" class="btn btn-primary">🔒 Atualizar Senha</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="./js/auth.js"></script>
+    <script src="./js/chatbot.js"></script>
+    <script>
+        let currentUser = null;
+
+        async function loadProfile() {
+            try {
+                const response = await fetch('/api/auth/me', {
+                    headers: {
+                        'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
+                    }
+                });
+
+                if (!response.ok) {
+                    window.location.href = '/';
+                    return;
+                }
+
+                currentUser = await response.json();
+                populateForm();
+            } catch (err) {
+                showAlert('Erro ao carregar perfil', 'error');
+                setTimeout(() => window.location.href = '/', 2000);
+            }
+        }
+
+        function populateForm() {
+            document.getElementById('profileName').textContent = currentUser.name || 'Usuário';
+            document.getElementById('profileEmail').textContent = currentUser.email;
+            
+            document.getElementById('inputName').value = currentUser.name || '';
+            document.getElementById('inputEmail').value = currentUser.email;
+            document.getElementById('inputPhone').value = currentUser.phone || '';
+            document.getElementById('inputAvatar').value = currentUser.avatar_url || '';
+
+            // Info box
+            document.getElementById('infoStatus').textContent = currentUser.status === 'active' ? '✅ Ativo' : '⏸️ Inativo';
+            document.getElementById('infoVerified').textContent = currentUser.email_verified ? '✅ Verificado' : '❌ Não verificado';
+            document.getElementById('infoCreated').textContent = new Date(currentUser.created_at).toLocaleDateString('pt-BR');
+            document.getElementById('infoLastLogin').textContent = currentUser.last_login ? new Date(currentUser.last_login).toLocaleDateString('pt-BR') : 'Nunca';
+
+            // Avatar image
+            if (currentUser.avatar_url) {
+                document.getElementById('avatarImg').src = currentUser.avatar_url;
+            }
+        }
+
+        function switchTab(tabName) {
+            document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+            document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
+            
+            event.target.classList.add('active');
+            document.getElementById(tabName).classList.add('active');
+        }
+
+        function showAlert(message, type = 'info') {
+            const alertDiv = document.createElement('div');
+            alertDiv.className = type;
+            alertDiv.textContent = message;
+            document.getElementById('alerts').appendChild(alertDiv);
+            
+            setTimeout(() => alertDiv.remove(), 4000);
+        }
+
+        function reloadProfile() {
+            if (currentUser) populateForm();
+        }
+
+        // Update Profile
+        document.getElementById('profileForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const formData = {
+                name: document.getElementById('inputName').value,
+                phone: document.getElementById('inputPhone').value,
+                avatar_url: document.getElementById('inputAvatar').value
+            };
+
+            try {
+                const response = await fetch('/api/user/profile', {
+                    method: 'PUT',
+                    headers: {
+                        'Authorization': `Bearer ${localStorage.getItem('auth_token')}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(formData)
+                });
+
+                if (response.ok) {
+                    showAlert('✅ Perfil atualizado com sucesso!', 'success');
+                    currentUser = await response.json();
+                    populateForm();
+                } else {
+                    const error = await response.json();
+                    showAlert(`❌ Erro: ${error.error}`, 'error');
+                }
+            } catch (err) {
+                showAlert('❌ Erro ao atualizar perfil', 'error');
+            }
+        });
+
+        // Change Password
+        document.getElementById('passwordForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const newPwd = document.getElementById('newPassword').value;
+            const confirmPwd = document.getElementById('confirmPassword').value;
+
+            if (newPwd !== confirmPwd) {
+                showAlert('❌ Senhas não coincidem', 'error');
+                return;
+            }
+
+            if (newPwd.length < 8) {
+                showAlert('❌ Senha deve ter pelo menos 8 caracteres', 'error');
+                return;
+            }
+
+            try {
+                const response = await fetch('/api/auth/change-password', {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${localStorage.getItem('auth_token')}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        current_password: document.getElementById('currentPassword').value,
+                        new_password: newPwd
+                    })
+                });
+
+                if (response.ok) {
+                    showAlert('✅ Senha alterada com sucesso!', 'success');
+                    document.getElementById('passwordForm').reset();
+                } else {
+                    const error = await response.json();
+                    showAlert(`❌ ${error.error}`, 'error');
+                }
+            } catch (err) {
+                showAlert('❌ Erro ao alterar senha', 'error');
+            }
+        });
+
+        // Initialize
+        loadProfile();
+    </script>
+</body>
+</html>

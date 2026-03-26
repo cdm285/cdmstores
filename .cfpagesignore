@@ -1,0 +1,23 @@
+# Arquivos que o Cloudflare Pages não deve publicar como assets estáticos
+
+# Backend / Worker
+worker/
+
+# Dependências
+node_modules/
+
+# Arquivos de CI/CD
+.github/
+
+# Arquivos de teste e config
+*.py
+*.ps1
+*.sh
+*.json
+!test-stripe.json
+
+# Documentação interna
+*.md
+
+# Pasta vazia
+New folder/

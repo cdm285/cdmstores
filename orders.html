@@ -1,0 +1,483 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Meus Pedidos - CDM Stores</title>
+    <link rel="stylesheet" href="./css/global.css">
+    <link rel="stylesheet" href="./css/mobile.css">
+    <style>
+        .orders-container {
+            max-width: 1200px;
+            margin: 2rem auto;
+            padding: 2rem;
+        }
+
+        .orders-header {
+            margin-bottom: 2rem;
+        }
+
+        .orders-header h1 {
+            color: #333;
+            margin: 0;
+        }
+
+        .filter-section {
+            display: flex;
+            gap: 1rem;
+            margin: 1.5rem 0;
+            flex-wrap: wrap;
+        }
+
+        .filter-section input,
+        .filter-section select {
+            padding: 0.75rem;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            font-size: 0.95rem;
+        }
+
+        .filter-section input {
+            flex: 1;
+            min-width: 250px;
+        }
+
+        .filter-section select {
+            min-width: 150px;
+        }
+
+        .orders-grid {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 1.5rem;
+        }
+
+        .order-card {
+            background: white;
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+            padding: 1.5rem;
+            transition: all 0.3s;
+            border-left: 4px solid #00AFFF;
+        }
+
+        .order-card:hover {
+            box-shadow: 0 4px 12px rgba(0,175,255,0.2);
+        }
+
+        .order-header {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr 1fr;
+            gap: 1rem;
+            margin-bottom: 1rem;
+            padding-bottom: 1rem;
+            border-bottom: 1px solid #eee;
+        }
+
+        @media (max-width: 768px) {
+            .order-header {
+                grid-template-columns: 1fr 1fr;
+            }
+        }
+
+        .order-info {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .order-label {
+            color: #999;
+            font-size: 0.8rem;
+            text-transform: uppercase;
+            margin-bottom: 0.25rem;
+        }
+
+        .order-value {
+            color: #333;
+            font-weight: 600;
+            font-size: 1rem;
+        }
+
+        .order-status {
+            display: inline-block;
+            padding: 0.4rem 0.8rem;
+            border-radius: 20px;
+            font-size: 0.85rem;
+            font-weight: 600;
+            width: fit-content;
+        }
+
+        .status-pending {
+            background: #fff3cd;
+            color: #856404;
+        }
+
+        .status-processing {
+            background: #cfe2ff;
+            color: #084298;
+        }
+
+        .status-shipped {
+            background: #d1e7dd;
+            color: #0f5132;
+        }
+
+        .status-delivered {
+            background: #d1f2eb;
+            color: #0c5460;
+        }
+
+        .status-cancelled {
+            background: #f8d7da;
+            color: #721c24;
+        }
+
+        .order-items {
+            margin: 1rem 0;
+        }
+
+        .item-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 0.75rem 0;
+            font-size: 0.9rem;
+            border-bottom: 1px solid #f5f5f5;
+        }
+
+        .item-row:last-child {
+            border-bottom: none;
+        }
+
+        .item-name {
+            color: #333;
+            font-weight: 500;
+        }
+
+        .item-qty {
+            color: #999;
+        }
+
+        .item-price {
+            color: #00AFFF;
+            font-weight: 600;
+        }
+
+        .order-footer {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-top: 1rem;
+            padding-top: 1rem;
+            border-top: 1px solid #eee;
+        }
+
+        .order-total {
+            font-size: 1.2rem;
+            font-weight: 700;
+            color: #00AFFF;
+        }
+
+        .order-actions {
+            display: flex;
+            gap: 0.5rem;
+        }
+
+        .btn-small {
+            padding: 0.6rem 1rem;
+            border: none;
+            border-radius: 4px;
+            font-size: 0.85rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .btn-primary-small {
+            background: linear-gradient(135deg, #00AFFF 0%, #0088CC 100%);
+            color: white;
+        }
+
+        .btn-primary-small:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 2px 8px rgba(0,175,255,0.3);
+        }
+
+        .btn-secondary-small {
+            background: transparent;
+            border: 1px solid #00AFFF;
+            color: #00AFFF;
+        }
+
+        .btn-secondary-small:hover {
+            background: rgba(0,175,255,0.1);
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 3rem 1rem;
+            color: #999;
+        }
+
+        .empty-state h2 {
+            color: #666;
+            margin-bottom: 1rem;
+        }
+
+        .empty-state a {
+            color: #00AFFF;
+            text-decoration: none;
+            font-weight: 600;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 2rem;
+            color: #00AFFF;
+        }
+
+        .tracking-info {
+            background: rgba(0,175,255,0.05);
+            padding: 0.75rem;
+            border-radius: 4px;
+            margin-top: 0.5rem;
+            font-size: 0.85rem;
+        }
+
+        .tracking-code {
+            color: #00AFFF;
+            font-weight: 600;
+            font-family: monospace;
+        }
+    </style>
+</head>
+<body>
+    <header class="navbar">
+        <div class="navbar-container">
+            <div class="navbar-brand">
+                <a href="/" style="text-decoration: none; color: inherit;">
+                    <h1>CDM Stores 🛍️</h1>
+                </a>
+            </div>
+            <nav class="navbar-menu">
+                <a href="/" class="nav-link">Home</a>
+                <a href="/#products" class="nav-link">Produtos</a>
+                <a href="#" onclick="openChat()" class="nav-link">🤖</a>
+                <span id="nav-auth-placeholder"></span>
+            </nav>
+        </div>
+    </header>
+
+    <div class="orders-container">
+        <div class="orders-header">
+            <h1>📦 Meus Pedidos</h1>
+            <div class="filter-section">
+                <input type="text" id="searchInput" placeholder="🔍 Buscar por ID ou produto..." onchange="filterOrders()">
+                <select id="statusFilter" onchange="filterOrders()">
+                    <option value="">Todos os Status</option>
+                    <option value="pending">⏳ Pendente</option>
+                    <option value="processing">🔄 Processando</option>
+                    <option value="shipped">🚚 Enviado</option>
+                    <option value="delivered">✅ Entregue</option>
+                    <option value="cancelled">❌ Cancelado</option>
+                </select>
+            </div>
+        </div>
+
+        <div id="ordersContent" class="orders-grid">
+            <div class="loading">Carregando seus pedidos...</div>
+        </div>
+    </div>
+
+    <!-- Modal de Detalhes -->
+    <div id="orderModal" style="display:none; position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.7); z-index:1000; display:flex; align-items:center; justify-content:center;">
+        <div style="background:white; border-radius:8px; max-width:600px; width:90%; max-height:80vh; overflow-y:auto; padding:2rem;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1.5rem;">
+                <h2 style="margin:0;">Detalhes do Pedido</h2>
+                <button onclick="closeOrderModal()" style="background:none; border:none; font-size:1.5rem; cursor:pointer;">✕</button>
+            </div>
+            <div id="modalContent"></div>
+        </div>
+    </div>
+
+    <script src="./js/auth.js"></script>
+    <script src="./js/chatbot.js"></script>
+    <script>
+        let allOrders = [];
+
+        async function loadOrders() {
+            try {
+                const response = await fetch('/api/orders/user', {
+                    headers: {
+                        'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
+                    }
+                });
+
+                if (!response.ok) {
+                    if (response.status === 401) {
+                        window.location.href = '/';
+                        return;
+                    }
+                    throw new Error('Erro ao carregar pedidos');
+                }
+
+                allOrders = await response.json();
+                renderOrders(allOrders);
+            } catch (err) {
+                document.getElementById('ordersContent').innerHTML = `
+                    <div class="empty-state">
+                        <h2>Erro ao carregar pedidos</h2>
+                        <p>${err.message}</p>
+                        <a href="/">← Voltar ao início</a>
+                    </div>
+                `;
+            }
+        }
+
+        function renderOrders(orders) {
+            if (orders.length === 0) {
+                document.getElementById('ordersContent').innerHTML = `
+                    <div class="empty-state">
+                        <h2>📭 Nenhum pedido ainda</h2>
+                        <p>Você ainda não fez nenhuma compra.</p>
+                        <a href="/">← Continuar comprando</a>
+                    </div>
+                `;
+                return;
+            }
+
+            document.getElementById('ordersContent').innerHTML = orders.map(order => `
+                <div class="order-card">
+                    <div class="order-header">
+                        <div class="order-info">
+                            <div class="order-label">📋 Pedido</div>
+                            <div class="order-value" style="font-family:monospace;">#${order.id.substring(0, 8)}</div>
+                        </div>
+                        <div class="order-info">
+                            <div class="order-label">📅 Data</div>
+                            <div class="order-value">${new Date(order.created_at).toLocaleDateString('pt-BR')}</div>
+                        </div>
+                        <div class="order-info">
+                            <div class="order-label">Status</div>
+                            <div class="order-status status-${order.status}">
+                                ${getStatusBadge(order.status)}
+                            </div>
+                        </div>
+                        <div class="order-info">
+                            <div class="order-label">💰 Total</div>
+                            <div class="order-value">R$ ${parseFloat(order.total).toLocaleString('pt-BR', {minimumFractionDigits:2})}</div>
+                        </div>
+                    </div>
+
+                    ${order.items ? `
+                        <div class="order-items">
+                            ${order.items.map(item => `
+                                <div class="item-row">
+                                    <div>
+                                        <div class="item-name">${item.product_name}</div>
+                                        <div class="item-qty">Qtd: ${item.quantity}</div>
+                                    </div>
+                                    <div class="item-price">R$ ${parseFloat(item.total_price).toLocaleString('pt-BR', {minimumFractionDigits:2})}</div>
+                                </div>
+                            `).join('')}
+                        </div>
+                    ` : ''}
+
+                    ${order.tracking_code ? `
+                        <div class="tracking-info">
+                            📍 Rastreamento: <span class="tracking-code">${order.tracking_code}</span>
+                        </div>
+                    ` : ''}
+
+                    <div class="order-footer">
+                        <div class="order-total">R$ ${parseFloat(order.total).toLocaleString('pt-BR', {minimumFractionDigits:2})}</div>
+                        <div class="order-actions">
+                            <button class="btn-small btn-primary-small" onclick="viewOrderDetails('${order.id}')">👁️ Ver Detalhes</button>
+                            ${order.status === 'shipped' ? `
+                                <button class="btn-small btn-secondary-small" onclick="trackOrder('${order.tracking_code}')">🚚 Rastrear</button>
+                            ` : ''}
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function getStatusBadge(status) {
+            const badges = {
+                'pending': '⏳ Pendente',
+                'processing': '🔄 Processando',
+                'shipped': '🚚 Enviado',
+                'delivered': '✅ Entregue',
+                'cancelled': '❌ Cancelado'
+            };
+            return badges[status] || status;
+        }
+
+        function filterOrders() {
+            const searchText = document.getElementById('searchInput').value.toLowerCase();
+            const statusFilter = document.getElementById('statusFilter').value;
+
+            let filtered = allOrders.filter(order => {
+                const matchSearch = !searchText || 
+                    order.id.includes(searchText) || 
+                    (order.items && order.items.some(item => 
+                        item.product_name.toLowerCase().includes(searchText)
+                    ));
+
+                const matchStatus = !statusFilter || order.status === statusFilter;
+
+                return matchSearch && matchStatus;
+            });
+
+            renderOrders(filtered);
+        }
+
+        function viewOrderDetails(orderId) {
+            const order = allOrders.find(o => o.id === orderId);
+            if (!order) return;
+
+            const modal = document.getElementById('orderModal');
+            const content = document.getElementById('modalContent');
+
+            content.innerHTML = `
+                <div style="margin-bottom:1.5rem;">
+                    <p><strong>ID do Pedido:</strong> <code>${order.id}</code></p>
+                    <p><strong>Status:</strong> <span class="order-status status-${order.status}">${getStatusBadge(order.status)}</span></p>
+                    <p><strong>Data:</strong> ${new Date(order.created_at).toLocaleString('pt-BR')}</p>
+                    <p><strong>Total:</strong> <strong style="color:#00AFFF;">R$ ${parseFloat(order.total).toLocaleString('pt-BR', {minimumFractionDigits:2})}</strong></p>
+                </div>
+
+                <h3>Itens do Pedido</h3>
+                ${order.items ? order.items.map(item => `
+                    <div style="background:#f5f5f5; padding:1rem; border-radius:4px; margin-bottom:0.5rem;">
+                        <p style="margin:0 0 0.5rem 0;"><strong>${item.product_name}</strong></p>
+                        <p style="margin:0; color:#666; font-size:0.9rem;">Quantidade: ${item.quantity} | R$ ${parseFloat(item.price).toLocaleString('pt-BR', {minimumFractionDigits:2})} cada</p>
+                        <p style="margin:0.5rem 0 0 0; color:#00AFFF; font-weight:600;">Subtotal: R$ ${parseFloat(item.total_price).toLocaleString('pt-BR', {minimumFractionDigits:2})}</p>
+                    </div>
+                `).join('') : '<p>Sem itens</p>'}
+
+                <div style="margin-top:1.5rem; padding-top:1.5rem; border-top:1px solid #eee;">
+                    <h3>Endereço de Entrega</h3>
+                    <p>${order.shipping_address || 'Não fornecido'}</p>
+                </div>
+            `;
+
+            modal.style.display = 'flex';
+        }
+
+        function closeOrderModal() {
+            document.getElementById('orderModal').style.display = 'none';
+        }
+
+        function trackOrder(trackingCode) {
+            if (!trackingCode) {
+                alert('Código de rastreamento não disponível');
+                return;
+            }
+            window.open(`https://rastreamento.com.br/?codigo=${trackingCode}`, '_blank');
+        }
+
+        // Initialize
+        loadOrders();
+    </script>
+</body>
+</html>

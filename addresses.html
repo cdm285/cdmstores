@@ -1,0 +1,644 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Meus Endereços - CDM Stores</title>
+    <link rel="stylesheet" href="./css/global.css">
+    <link rel="stylesheet" href="./css/mobile.css">
+    <style>
+        .addresses-container {
+            max-width: 1200px;
+            margin: 2rem auto;
+            padding: 2rem;
+        }
+
+        .addresses-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 2rem;
+            flex-wrap: wrap;
+            gap: 1rem;
+        }
+
+        .addresses-header h1 {
+            color: #333;
+            margin: 0;
+        }
+
+        .btn-add {
+            background: linear-gradient(135deg, #00AFFF 0%, #0088CC 100%);
+            color: white;
+            border: none;
+            padding: 0.75rem 1.5rem;
+            border-radius: 6px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .btn-add:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0,175,255,0.4);
+        }
+
+        .addresses-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+        }
+
+        .address-card {
+            background: white;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            padding: 1.5rem;
+            position: relative;
+            transition: all 0.3s;
+        }
+
+        .address-card:hover {
+            border-color: #00AFFF;
+            box-shadow: 0 4px 12px rgba(0,175,255,0.2);
+        }
+
+        .address-card.default {
+            border-color: #00AFFF;
+            background: linear-gradient(135deg, rgba(0,175,255,0.05) 0%, rgba(155,77,255,0.05) 100%);
+            border-width: 3px;
+        }
+
+        .address-badge {
+            position: absolute;
+            top: 1rem;
+            right: 1rem;
+            background: #00AFFF;
+            color: white;
+            padding: 0.4rem 0.8rem;
+            border-radius: 20px;
+            font-size: 0.75rem;
+            font-weight: 600;
+        }
+
+        .address-label {
+            display: inline-block;
+            background: #9B4DFF;
+            color: white;
+            padding: 0.4rem 0.8rem;
+            border-radius: 4px;
+            font-size: 0.85rem;
+            font-weight: 600;
+            margin-bottom: 1rem;
+        }
+
+        .address-content {
+            margin-bottom: 1rem;
+        }
+
+        .address-name {
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 0.5rem;
+        }
+
+        .address-text {
+            color: #666;
+            font-size: 0.95rem;
+            line-height: 1.6;
+            margin: 0.25rem 0;
+        }
+
+        .address-actions {
+            display: flex;
+            gap: 0.5rem;
+            padding-top: 1rem;
+            border-top: 1px solid #eee;
+        }
+
+        .btn-small {
+            flex: 1;
+            padding: 0.6rem;
+            border: none;
+            border-radius: 4px;
+            font-size: 0.85rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .btn-primary-small {
+            background: linear-gradient(135deg, #00AFFF 0%, #0088CC 100%);
+            color: white;
+        }
+
+        .btn-primary-small:hover {
+            transform: translateY(-2px);
+        }
+
+        .btn-secondary-small {
+            background: transparent;
+            border: 1px solid #00AFFF;
+            color: #00AFFF;
+        }
+
+        .btn-secondary-small:hover {
+            background: rgba(0,175,255,0.1);
+        }
+
+        .btn-danger-small {
+            background: transparent;
+            border: 1px solid #ff6b6b;
+            color: #ff6b6b;
+        }
+
+        .btn-danger-small:hover {
+            background: rgba(255,107,107,0.1);
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 3rem 1rem;
+            color: #999;
+        }
+
+        .empty-state h2 {
+            color: #666;
+            margin-bottom: 1rem;
+        }
+
+        /* Modal */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0,0,0,0.7);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal-overlay.active {
+            display: flex;
+        }
+
+        .modal-content {
+            background: white;
+            border-radius: 8px;
+            max-width: 500px;
+            width: 90%;
+            max-height: 90vh;
+            overflow-y: auto;
+            padding: 2rem;
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1.5rem;
+            padding-bottom: 1rem;
+            border-bottom: 2px solid #00AFFF;
+        }
+
+        .modal-header h2 {
+            margin: 0;
+            color: #333;
+        }
+
+        .modal-close {
+            background: none;
+            border: none;
+            font-size: 1.5rem;
+            cursor: pointer;
+            color: #999;
+        }
+
+        .form-group {
+            margin-bottom: 1rem;
+        }
+
+        .form-group label {
+            display: block;
+            color: #333;
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+            font-size: 0.9rem;
+        }
+
+        .form-group input,
+        .form-group select {
+            width: 100%;
+            padding: 0.75rem;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 0.95rem;
+            font-family: inherit;
+        }
+
+        .form-group input:focus,
+        .form-group select:focus {
+            outline: none;
+            border-color: #00AFFF;
+            box-shadow: 0 0 0 3px rgba(0,175,255,0.1);
+        }
+
+        .form-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1rem;
+        }
+
+        .checkbox-group {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            margin: 1rem 0;
+        }
+
+        .checkbox-group input[type="checkbox"] {
+            width: auto;
+        }
+
+        .form-actions {
+            display: flex;
+            gap: 1rem;
+            margin-top: 2rem;
+        }
+
+        .btn-primary,
+        .btn-secondary {
+            flex: 1;
+            padding: 0.75rem 1.5rem;
+            border: none;
+            border-radius: 6px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #00AFFF 0%, #0088CC 100%);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0,175,255,0.4);
+        }
+
+        .btn-secondary {
+            background: transparent;
+            border: 2px solid #ddd;
+            color: #666;
+        }
+
+        .btn-secondary:hover {
+            border-color: #00AFFF;
+            color: #00AFFF;
+        }
+
+        .success {
+            background: #e0ffe0;
+            color: #2a7f2a;
+            padding: 1rem;
+            border-radius: 4px;
+            margin-bottom: 1rem;
+            border-left: 4px solid #2a7f2a;
+        }
+
+        .error {
+            background: #ffe0e0;
+            color: #c92a2a;
+            padding: 1rem;
+            border-radius: 4px;
+            margin-bottom: 1rem;
+            border-left: 4px solid #c92a2a;
+        }
+    </style>
+</head>
+<body>
+    <header class="navbar">
+        <div class="navbar-container">
+            <div class="navbar-brand">
+                <a href="/" style="text-decoration: none; color: inherit;">
+                    <h1>CDM Stores 🛍️</h1>
+                </a>
+            </div>
+            <nav class="navbar-menu">
+                <a href="/" class="nav-link">Home</a>
+                <a href="/#products" class="nav-link">Produtos</a>
+                <a href="#" onclick="openChat()" class="nav-link">🤖</a>
+                <span id="nav-auth-placeholder"></span>
+            </nav>
+        </div>
+    </header>
+
+    <div class="addresses-container">
+        <div class="addresses-header">
+            <h1>📍 Meus Endereços</h1>
+            <button class="btn-add" onclick="openAddressModal()">➕ Novo Endereço</button>
+        </div>
+
+        <div id="alertsContainer"></div>
+
+        <div id="addressesContent" class="addresses-grid">
+            <div style="text-align:center; color:#00AFFF; padding:2rem;">Carregando endereços...</div>
+        </div>
+    </div>
+
+    <!-- Modal de Endereço -->
+    <div id="addressModal" class="modal-overlay">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="modalTitle">Novo Endereço</h2>
+                <button class="modal-close" onclick="closeAddressModal()">✕</button>
+            </div>
+
+            <div id="modalAlerts"></div>
+
+            <form id="addressForm" onsubmit="saveAddress(event)">
+                <div class="form-group">
+                    <label>Nome do Endereço (ex: Casa, Trabalho)</label>
+                    <input type="text" id="inputLabel" placeholder="Casa" required>
+                </div>
+
+                <div class="form-group">
+                    <label>Nome Completo</label>
+                    <input type="text" id="inputName" placeholder="Seu nome" required>
+                </div>
+
+                <div class="form-group">
+                    <label>Telefone</label>
+                    <input type="tel" id="inputPhone" placeholder="(11) 99999-9999" required>
+                </div>
+
+                <div class="form-group">
+                    <label>Rua/Avenida</label>
+                    <input type="text" id="inputStreet" placeholder="Rua das Flores" required>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Número</label>
+                        <input type="text" id="inputNumber" placeholder="123" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Complemento</label>
+                        <input type="text" id="inputComplement" placeholder="Apto 45">
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label>Bairro</label>
+                    <input type="text" id="inputCity" placeholder="Vila Mariana" required>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Cidade</label>
+                        <input type="text" id="inputCityName" placeholder="São Paulo" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Estado</label>
+                        <input type="text" id="inputState" placeholder="SP" maxlength="2" required>
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>CEP</label>
+                        <input type="text" id="inputZip" placeholder="01234-567" required>
+                    </div>
+                    <div class="form-group">
+                        <label>País</label>
+                        <input type="text" id="inputCountry" placeholder="Brasil" required>
+                    </div>
+                </div>
+
+                <div class="checkbox-group">
+                    <input type="checkbox" id="inputDefault">
+                    <label for="inputDefault" style="margin:0;">Definir como endereço padrão</label>
+                </div>
+
+                <div class="form-actions">
+                    <button type="submit" class="btn-primary">💾 Salvar Endereço</button>
+                    <button type="button" class="btn-secondary" onclick="closeAddressModal()">Cancelar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script src="./js/auth.js"></script>
+    <script src="./js/chatbot.js"></script>
+    <script>
+        let allAddresses = [];
+        let editingAddressId = null;
+
+        async function loadAddresses() {
+            try {
+                const response = await fetch('/api/addresses', {
+                    headers: {
+                        'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
+                    }
+                });
+
+                if (!response.ok) {
+                    if (response.status === 401) {
+                        window.location.href = '/';
+                        return;
+                    }
+                    throw new Error('Erro ao carregar endereços');
+                }
+
+                allAddresses = await response.json();
+                renderAddresses();
+            } catch (err) {
+                document.getElementById('addressesContent').innerHTML = `
+                    <div class="empty-state" style="grid-column: 1/-1;">
+                        <h2>❌ Erro</h2>
+                        <p>${err.message}</p>
+                    </div>
+                `;
+            }
+        }
+
+        function renderAddresses() {
+            if (allAddresses.length === 0) {
+                document.getElementById('addressesContent').innerHTML = `
+                    <div class="empty-state" style="grid-column: 1/-1;">
+                        <h2>📭 Nenhum endereço cadastrado</h2>
+                        <p>Adicione seu primeiro endereço!</p>
+                    </div>
+                `;
+                return;
+            }
+
+            document.getElementById('addressesContent').innerHTML = allAddresses.map(addr => `
+                <div class="address-card ${addr.is_default ? 'default' : ''}">
+                    ${addr.is_default ? '<div class="address-badge">⭐ PADRÃO</div>' : ''}
+                    <div class="address-label">${escapeHtml(addr.label)}</div>
+                    <div class="address-content">
+                        <div class="address-name">${escapeHtml(addr.name)}</div>
+                        <div class="address-text">📞 ${escapeHtml(addr.phone)}</div>
+                        <div class="address-text">📍 ${escapeHtml(addr.street)}, ${escapeHtml(addr.number)}</div>
+                        ${addr.complement ? `<div class="address-text">${escapeHtml(addr.complement)}</div>` : ''}
+                        <div class="address-text">${escapeHtml(addr.city)} - ${escapeHtml(addr.state)}</div>
+                        <div class="address-text">${escapeHtml(addr.zip)} - ${escapeHtml(addr.country)}</div>
+                    </div>
+                    <div class="address-actions">
+                        <button class="btn-small btn-primary-small" onclick="editAddress('${addr.id}')">✏️ Editar</button>
+                        ${!addr.is_default ? `<button class="btn-small btn-secondary-small" onclick="setDefault('${addr.id}')">⭐ Padrão</button>` : ''}
+                        <button class="btn-small btn-danger-small" onclick="deleteAddress('${addr.id}')">🗑️ Excluir</button>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function openAddressModal() {
+            editingAddressId = null;
+            document.getElementById('modalTitle').textContent = 'Novo Endereço';
+            document.getElementById('addressForm').reset();
+            document.getElementById('addressModal').classList.add('active');
+        }
+
+        function closeAddressModal() {
+            document.getElementById('addressModal').classList.remove('active');
+            editingAddressId = null;
+        }
+
+        async function editAddress(addressId) {
+            const addr = allAddresses.find(a => a.id === addressId);
+            if (!addr) return;
+
+            editingAddressId = addressId;
+            document.getElementById('modalTitle').textContent = 'Editar Endereço';
+            
+            document.getElementById('inputLabel').value = addr.label;
+            document.getElementById('inputName').value = addr.name;
+            document.getElementById('inputPhone').value = addr.phone;
+            document.getElementById('inputStreet').value = addr.street;
+            document.getElementById('inputNumber').value = addr.number;
+            document.getElementById('inputComplement').value = addr.complement || '';
+            document.getElementById('inputCity').value = addr.city;
+            document.getElementById('inputCityName').value = addr.city;
+            document.getElementById('inputState').value = addr.state;
+            document.getElementById('inputZip').value = addr.zip;
+            document.getElementById('inputCountry').value = addr.country;
+            document.getElementById('inputDefault').checked = addr.is_default;
+
+            document.getElementById('addressModal').classList.add('active');
+        }
+
+        async function saveAddress(event) {
+            event.preventDefault();
+
+            const formData = {
+                label: document.getElementById('inputLabel').value,
+                name: document.getElementById('inputName').value,
+                phone: document.getElementById('inputPhone').value,
+                street: document.getElementById('inputStreet').value,
+                number: document.getElementById('inputNumber').value,
+                complement: document.getElementById('inputComplement').value,
+                city: document.getElementById('inputCity').value,
+                state: document.getElementById('inputState').value,
+                zip: document.getElementById('inputZip').value,
+                country: document.getElementById('inputCountry').value,
+                is_default: document.getElementById('inputDefault').checked
+            };
+
+            try {
+                const url = editingAddressId 
+                    ? `/api/addresses/${editingAddressId}`
+                    : '/api/addresses';
+
+                const method = editingAddressId ? 'PUT' : 'POST';
+
+                const response = await fetch(url, {
+                    method,
+                    headers: {
+                        'Authorization': `Bearer ${localStorage.getItem('auth_token')}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(formData)
+                });
+
+                if (response.ok) {
+                    closeAddressModal();
+                    loadAddresses();
+                    showAlert(editingAddressId ? '✅ Endereço atualizado!' : '✅ Endereço adicionado!', 'success');
+                } else {
+                    const err = await response.json();
+                    showAlert(`❌ ${err.error}`, 'error');
+                }
+            } catch (err) {
+                showAlert('❌ Erro ao salvar endereço', 'error');
+            }
+        }
+
+        async function setDefault(addressId) {
+            try {
+                const response = await fetch(`/api/addresses/${addressId}/default`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
+                    }
+                });
+
+                if (response.ok) {
+                    loadAddresses();
+                    showAlert('✅ Endereço padrão atualizado!', 'success');
+                } else {
+                    showAlert('❌ Erro ao definir endereço padrão', 'error');
+                }
+            } catch (err) {
+                showAlert('❌ Erro', 'error');
+            }
+        }
+
+        async function deleteAddress(addressId) {
+            if (!confirm('Tem certeza que deseja excluir este endereço?')) return;
+
+            try {
+                const response = await fetch(`/api/addresses/${addressId}`, {
+                    method: 'DELETE',
+                    headers: {
+                        'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
+                    }
+                });
+
+                if (response.ok) {
+                    loadAddresses();
+                    showAlert('✅ Endereço excluído!', 'success');
+                } else {
+                    showAlert('❌ Erro ao excluir', 'error');
+                }
+            } catch (err) {
+                showAlert('❌ Erro', 'error');
+            }
+        }
+
+        function showAlert(message, type) {
+            const alertDiv = document.createElement('div');
+            alertDiv.className = type;
+            alertDiv.textContent = message;
+            document.getElementById('alertsContainer').appendChild(alertDiv);
+            setTimeout(() => alertDiv.remove(), 4000);
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        // Initialize
+        loadAddresses();
+    </script>
+</body>
+</html>

@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="CDM STORES — Eletrônicos premium com entrega rápida, pagamento seguro e rastreio profissional. Fones, carregadores, cabos e mais.">
+    <meta property="og:title" content="CDM STORES — Eletrônicos Premium">
+    <meta property="og:description" content="Produtos premium com entrega rápida, segura e rastreio profissional.">
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://cdmstores.com/">
+    <link rel="canonical" href="https://cdmstores.com/">
+    <title>CDM STORES — Eletrônicos Premium</title>
+
+    <link rel="stylesheet" href="css/global.css">
+    <link rel="stylesheet" href="css/mobile.css">
+</head>
+
+<body>
+
+    <!-- BARRA PROMOCIONAL -->
+    <div class="promo-bar">
+        <p>🚚 Frete Grátis para compras acima de R$&nbsp;199 &nbsp;·&nbsp; 🔒 Pagamento 100% Seguro &nbsp;·&nbsp; ↩️ Troca fácil em 30 dias</p>
+    </div>
+
+    <!-- HEADER -->
+    <header class="header" id="site-header">
+
+        <!-- MENU ESQUERDA -->
+        <div class="left-area">
+            <nav class="menu" aria-label="Navegação principal">
+                <a href="index.html" data-i18n="nav.home">Início</a>
+                <a href="#produtos" data-i18n="nav.products">Produtos</a>
+                <a href="pages/rastreio.html" data-i18n="nav.track">Rastreio</a>
+                <button id="menu-cart-btn" class="menu-cart-btn" aria-label="Abrir carrinho de compras">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg>
+                    <span id="menu-cart-count" class="cart-badge-nav">0</span>
+                </button>
+            </nav>
+        </div>
+
+        <!-- LOGO CENTRAL -->
+        <div class="logo-area">
+            <a href="index.html" aria-label="CDM STORES - Ir para página inicial">
+                <img src="./assets/logo.png" class="logo" alt="CDM STORES">
+            </a>
+        </div>
+
+        <!-- SELETOR DE IDIOMA -->
+        <div class="right-area">
+            <div class="lang-selector" role="group" aria-label="Selecionar idioma">
+                <button class="lang-btn active" data-lang="pt" title="Português (BR)" aria-pressed="true">
+                    <img src="./assets/br.png" alt="Português" width="24" height="24">
+                </button>
+                <button class="lang-btn" data-lang="en" title="English" aria-pressed="false">
+                    <img src="./assets/us.png" alt="English" width="24" height="24">
+                </button>
+                <button class="lang-btn" data-lang="es" title="Español" aria-pressed="false">
+                    <img src="./assets/es.png" alt="Español" width="24" height="24">
+                </button>
+            </div>
+        </div>
+
+    </header>
+
+    <!-- MODAL DO CARRINHO -->
+    <div id="cart-modal" class="cart-modal" role="dialog" aria-modal="true" aria-label="Carrinho de compras">
+        <div class="cart-modal-content">
+            <div class="cart-modal-header">
+                <h2 data-i18n="cart.my">Meu Carrinho</h2>
+                <button class="cart-modal-close" onclick="toggleCartModal()" aria-label="Fechar carrinho">&times;</button>
+            </div>
+            <div class="cart-modal-body">
+                <div id="cart-items-list">
+                    <p class="cart-empty" data-i18n="cart.empty">Carrinho vazio</p>
+                </div>
+            </div>
+            <div class="cart-modal-footer">
+                <div class="cart-coupon">
+                    <input type="text" id="coupon-input" data-i18n-placeholder="cart.coupon" placeholder="Código do cupom" maxlength="20" aria-label="Código do cupom">
+                    <button onclick="aplicarCupom()" class="btn-coupon" data-i18n="cart.apply">Aplicar</button>
+                </div>
+                <div class="cart-total">
+                    <div class="cart-total-row">
+                        <span data-i18n="cart.subtotal">Subtotal</span>
+                        <strong>R$ <span id="cart-subtotal">0.00</span></strong>
+                    </div>
+                    <div class="cart-total-row discount-row" id="discount-info" style="display:none;">
+                        <span data-i18n="cart.discount">Desconto</span>
+                        <strong class="text-success">-R$ <span id="cart-discount">0.00</span></strong>
+                    </div>
+                    <div class="cart-total-row">
+                        <span data-i18n="cart.shipping">Frete</span>
+                        <strong>R$ 15,00</strong>
+                    </div>
+                    <div class="cart-total-row cart-grand-total">
+                        <span data-i18n="cart.total">Total</span>
+                        <strong>R$ <span id="cart-total-amount">15.00</span></strong>
+                    </div>
+                </div>
+                <a href="pages/checkout.html" class="btn-checkout">
+                    Finalizar Compra
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="9 18 15 12 9 6"/></svg>
+                </a>
+            </div>
+        </div>
+    </div>
+    <div id="cart-overlay" class="cart-overlay" onclick="toggleCartModal()"></div>
+
+    <!-- HERO -->
+    <section class="hero" aria-label="Destaque principal">
+        <div class="hero-content">
+            <span class="hero-eyebrow">Eletrônicos Premium</span>
+            <h1 data-i18n="hero.title">CDM STORES</h1>
+            <p data-i18n="hero.subtitle">Produtos de alta qualidade com entrega rápida, pagamento seguro e rastreio profissional.</p>
+            <div class="hero-actions">
+                <a href="#produtos" class="btn-hero" data-i18n="nav.products">Ver Produtos</a>
+                <a href="pages/rastreio.html" class="btn-hero-outline" data-i18n="nav.track">Rastrear Pedido</a>
+            </div>
+            <div class="hero-trust">
+                <span>✓ Entrega em 3–7 dias</span>
+                <span>✓ Pagamento seguro</span>
+                <span>✓ Troca em 30 dias</span>
+            </div>
+        </div>
+    </section>
+
+    <!-- CATEGORIAS RÁPIDAS -->
+    <section class="categories-strip" aria-label="Categorias em destaque">
+        <div class="categories-inner">
+            <a href="#produtos" class="cat-chip">🎧 Áudio</a>
+            <a href="#produtos" class="cat-chip">⚡ Carregadores</a>
+            <a href="#produtos" class="cat-chip">🔌 Cabos</a>
+            <a href="#produtos" class="cat-chip">📱 Acessórios</a>
+        </div>
+    </section>
+
+    <!-- PRODUTOS -->
+    <section id="produtos" class="produtos" aria-label="Catálogo de produtos">
+        <div class="section-header">
+            <h2 data-i18n="products.title">Nossos Produtos</h2>
+            <p class="section-subtitle">Qualidade garantida, preços justos e envio rápido.</p>
+        </div>
+
+        <div class="grid-produtos">
+
+            <!-- PRODUTO 1 -->
+            <article class="card">
+                <div class="card-badge badge-new">Novo</div>
+                <div class="card-img-wrap">
+                    <svg class="card-img" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                      <rect width="200" height="200" fill="#e8f4f8"/>
+                      <circle cx="100" cy="80" r="35" fill="#2196F3"/>
+                      <path d="M 70 100 Q 70 120 80 130 Q 70 135 60 130 Q 50 120 50 100" fill="#2196F3"/>
+                      <path d="M 130 100 Q 130 120 120 130 Q 130 135 140 130 Q 150 120 150 100" fill="#2196F3"/>
+                      <rect x="85" y="130" width="30" height="40" rx="5" fill="#2196F3"/>
+                    </svg>
+                </div>
+                <div class="card-body">
+                    <h3 data-i18n="products.p1.title">Fone Bluetooth</h3>
+                    <p data-i18n="products.p1.desc">Fone wireless de alta qualidade</p>
+                    <div class="card-rating" aria-label="Avaliação: 4.5 de 5 estrelas">
+                        <span class="stars" aria-hidden="true">★★★★½</span>
+                        <span class="rating-count">(128)</span>
+                    </div>
+                    <div class="card-price-row">
+                        <span class="card-price-old">R$ 129,90</span>
+                        <span class="card-price">R$ 89,90</span>
+                    </div>
+                    <button class="btn-card" data-i18n="products.buy" onclick="cdmStore.adicionarCarrinho(1, 'Fone Bluetooth', 89.90)">
+                        Adicionar ao Carrinho
+                    </button>
+                </div>
+            </article>
+
+            <!-- PRODUTO 2 -->
+            <article class="card">
+                <div class="card-badge badge-sale">-23%</div>
+                <div class="card-img-wrap">
+                    <svg class="card-img" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                      <rect width="200" height="200" fill="#fff3e0"/>
+                      <rect x="60" y="40" width="80" height="120" rx="8" fill="#FF9800"/>
+                      <rect x="70" y="50" width="60" height="80" fill="#FFE0B2"/>
+                      <circle cx="100" cy="150" r="8" fill="#FF9800"/>
+                      <rect x="95" y="20" width="10" height="15" fill="#FF9800"/>
+                    </svg>
+                </div>
+                <div class="card-body">
+                    <h3 data-i18n="products.p2.title">Carregador USB-C</h3>
+                    <p data-i18n="products.p2.desc">Carregador rápido 65W</p>
+                    <div class="card-rating" aria-label="Avaliação: 4.8 de 5 estrelas">
+                        <span class="stars" aria-hidden="true">★★★★★</span>
+                        <span class="rating-count">(256)</span>
+                    </div>
+                    <div class="card-price-row">
+                        <span class="card-price-old">R$ 64,90</span>
+                        <span class="card-price">R$ 49,90</span>
+                    </div>
+                    <button class="btn-card" data-i18n="products.buy" onclick="cdmStore.adicionarCarrinho(2, 'Carregador USB-C', 49.90)">
+                        Adicionar ao Carrinho
+                    </button>
+                </div>
+            </article>
+
+            <!-- PRODUTO 3 -->
+            <article class="card">
+                <div class="card-img-wrap">
+                    <svg class="card-img" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                      <rect width="200" height="200" fill="#f3e5f5"/>
+                      <line x1="50" y1="100" x2="150" y2="100" stroke="#9C27B0" stroke-width="12" stroke-linecap="round"/>
+                      <circle cx="50" cy="100" r="18" fill="#9C27B0"/>
+                      <path d="M 145 85 L 165 70 L 155 100 L 165 130 L 145 115" fill="#9C27B0"/>
+                    </svg>
+                </div>
+                <div class="card-body">
+                    <h3 data-i18n="products.p3.title">Cabo Lightning</h3>
+                    <p data-i18n="products.p3.desc">Cabo original certificado</p>
+                    <div class="card-rating" aria-label="Avaliação: 4.6 de 5 estrelas">
+                        <span class="stars" aria-hidden="true">★★★★½</span>
+                        <span class="rating-count">(87)</span>
+                    </div>
+                    <div class="card-price-row">
+                        <span class="card-price">R$ 29,90</span>
+                    </div>
+                    <button class="btn-card" data-i18n="products.buy" onclick="cdmStore.adicionarCarrinho(3, 'Cabo Lightning', 29.90)">
+                        Adicionar ao Carrinho
+                    </button>
+                </div>
+            </article>
+
+        </div>
+    </section>
+
+    <!-- FAIXA DE CONFIANÇA -->
+    <section class="trust-strip" aria-label="Diferenciais CDM STORES">
+        <div class="trust-inner">
+            <div class="trust-item">
+                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="1" y="3" width="15" height="13"/><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg>
+                <div>
+                    <strong>Frete Rápido</strong>
+                    <span>Entrega em 3–7 dias úteis</span>
+                </div>
+            </div>
+            <div class="trust-item">
+                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                <div>
+                    <strong>Pagamento Seguro</strong>
+                    <span>SSL · Stripe · PCI-DSS</span>
+                </div>
+            </div>
+            <div class="trust-item">
+                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+                <div>
+                    <strong>Troca Fácil</strong>
+                    <span>30 dias sem complicação</span>
+                </div>
+            </div>
+            <div class="trust-item">
+                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+                <div>
+                    <strong>Suporte 24/7</strong>
+                    <span>Chat, email e WhatsApp</span>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- FOOTER -->
+    <footer class="footer" role="contentinfo">
+        <div class="footer-inner">
+            <div class="footer-brand">
+                <img src="./assets/logo.png" alt="CDM STORES" class="footer-logo">
+                <p>Eletrônicos premium com entrega rápida e suporte dedicado.</p>
+                <div class="footer-social">
+                    <a href="#" aria-label="Instagram CDM STORES" rel="noopener">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="2" width="20" height="20" rx="5" ry="5"/><path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"/><line x1="17.5" y1="6.5" x2="17.51" y2="6.5"/></svg>
+                    </a>
+                    <a href="#" aria-label="WhatsApp CDM STORES" rel="noopener">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>
+                    </a>
+                </div>
+            </div>
+            <div class="footer-links">
+                <h4>Loja</h4>
+                <ul>
+                    <li><a href="#produtos">Produtos</a></li>
+                    <li><a href="pages/rastreio.html">Rastrear Pedido</a></li>
+                    <li><a href="pages/checkout.html">Finalizar Compra</a></li>
+                </ul>
+            </div>
+            <div class="footer-links">
+                <h4>Ajuda</h4>
+                <ul>
+                    <li><a href="#">Política de Trocas</a></li>
+                    <li><a href="#">Termos de Uso</a></li>
+                    <li><a href="#">Privacidade (LGPD)</a></li>
+                </ul>
+            </div>
+            <div class="footer-payment">
+                <h4>Pagamento</h4>
+                <div class="payment-icons">
+                    <span class="pay-icon" title="Visa">VISA</span>
+                    <span class="pay-icon" title="Mastercard">MC</span>
+                    <span class="pay-icon" title="Pix">PIX</span>
+                    <span class="pay-icon" title="Boleto">BOL</span>
+                </div>
+                <p class="footer-security">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                    Site seguro · SSL 256-bit
+                </p>
+            </div>
+        </div>
+        <div class="footer-bottom">
+            <p data-i18n="footer">© 2026 CDM STORES · Todos os direitos reservados.</p>
+        </div>
+    </footer>
+
+    <script src="js/script.js" defer></script>
+    <script src="./frontend-integration.js" defer></script>
+    <script src="./js/auth.js" defer></script>
+    <script src="./js/chatbot.js" defer></script>
+</body>
+</html>
+

@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CDM STORES</title>
+
+    <link rel="stylesheet" href="css/global.css">
+    <link rel="stylesheet" href="css/desktop.css">
+    <link rel="stylesheet" href="css/mobile.css">
+</head>
+
+<body>
+
+    <!-- HEADER INVISÍVEL -->
+    <header class="header">
+
+        <!-- MENU ESQUERDA -->
+        <div class="left-area">
+            <nav class="menu">
+                <a href="index.html" data-i18n="nav.home">Início</a>
+                <a href="#produtos" data-i18n="nav.products">Produtos</a>
+                <a href="atendimento.html" data-i18n="nav.support">Atendimento</a>
+                <a href="pages/rastreio.html" data-i18n="nav.track">Rastreio</a>
+                <button id="menu-cart-btn" class="menu-cart-btn" title="Carrinho">🛒 <span id="menu-cart-count">0</span></button>
+            </nav>
+        </div>
+
+        <!-- LOGO CENTRAL -->
+        <div class="logo-area">
+            <img src="./assets/logo.png" class="logo" alt="CDM STORES">
+        </div>
+
+        <!-- BANDEIRAS DIREITA -->
+        <div class="right-area">
+            <div class="lang-selector">
+                <img src="./assets/br.png" alt="BR" data-lang="pt" title="Português">
+                <img src="./assets/us.png" alt="EN" data-lang="en" title="English">
+                <img src="./assets/es.png" alt="ES" data-lang="es" title="Español">
+            </div>
+        </div>
+
+    </header>
+
+    <!-- MODAL DO CARRINHO -->
+    <div id="cart-modal" class="cart-modal">
+        <div class="cart-modal-content">
+            <div class="cart-modal-header">
+                <h2 data-i18n="cart.my">🛒 Meu Carrinho</h2>
+                <button class="cart-modal-close" onclick="toggleCartModal()">&times;</button>
+            </div>
+            <div class="cart-modal-body">
+                <div id="cart-items-list">
+                    <p class="cart-empty" data-i18n="cart.empty">Carrinho vazio</p>
+                </div>
+            </div>
+            <div class="cart-modal-footer">
+                <div class="cart-coupon">
+                    <input type="text" id="coupon-input" data-i18n-placeholder="cart.coupon" placeholder="Código do cupom" maxlength="20">
+                    <button onclick="aplicarCupom()" class="btn-coupon" data-i18n="cart.apply">Aplicar</button>
+                </div>
+                <div class="cart-total">
+                    <p><span data-i18n="cart.subtotal">Subtotal</span>: <strong>R$ <span id="cart-subtotal">0.00</span></strong></p>
+                    <p id="discount-info" style="display: none; color: #4CAF50;"><span data-i18n="cart.discount">Desconto</span>: <strong>-R$ <span id="cart-discount">0.00</span></strong></p>
+                    <p><span data-i18n="cart.shipping">Frete</span>: <strong>R$ 15.00</strong></p>
+                    <h3><span data-i18n="cart.total">Total</span>: R$ <span id="cart-total-amount">15.00</span></h3>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- OVERLAY MODAL -->
+    <div id="cart-overlay" class="cart-overlay" onclick="toggleCartModal()"></div>
+
+    <!-- HERO / FUNDO PREMIUM LEVE -->
+    <section class="hero">
+        <div class="hero-overlay"></div>
+        <div class="hero-content">
+            <h1 data-i18n="hero.title">Bem-vindo à CDM STORES</h1>
+            <p data-i18n="hero.subtitle">Produtos premium com entrega rápida, segura e rastreio profissional.</p>
+
+    </section>
+
+    <!-- PRODUTOS -->
+    <section id="produtos" class="produtos">
+        <h2 data-i18n="products.title">Nossos Produtos</h2>
+
+        <div class="grid-produtos">
+
+            <div class="card">
+                <svg class="card-img" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+                  <rect width="200" height="200" fill="#e8f4f8"/>
+                  <circle cx="100" cy="80" r="35" fill="#2196F3"/>
+                  <path d="M 70 100 Q 70 120 80 130 Q 70 135 60 130 Q 50 120 50 100" fill="#2196F3"/>
+                  <path d="M 130 100 Q 130 120 120 130 Q 130 135 140 130 Q 150 120 150 100" fill="#2196F3"/>
+                  <rect x="85" y="130" width="30" height="40" rx="5" fill="#2196F3"/>
+                </svg>
+                <h3 data-i18n="products.p1.title">Fone Bluetooth</h3>
+                <p data-i18n="products.p1.desc">Fone wireless de alta qualidade</p>
+                <button class="btn-card" data-i18n="products.buy" onclick="cdmStore.adicionarCarrinho(1, 'Fone Bluetooth', 89.90)">Adicionar ao Carrinho</button>
+            </div>
+
+            <div class="card">
+                <svg class="card-img" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+                  <rect width="200" height="200" fill="#fff3e0"/>
+                  <rect x="60" y="40" width="80" height="120" rx="8" fill="#FF9800"/>
+                  <rect x="70" y="50" width="60" height="80" fill="#FFE0B2"/>
+                  <circle cx="100" cy="150" r="8" fill="#FF9800"/>
+                  <rect x="95" y="20" width="10" height="15" fill="#FF9800"/>
+                </svg>
+                <h3 data-i18n="products.p2.title">Carregador USB-C</h3>
+                <p data-i18n="products.p2.desc">Carregador rápido 65W</p>
+                <button class="btn-card" data-i18n="products.buy" onclick="cdmStore.adicionarCarrinho(2, 'Carregador USB-C', 49.90)">Adicionar ao Carrinho</button>
+            </div>
+
+            <div class="card">
+                <svg class="card-img" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+                  <rect width="200" height="200" fill="#f3e5f5"/>
+                  <line x1="50" y1="100" x2="150" y2="100" stroke="#9C27B0" stroke-width="12" stroke-linecap="round"/>
+                  <circle cx="50" cy="100" r="18" fill="#9C27B0"/>
+                  <path d="M 145 85 L 165 70 L 155 100 L 165 130 L 145 115" fill="#9C27B0"/>
+                </svg>
+                <h3 data-i18n="products.p3.title">Cabo Lightning</h3>
+                <p data-i18n="products.p3.desc">Cabo original certificado</p>
+                <button class="btn-card" data-i18n="products.buy" onclick="cdmStore.adicionarCarrinho(3, 'Cabo Lightning', 29.90)">Adicionar ao Carrinho</button>
+            </div>
+
+        </div>
+    </section>
+
+    <footer class="footer">
+        <p data-i18n="footer">© 2026 CDM STORES · Todos os direitos reservados.</p>
+    </footer>
+
+    <script src="js/script.js"></script>
+    <script src="./frontend-integration.js"></script>
+    <script src="./js/auth.js"></script>
+    <script src="./js/chatbot.js"></script>
+</body>
+</html>

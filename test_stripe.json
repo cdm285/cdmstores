@@ -1,0 +1,7 @@
+{
+  "orderId": 2,
+  "items": [
+    {"product_id": 1, "quantity": 2, "price": 89.90}
+  ],
+  "total": 194.80
+}

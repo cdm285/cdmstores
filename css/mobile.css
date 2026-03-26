@@ -1,0 +1,182 @@
+/* ============================================================
+   CDM STORES — Responsive Styles (Mobile-First Overrides)
+   Versão 2.0
+   ============================================================ */
+
+/* ===== TABLET: até 1024px ===== */
+@media (max-width: 1024px) {
+    .trust-inner {
+        grid-template-columns: repeat(2, 1fr);
+    }
+
+    .footer-inner {
+        grid-template-columns: 1fr 1fr;
+        gap: 32px;
+    }
+
+    .footer-brand {
+        grid-column: 1 / -1;
+    }
+}
+
+/* ===== TABLET PEQUENO: até 900px ===== */
+@media (max-width: 900px) {
+    .grid-produtos {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+
+/* ===== MOBILE: até 768px ===== */
+@media (max-width: 768px) {
+
+    /* --- HEADER MOBILE --- */
+    :root {
+        --header-height: 60px;
+        --promo-height: 36px;
+    }
+
+    .header {
+        padding: 0 16px;
+        height: var(--header-height);
+        justify-content: space-between;
+    }
+
+    /* Logo centralizada absoluta: manter comportamento */
+    .logo-area {
+        position: absolute;
+        left: 50%;
+        transform: translateX(-50%);
+    }
+
+    .logo {
+        height: 34px;
+    }
+
+    /* Menu mobile: esconder texto, manter carrinho */
+    .menu a[data-i18n="nav.home"] {
+        display: none;
+    }
+
+    .menu {
+        gap: 14px;
+    }
+
+    .menu a {
+        font-size: 0.82rem;
+    }
+
+    .lang-btn img {
+        width: 22px;
+        height: 22px;
+    }
+
+    /* --- BARRA PROMO --- */
+    .promo-bar {
+        font-size: 0.72rem;
+    }
+
+    /* --- HERO MOBILE --- */
+    .hero {
+        padding: 48px 20px 56px;
+        min-height: auto;
+    }
+
+    .hero h1 {
+        font-size: 2rem;
+    }
+
+    .hero p {
+        font-size: 0.95rem;
+    }
+
+    .hero-trust {
+        gap: 12px;
+    }
+
+    .hero-trust span {
+        font-size: 0.78rem;
+    }
+
+    /* --- CATEGORIAS --- */
+    .categories-inner {
+        padding: 0 16px;
+    }
+
+    /* --- PRODUTOS MOBILE --- */
+    .produtos {
+        padding: 40px 16px 56px;
+    }
+
+    .section-header h2 {
+        font-size: 1.5rem;
+    }
+
+    .grid-produtos {
+        grid-template-columns: 1fr;
+        gap: 16px;
+    }
+
+    /* --- CONFIANÇA MOBILE --- */
+    .trust-inner {
+        grid-template-columns: 1fr 1fr;
+        gap: 20px;
+    }
+
+    .trust-strip {
+        padding: 28px 16px;
+    }
+
+    /* --- FOOTER MOBILE --- */
+    .footer-inner {
+        grid-template-columns: 1fr;
+        gap: 28px;
+        padding: 40px 20px 28px;
+    }
+
+    .footer-brand p {
+        max-width: 100%;
+    }
+
+    /* --- CART MODAL MOBILE --- */
+    .cart-modal {
+        width: 100%;
+        right: -100%;
+    }
+
+    .cart-modal.active {
+        right: 0;
+    }
+
+    .cart-modal-footer {
+        position: sticky;
+        bottom: 0;
+    }
+
+    /* --- CHECKOUT MOBILE --- */
+    .checkout {
+        padding: 32px 16px;
+    }
+
+    .checkout-card {
+        padding: 24px 20px;
+    }
+}
+
+/* ===== MOBILE PEQUENO: até 480px ===== */
+@media (max-width: 480px) {
+    .trust-inner {
+        grid-template-columns: 1fr;
+    }
+
+    .hero-actions {
+        flex-direction: column;
+        align-items: center;
+    }
+
+    .btn-hero,
+    .btn-hero-outline {
+        width: 100%;
+        max-width: 280px;
+        justify-content: center;
+    }
+}
