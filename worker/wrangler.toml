@@ -4,10 +4,13 @@ compatibility_date = "2024-12-01"
 compatibility_flags = ["nodejs_compat"]
 
 # Banco de dados D1
+# IMPORTANTE: database_id foi removido do repositório por segurança.
+# Configure via: wrangler d1 list  (para obter o ID)
+# ou defina a variável de ambiente CLOUDFLARE_D1_DATABASE_ID antes de fazer deploy.
 [[d1_databases]]
 binding = "DB"
 database_name = "cdmstores"
-database_id = "a22156d2-037a-400d-9408-d064020b4ca8"
+database_id = "CONFIGURE_VIA_WRANGLER_SECRET"
 
 # Variáveis de ambiente
 [env.production]
@@ -17,10 +20,17 @@ vars = { ENVIRONMENT = "production" }
 vars = { ENVIRONMENT = "development" }
 
 # Variáveis secretas (use wrangler secret put)
+# wrangler secret put JWT_SECRET
 # wrangler secret put STRIPE_SECRET_KEY
 # wrangler secret put STRIPE_WEBHOOK_SECRET
+# wrangler secret put STRIPE_PUBLISHABLE_KEY
 # wrangler secret put CJ_API_KEY
-# wrangler secret put CJ_API_SECRET
+# wrangler secret put RESEND_API_KEY
+# wrangler secret put APP_URL
+# wrangler secret put GOOGLE_CLIENT_ID
+# wrangler secret put GOOGLE_CLIENT_SECRET
+# wrangler secret put FACEBOOK_APP_ID
+# wrangler secret put FACEBOOK_APP_SECRET
 
 # CORS para seu domínio
 [[routes]]

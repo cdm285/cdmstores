@@ -429,11 +429,15 @@ class ChatBot {
       // 8. WhatsApp
       case 'whatsapp_link':
         if (data.link) {
-          this.addMessageWithLink(
-            '💬 Você será redirecionado para WhatsApp.',
-            data.link,
-            'Abrir WhatsApp →'
-          );
+          // Validar que o link é apenas https:// ou https://wa.me (prevenir javascript: injection)
+          const safeLink = /^https:\/\/(wa\.me|api\.whatsapp\.com)/.test(data.link) ? data.link : null;
+          if (safeLink) {
+            this.addMessageWithLink(
+              '💬 Você será redirecionado para WhatsApp.',
+              safeLink,
+              'Abrir WhatsApp →'
+            );
+          }
         }
         break;
 

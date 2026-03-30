@@ -6,6 +6,11 @@ const CORS_HEADERS = {
   'Access-Control-Allow-Methods': 'GET, POST, DELETE, OPTIONS',
   'Access-Control-Allow-Headers': 'Content-Type, Authorization',
   'Content-Type': 'application/json',
+  // Security headers
+  'Strict-Transport-Security': 'max-age=31536000; includeSubDomains',
+  'X-Content-Type-Options': 'nosniff',
+  'X-Frame-Options': 'DENY',
+  'Referrer-Policy': 'no-referrer',
 };
 
 interface Env {
@@ -29,6 +34,9 @@ function requireJWTSecret(env: Env): string {
   if (!env.JWT_SECRET) throw new Error('JWT_SECRET não configurado');
   return env.JWT_SECRET;
 }
+
+/** Email validation regex */
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 
 /**
  * Hash de senha usando PBKDF2 com salt aleatório
@@ -144,25 +152,23 @@ async function sendEmail(env: Env, to: string, subject: string, html: string): P
 }
 
 /**
- * Gerar TOTP Secret (base32)
+ * Gerar TOTP Secret (base32) com entropia criptográfica
  */
 function generateTOTPSecret(): string {
   const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
-  let secret = '';
-  for (let i = 0; i < 32; i++) {
-    secret += chars.charAt(Math.floor(Math.random() * chars.length));
-  }
-  return secret;
+  const bytes = crypto.getRandomValues(new Uint8Array(32));
+  return Array.from(bytes).map(b => chars[b % chars.length]).join('');
 }
 
 /**
- * Gerar códigos de backup (para 2FA)
+ * Gerar códigos de backup com entropia criptográfica
  */
 function generateBackupCodes(count: number = 10): string[] {
-  const codes = [];
+  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+  const codes: string[] = [];
   for (let i = 0; i < count; i++) {
-    const code = Math.random().toString(36).substring(2, 10).toUpperCase();
-    codes.push(code);
+    const bytes = crypto.getRandomValues(new Uint8Array(8));
+    codes.push(Array.from(bytes).map(b => chars[b % chars.length]).join(''));
   }
   return codes;
 }
@@ -206,7 +212,24 @@ function json(data: any, status = 200) {
   });
 }
 
+/** Auth helper — extracts and verifies Bearer token from request */
+type AuthResult = { error: Response } | { userId: number; email: string };
+async function extractAuth(request: Request, env: Env): Promise<AuthResult> {
+  const authHeader = request.headers.get('Authorization');
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return { error: json({ success: false, error: 'Token não fornecido' }, 401) };
+  }
+  const token = authHeader.substring(7);
+  const verified = await verifyJWT(token, requireJWTSecret(env));
+  if (!verified.valid) {
+    return { error: json({ success: false, error: 'Token inválido' }, 401) };
+  }
+  return { userId: verified.userId!, email: verified.email! };
+}
+
 // Rate limiter simples por IP (best-effort, por isolate)
+// NOTA: Este rate limiter é in-memory e reseta quando o isolate é reiniciado.
+// Para produção com alta escala, use Cloudflare Rate Limiting via wrangler ou Durable Objects.
 const rateLimitMap = new Map<string, { count: number; resetAt: number }>();
 
 function checkRateLimit(ip: string, limit = 20, windowMs = 60000): boolean {
@@ -569,23 +592,45 @@ async function handleRequest(request: Request, env: Env) {
       const body = await request.json();
       const { customer_name, customer_email, items, total, shipping_cost } = body;
 
-      if (!customer_email || !items || !total) {
+      // Validar campos obrigatórios
+      if (!customer_email || !items || total === undefined) {
         return json({ success: false, error: 'Dados incompletos' }, 400);
+      }
+
+      // Validar formato de email
+      if (!EMAIL_RE.test(customer_email)) {
+        return json({ success: false, error: 'Email inválido' }, 400);
+      }
+
+      // Validar items
+      if (!Array.isArray(items) || items.length === 0) {
+        return json({ success: false, error: 'Carrinho vazio ou inválido' }, 400);
+      }
+
+      // Sanitizar strings
+      const safeName = String(customer_name || '').substring(0, 200);
+      const safeEmail = String(customer_email).substring(0, 320);
+      const safeTotal = Number(total);
+      const safeShipping = Number(shipping_cost) || 0;
+
+      if (isNaN(safeTotal) || safeTotal <= 0) {
+        return json({ success: false, error: 'Total inválido' }, 400);
       }
 
       const result = await env.DB.prepare(
         'INSERT INTO orders (customer_name, customer_email, total, shipping_cost, status, created_at, updated_at) VALUES (?, ?, ?, ?, "pending", datetime("now"), datetime("now"))'
-      ).bind(customer_name, customer_email, total, shipping_cost).run();
+      ).bind(safeName, safeEmail, safeTotal, safeShipping).run();
 
       const orderId = result.meta.last_row_id;
 
       for (const item of items) {
+        if (!item.product_id || !item.quantity || !item.price) continue;
         await env.DB.prepare(
           'INSERT INTO order_items (order_id, product_id, quantity, price) VALUES (?, ?, ?, ?)'
-        ).bind(orderId, item.product_id, item.quantity, item.price).run();
+        ).bind(orderId, Number(item.product_id), Number(item.quantity), Number(item.price)).run();
       }
 
-      return json({ success: true, order_id: orderId, total: total, status: 'pending' }, 201);
+      return json({ success: true, order_id: orderId, total: safeTotal, status: 'pending' }, 201);
     } catch (error: any) {
       return json({ success: false, error: error.message }, 500);
     }
@@ -613,7 +658,7 @@ async function handleRequest(request: Request, env: Env) {
     try {
       const code = path.replace('/api/tracking/', '');
       const order = await env.DB.prepare(
-        'SELECT id, customer_name, tracking_code, status, created_at, updated_at FROM orders WHERE tracking_code = ?'
+        'SELECT id, tracking_code, status, created_at, updated_at FROM orders WHERE tracking_code = ?'
       ).bind(code).first();
 
       if (!order) {
@@ -630,6 +675,11 @@ async function handleRequest(request: Request, env: Env) {
 
   // Registro de novo usuário
   if (path === '/api/auth/register' && request.method === 'POST') {
+    // Rate limiting para evitar spam de cadastros
+    const clientIp = request.headers.get('CF-Connecting-IP') || request.headers.get('X-Forwarded-For') || 'unknown';
+    if (!checkRateLimit(`register:${clientIp}`, 5, 60000)) {
+      return json({ success: false, error: 'Muitas tentativas. Aguarde um minuto.' }, 429);
+    }
     try {
       const { email, password, name } = await request.json();
 
@@ -638,13 +688,13 @@ async function handleRequest(request: Request, env: Env) {
       }
 
       // Validar email
-      if (!email.includes('@')) {
+      if (!EMAIL_RE.test(email)) {
         return json({ success: false, error: 'Email inválido' }, 400);
       }
 
       // Validar senha
-      if (password.length < 6) {
-        return json({ success: false, error: 'Senha deve ter no mínimo 6 caracteres' }, 400);
+      if (password.length < 8 || password.length > 128) {
+        return json({ success: false, error: 'Senha deve ter entre 8 e 128 caracteres' }, 400);
       }
 
       // Verificar se email já existe
@@ -702,6 +752,11 @@ async function handleRequest(request: Request, env: Env) {
 
   // Login
   if (path === '/api/auth/login' && request.method === 'POST') {
+    // Rate limiting para prevenir brute force
+    const clientIp = request.headers.get('CF-Connecting-IP') || request.headers.get('X-Forwarded-For') || 'unknown';
+    if (!checkRateLimit(`login:${clientIp}`, 5, 60000)) {
+      return json({ success: false, error: 'Muitas tentativas de login. Aguarde um minuto.' }, 429);
+    }
     try {
       const { email, password } = await request.json();
 
@@ -709,9 +764,9 @@ async function handleRequest(request: Request, env: Env) {
         return json({ success: false, error: 'Email e senha obrigatórios' }, 400);
       }
 
-      // Buscar usuário
+      // Buscar usuário incluindo dados de 2FA
       const user = await env.DB.prepare(
-        'SELECT id, email, name, password_hash, status FROM users WHERE email = ? LIMIT 1'
+        'SELECT id, email, name, password_hash, status, two_factor_enabled FROM users WHERE email = ? LIMIT 1'
       ).bind(email).first();
 
       if (!user) {
@@ -726,6 +781,16 @@ async function handleRequest(request: Request, env: Env) {
       const passwordMatch = await verifyPassword(password, user.password_hash);
       if (!passwordMatch) {
         return json({ success: false, error: 'Email ou senha incorretos' }, 401);
+      }
+
+      // Se 2FA está ativo, exigir verificação antes de emitir token completo
+      if (user.two_factor_enabled) {
+        return json({
+          success: true,
+          requires2FA: true,
+          userId: user.id,
+          message: 'Verificação em duas etapas necessária'
+        });
       }
 
       // Gerar token
@@ -759,21 +824,12 @@ async function handleRequest(request: Request, env: Env) {
   // Obter usuário atual
   if (path === '/api/auth/me' && request.method === 'GET') {
     try {
-      const authHeader = request.headers.get('Authorization');
-      if (!authHeader || !authHeader.startsWith('Bearer ')) {
-        return json({ success: false, error: 'Token não fornecido' }, 401);
-      }
-
-      const token = authHeader.substring(7);
-      const verified = await verifyJWT(token, requireJWTSecret(env));
-
-      if (!verified.valid) {
-        return json({ success: false, error: 'Token inválido' }, 401);
-      }
+      const auth = await extractAuth(request, env);
+      if ('error' in auth) return auth.error;
 
       const user = await env.DB.prepare(
         'SELECT id, email, name, phone, avatar_url, status, email_verified, created_at, last_login FROM users WHERE id = ? LIMIT 1'
-      ).bind(verified.userId).first();
+      ).bind(auth.userId).first();
 
       if (!user) {
         return json({ success: false, error: 'Usuário não encontrado' }, 404);
@@ -820,7 +876,7 @@ async function handleRequest(request: Request, env: Env) {
         return json({ success: false, error: 'Refresh token inválido' }, 401);
       }
 
-      // Verificar se sessão ainda existe
+      // Verificar se sessão ainda existe e refresh token não expirou
       const session = await env.DB.prepare(
         'SELECT refresh_expires_at FROM sessions WHERE refresh_token = ? LIMIT 1'
       ).bind(refreshToken).first();
@@ -829,8 +885,14 @@ async function handleRequest(request: Request, env: Env) {
         return json({ success: false, error: 'Sessão não encontrada' }, 401);
       }
 
+      // Verificar expiração do refresh token no banco
+      if (new Date(String(session.refresh_expires_at)) <= new Date()) {
+        await env.DB.prepare('DELETE FROM sessions WHERE refresh_token = ?').bind(refreshToken).run();
+        return json({ success: false, error: 'Refresh token expirado' }, 401);
+      }
+
       // Gerar novo token
-      const newToken = await generateJWT(verified.userId, verified.email, requireJWTSecret(env), 3600);
+      const newToken = await generateJWT(verified.userId!, verified.email!, requireJWTSecret(env), 3600);
 
       return json({ success: true, token: newToken });
     } catch (error: any) {
@@ -864,9 +926,21 @@ async function handleRequest(request: Request, env: Env) {
         'INSERT INTO password_resets (user_id, token, expires_at, created_at) VALUES (?, ?, ?, datetime("now"))'
       ).bind(user.id, resetToken, expiresAt).run();
 
-      // TODO: Enviar email com link de reset
-      // const resetLink = `https://cdmstores.com/reset-password?token=${resetToken}`;
-      // await sendEmail(email, 'Reset de Senha', `Clique aqui: ${resetLink}`);
+      // Enviar email com link de reset
+      const resetLink = `${env.APP_URL || 'https://cdmstores.com'}/reset-password?token=${resetToken}`;
+      const subject = 'Redefinição de Senha - CDM Stores';
+      const html = `
+        <h2>Redefinição de Senha 🔒</h2>
+        <p>Recebemos uma solicitação para redefinir a senha da sua conta CDM Stores.</p>
+        <p>Clique no botão abaixo para criar uma nova senha:</p>
+        <p><a href="${resetLink}" style="background: #00AFFF; color: white; padding: 12px 24px; border-radius: 6px; text-decoration: none; display: inline-block;">🔑 Redefinir Senha</a></p>
+        <p>Ou copie e cole este link:</p>
+        <p><code>${resetLink}</code></p>
+        <p><strong>Este link expira em 1 hora.</strong></p>
+        <hr />
+        <p style="color: #999; font-size: 12px;">Se você não solicitou a redefinição de senha, ignore este email. Sua senha não será alterada.</p>
+      `;
+      await sendEmail(env, email, subject, html);
 
       return json({ success: true, message: 'Link de reset enviado para o email' });
     } catch (error: any) {
@@ -883,12 +957,9 @@ async function handleRequest(request: Request, env: Env) {
         return json({ success: false, error: 'Token e nova senha obrigatórios' }, 400);
       }
 
-      if (newPassword.length < 6) {
-        return json({ success: false, error: 'Senha deve ter no mínimo 6 caracteres' }, 400);
+      if (newPassword.length < 8 || newPassword.length > 128) {
+        return json({ success: false, error: 'Senha deve ter entre 8 e 128 caracteres' }, 400);
       }
-
-      // Verificar token
-      const resetRecord = await env.DB.prepare(
         'SELECT user_id, expires_at, used FROM password_resets WHERE token = ? LIMIT 1'
       ).bind(token).first();
 
@@ -911,9 +982,9 @@ async function handleRequest(request: Request, env: Env) {
         'UPDATE users SET password_hash = ?, updated_at = datetime("now") WHERE id = ?'
       ).bind(passwordHash, resetRecord.user_id).run();
 
-      // Marcar token como usado
+      // Deletar token após uso (HIGH-006)
       await env.DB.prepare(
-        'UPDATE password_resets SET used = 1 WHERE token = ?'
+        'DELETE FROM password_resets WHERE token = ?'
       ).bind(token).run();
 
       return json({ success: true, message: 'Senha redefinida com sucesso!' });
@@ -925,27 +996,18 @@ async function handleRequest(request: Request, env: Env) {
   // ===== UPDATE PERFIL =====
   if (path === '/api/user/profile' && request.method === 'PUT') {
     try {
-      const authHeader = request.headers.get('Authorization');
-      if (!authHeader || !authHeader.startsWith('Bearer ')) {
-        return json({ success: false, error: 'Token não fornecido' }, 401);
-      }
-
-      const token = authHeader.substring(7);
-      const verified = await verifyJWT(token, requireJWTSecret(env));
-
-      if (!verified.valid) {
-        return json({ success: false, error: 'Token inválido' }, 401);
-      }
+      const auth = await extractAuth(request, env);
+      if ('error' in auth) return auth.error;
 
       const { name, phone, avatar_url } = await request.json();
 
       await env.DB.prepare(
         'UPDATE users SET name = ?, phone = ?, avatar_url = ?, updated_at = datetime("now") WHERE id = ?'
-      ).bind(name || null, phone || null, avatar_url || null, verified.userId).run();
+      ).bind(name || null, phone || null, avatar_url || null, auth.userId).run();
 
       const user = await env.DB.prepare(
         'SELECT id, email, name, phone, avatar_url, status, email_verified, created_at, last_login FROM users WHERE id = ? LIMIT 1'
-      ).bind(verified.userId).first();
+      ).bind(auth.userId).first();
 
       return json({ ...user, success: true });
     } catch (error: any) {
@@ -956,17 +1018,8 @@ async function handleRequest(request: Request, env: Env) {
   // ===== CHANGE PASSWORD =====
   if (path === '/api/auth/change-password' && request.method === 'POST') {
     try {
-      const authHeader = request.headers.get('Authorization');
-      if (!authHeader || !authHeader.startsWith('Bearer ')) {
-        return json({ success: false, error: 'Token não fornecido' }, 401);
-      }
-
-      const token = authHeader.substring(7);
-      const verified = await verifyJWT(token, requireJWTSecret(env));
-
-      if (!verified.valid) {
-        return json({ success: false, error: 'Token inválido' }, 401);
-      }
+      const auth = await extractAuth(request, env);
+      if ('error' in auth) return auth.error;
 
       const { current_password, new_password } = await request.json();
 
@@ -974,13 +1027,13 @@ async function handleRequest(request: Request, env: Env) {
         return json({ success: false, error: 'Senhas obrigatórias' }, 400);
       }
 
-      if (new_password.length < 8) {
-        return json({ success: false, error: 'Nova senha deve ter no mínimo 8 caracteres' }, 400);
+      if (new_password.length < 8 || new_password.length > 128) {
+        return json({ success: false, error: 'Nova senha deve ter entre 8 e 128 caracteres' }, 400);
       }
 
       const user = await env.DB.prepare(
         'SELECT password_hash FROM users WHERE id = ? LIMIT 1'
-      ).bind(verified.userId).first();
+      ).bind(auth.userId).first();
 
       const passwordMatch = await verifyPassword(current_password, user.password_hash);
       if (!passwordMatch) {
@@ -990,7 +1043,7 @@ async function handleRequest(request: Request, env: Env) {
       const newHash = await hashPassword(new_password);
       await env.DB.prepare(
         'UPDATE users SET password_hash = ?, updated_at = datetime("now") WHERE id = ?'
-      ).bind(newHash, verified.userId).run();
+      ).bind(newHash, auth.userId).run();
 
       return json({ success: true, message: 'Senha alterada com sucesso!' });
     } catch (error: any) {
@@ -1001,21 +1054,18 @@ async function handleRequest(request: Request, env: Env) {
   // ===== GET ORDERS (FOR USER) =====
   if (path === '/api/orders/user' && request.method === 'GET') {
     try {
-      const authHeader = request.headers.get('Authorization');
-      if (!authHeader || !authHeader.startsWith('Bearer ')) {
-        return json({ success: false, error: 'Token não fornecido' }, 401);
-      }
+      const auth = await extractAuth(request, env);
+      if ('error' in auth) return auth.error;
 
-      const token = authHeader.substring(7);
-      const verified = await verifyJWT(token, requireJWTSecret(env));
-
-      if (!verified.valid) {
-        return json({ success: false, error: 'Token inválido' }, 401);
-      }
+      // Paginação
+      const pageParam = url.searchParams.get('page');
+      const page = Math.max(1, parseInt(pageParam || '1', 10));
+      const limit = 20;
+      const offset = (page - 1) * limit;
 
       const orders = await env.DB.prepare(
-        'SELECT id, customer_name, customer_email, total, status, shipping_cost, tracking_code, created_at, updated_at FROM orders WHERE customer_email = ? ORDER BY created_at DESC'
-      ).bind(verified.email).all();
+        'SELECT id, customer_name, customer_email, total, status, shipping_cost, tracking_code, created_at, updated_at FROM orders WHERE customer_email = ? ORDER BY created_at DESC LIMIT ? OFFSET ?'
+      ).bind(auth.email, limit, offset).all();
 
       // Carregar items para cada pedido
       const ordersWithItems = await Promise.all(
@@ -1038,7 +1088,7 @@ async function handleRequest(request: Request, env: Env) {
         })
       );
 
-      return json(ordersWithItems);
+      return json({ success: true, data: ordersWithItems, page, limit });
     } catch (error: any) {
       return json({ success: false, error: error.message }, 500);
     }
@@ -1048,21 +1098,12 @@ async function handleRequest(request: Request, env: Env) {
   // GET all addresses
   if (path === '/api/addresses' && request.method === 'GET') {
     try {
-      const authHeader = request.headers.get('Authorization');
-      if (!authHeader || !authHeader.startsWith('Bearer ')) {
-        return json({ success: false, error: 'Token não fornecido' }, 401);
-      }
-
-      const token = authHeader.substring(7);
-      const verified = await verifyJWT(token, requireJWTSecret(env));
-
-      if (!verified.valid) {
-        return json({ success: false, error: 'Token inválido' }, 401);
-      }
+      const auth = await extractAuth(request, env);
+      if ('error' in auth) return auth.error;
 
       const addresses = await env.DB.prepare(
         'SELECT id, label, name, phone, street, number, complement, city, state, zip, country, is_default, created_at FROM user_addresses WHERE user_id = ? ORDER BY is_default DESC, created_at DESC'
-      ).bind(verified.userId).all();
+      ).bind(auth.userId).all();
 
       return json(addresses.results);
     } catch (error: any) {
@@ -1073,17 +1114,8 @@ async function handleRequest(request: Request, env: Env) {
   // CREATE address
   if (path === '/api/addresses' && request.method === 'POST') {
     try {
-      const authHeader = request.headers.get('Authorization');
-      if (!authHeader || !authHeader.startsWith('Bearer ')) {
-        return json({ success: false, error: 'Token não fornecido' }, 401);
-      }
-
-      const token = authHeader.substring(7);
-      const verified = await verifyJWT(token, requireJWTSecret(env));
-
-      if (!verified.valid) {
-        return json({ success: false, error: 'Token inválido' }, 401);
-      }
+      const auth = await extractAuth(request, env);
+      if ('error' in auth) return auth.error;
 
       const { label, name, phone, street, number, complement, city, state, zip, country, is_default } = await request.json();
 
@@ -1095,12 +1127,12 @@ async function handleRequest(request: Request, env: Env) {
       if (is_default) {
         await env.DB.prepare(
           'UPDATE user_addresses SET is_default = 0 WHERE user_id = ?'
-        ).bind(verified.userId).run();
+        ).bind(auth.userId).run();
       }
 
       const result = await env.DB.prepare(
         'INSERT INTO user_addresses (user_id, label, name, phone, street, number, complement, city, state, zip, country, is_default, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime("now"))'
-      ).bind(verified.userId, label, name, phone, street, number, complement || null, city, state, zip, country, is_default ? 1 : 0).run();
+      ).bind(auth.userId, label, name, phone, street, number, complement || null, city, state, zip, country, is_default ? 1 : 0).run();
 
       const addressId = result.meta.last_row_id;
       const address = await env.DB.prepare(
@@ -1116,17 +1148,8 @@ async function handleRequest(request: Request, env: Env) {
   // UPDATE address
   if (path.match(/^\/api\/addresses\/[a-f0-9-]+$/) && request.method === 'PUT') {
     try {
-      const authHeader = request.headers.get('Authorization');
-      if (!authHeader || !authHeader.startsWith('Bearer ')) {
-        return json({ success: false, error: 'Token não fornecido' }, 401);
-      }
-
-      const token = authHeader.substring(7);
-      const verified = await verifyJWT(token, requireJWTSecret(env));
-
-      if (!verified.valid) {
-        return json({ success: false, error: 'Token inválido' }, 401);
-      }
+      const auth = await extractAuth(request, env);
+      if ('error' in auth) return auth.error;
 
       const addressId = path.split('/').pop();
       const { label, name, phone, street, number, complement, city, state, zip, country, is_default } = await request.json();
@@ -1136,7 +1159,7 @@ async function handleRequest(request: Request, env: Env) {
         'SELECT user_id FROM user_addresses WHERE id = ?'
       ).bind(addressId).first();
 
-      if (!address || address.user_id !== verified.userId) {
+      if (!address || Number(address.user_id) !== auth.userId) {
         return json({ success: false, error: 'Endereço não encontrado' }, 404);
       }
 
@@ -1144,7 +1167,7 @@ async function handleRequest(request: Request, env: Env) {
       if (is_default) {
         await env.DB.prepare(
           'UPDATE user_addresses SET is_default = 0 WHERE user_id = ?'
-        ).bind(verified.userId).run();
+        ).bind(auth.userId).run();
       }
 
       await env.DB.prepare(
@@ -1164,17 +1187,8 @@ async function handleRequest(request: Request, env: Env) {
   // DELETE address
   if (path.match(/^\/api\/addresses\/[a-f0-9-]+$/) && request.method === 'DELETE') {
     try {
-      const authHeader = request.headers.get('Authorization');
-      if (!authHeader || !authHeader.startsWith('Bearer ')) {
-        return json({ success: false, error: 'Token não fornecido' }, 401);
-      }
-
-      const token = authHeader.substring(7);
-      const verified = await verifyJWT(token, requireJWTSecret(env));
-
-      if (!verified.valid) {
-        return json({ success: false, error: 'Token inválido' }, 401);
-      }
+      const auth = await extractAuth(request, env);
+      if ('error' in auth) return auth.error;
 
       const addressId = path.split('/').pop();
 
@@ -1183,7 +1197,7 @@ async function handleRequest(request: Request, env: Env) {
         'SELECT user_id, is_default FROM user_addresses WHERE id = ?'
       ).bind(addressId).first();
 
-      if (!address || address.user_id !== verified.userId) {
+      if (!address || Number(address.user_id) !== auth.userId) {
         return json({ success: false, error: 'Endereço não encontrado' }, 404);
       }
 
@@ -1200,17 +1214,8 @@ async function handleRequest(request: Request, env: Env) {
   // SET address as default
   if (path.match(/^\/api\/addresses\/[a-f0-9-]+\/default$/) && request.method === 'POST') {
     try {
-      const authHeader = request.headers.get('Authorization');
-      if (!authHeader || !authHeader.startsWith('Bearer ')) {
-        return json({ success: false, error: 'Token não fornecido' }, 401);
-      }
-
-      const token = authHeader.substring(7);
-      const verified = await verifyJWT(token, requireJWTSecret(env));
-
-      if (!verified.valid) {
-        return json({ success: false, error: 'Token inválido' }, 401);
-      }
+      const auth = await extractAuth(request, env);
+      if ('error' in auth) return auth.error;
 
       const addressId = path.split('/').slice(0, -1).pop();
 
@@ -1219,14 +1224,14 @@ async function handleRequest(request: Request, env: Env) {
         'SELECT user_id FROM user_addresses WHERE id = ?'
       ).bind(addressId).first();
 
-      if (!address || address.user_id !== verified.userId) {
+      if (!address || Number(address.user_id) !== auth.userId) {
         return json({ success: false, error: 'Endereço não encontrado' }, 404);
       }
 
       // Remover default dos outros
       await env.DB.prepare(
         'UPDATE user_addresses SET is_default = 0 WHERE user_id = ?'
-      ).bind(verified.userId).run();
+      ).bind(auth.userId).run();
 
       // Marcar como default
       await env.DB.prepare(
@@ -1243,21 +1248,12 @@ async function handleRequest(request: Request, env: Env) {
   // Send verification email
   if (path === '/api/auth/send-verification-email' && request.method === 'POST') {
     try {
-      const authHeader = request.headers.get('Authorization');
-      if (!authHeader || !authHeader.startsWith('Bearer ')) {
-        return json({ success: false, error: 'Token não fornecido' }, 401);
-      }
-
-      const token = authHeader.substring(7);
-      const verified = await verifyJWT(token, requireJWTSecret(env));
-
-      if (!verified.valid) {
-        return json({ success: false, error: 'Token inválido' }, 401);
-      }
+      const auth = await extractAuth(request, env);
+      if ('error' in auth) return auth.error;
 
       const user = await env.DB.prepare(
         'SELECT id, email, email_verified FROM users WHERE id = ? LIMIT 1'
-      ).bind(verified.userId).first();
+      ).bind(auth.userId).first();
 
       if (!user) {
         return json({ success: false, error: 'Usuário não encontrado' }, 404);
@@ -1268,9 +1264,9 @@ async function handleRequest(request: Request, env: Env) {
       }
 
       // Gerar token de verificação (válido por 24 horas)
-      const verificationToken = await generateJWT(user.id, user.email, requireJWTSecret(env), 86400);
+      const verificationToken = await generateJWT(Number(user.id), String(user.email), requireJWTSecret(env), 86400);
 
-      // Salvar token no banco (pode reutilizar password_resets table)
+      // Salvar token no banco
       await env.DB.prepare(
         'INSERT INTO password_resets (user_id, token, expires_at, created_at) VALUES (?, ?, ?, datetime("now"))'
       ).bind(user.id, verificationToken, new Date(Date.now() + 86400 * 1000).toISOString()).run();
@@ -1376,9 +1372,11 @@ async function handleRequest(request: Request, env: Env) {
       }
 
       // Verificar se usuário existe
-      let user = await env.DB.prepare(
+      const existingUser = await env.DB.prepare(
         'SELECT id, email, name FROM users WHERE email = ? LIMIT 1'
       ).bind(googleUser.email).first();
+
+      let user = existingUser;
 
       // Se não existe, criar novo usuário
       if (!user) {
@@ -1394,8 +1392,8 @@ async function handleRequest(request: Request, env: Env) {
       }
 
       // Gerar token
-      const token = await generateJWT(user.id, user.email, requireJWTSecret(env), 3600);
-      const refreshToken = await generateJWT(user.id, user.email, requireJWTSecret(env), 86400 * 7);
+      const token = await generateJWT(Number(user.id), String(user.email), requireJWTSecret(env), 3600);
+      const refreshToken = await generateJWT(Number(user.id), String(user.email), requireJWTSecret(env), 86400 * 7);
 
       // Salvar sessão
       const expiresAt = new Date(Date.now() + 3600 * 1000).toISOString();
@@ -1416,7 +1414,7 @@ async function handleRequest(request: Request, env: Env) {
         user: { id: user.id, email: user.email, name: user.name },
         token,
         refreshToken,
-        isNewUser: !user.id
+        isNewUser: !existingUser
       });
     } catch (error: any) {
       return json({ success: false, error: error.message }, 500);
@@ -1453,9 +1451,11 @@ async function handleRequest(request: Request, env: Env) {
       }
 
       // Verificar se usuário existe
-      let user = await env.DB.prepare(
+      const existingFbUser = await env.DB.prepare(
         'SELECT id, email, name FROM users WHERE email = ? LIMIT 1'
       ).bind(facebookUser.email).first();
+
+      let user = existingFbUser;
 
       // Se não existe, criar novo usuário
       if (!user) {
@@ -1472,8 +1472,8 @@ async function handleRequest(request: Request, env: Env) {
       }
 
       // Gerar token
-      const token = await generateJWT(user.id, user.email, requireJWTSecret(env), 3600);
-      const refreshToken = await generateJWT(user.id, user.email, requireJWTSecret(env), 86400 * 7);
+      const token = await generateJWT(Number(user.id), String(user.email), requireJWTSecret(env), 3600);
+      const refreshToken = await generateJWT(Number(user.id), String(user.email), requireJWTSecret(env), 86400 * 7);
 
       // Salvar sessão
       const expiresAt = new Date(Date.now() + 3600 * 1000).toISOString();
@@ -1494,7 +1494,7 @@ async function handleRequest(request: Request, env: Env) {
         user: { id: user.id, email: user.email, name: user.name },
         token,
         refreshToken,
-        isNewUser: !user.id
+        isNewUser: !existingFbUser
       });
     } catch (error: any) {
       return json({ success: false, error: error.message }, 500);
@@ -1505,24 +1505,15 @@ async function handleRequest(request: Request, env: Env) {
   // Setup 2FA - Generate TOTP Secret
   if (path === '/api/auth/2fa/setup' && request.method === 'POST') {
     try {
-      const authHeader = request.headers.get('Authorization');
-      if (!authHeader || !authHeader.startsWith('Bearer ')) {
-        return json({ success: false, error: 'Token não fornecido' }, 401);
-      }
-
-      const token = authHeader.substring(7);
-      const verified = await verifyJWT(token, requireJWTSecret(env));
-
-      if (!verified.valid) {
-        return json({ success: false, error: 'Token inválido' }, 401);
-      }
+      const auth = await extractAuth(request, env);
+      if ('error' in auth) return auth.error;
 
       // Gerar novo secret TOTP
       const secret = generateTOTPSecret();
       const backupCodes = generateBackupCodes(10);
 
       // Gerar QR Code URL (usando QR Server)
-      const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=otpauth://totp/CDM%20Stores:${verified.email}@cdmstores.com?secret=${secret}&issuer=CDM%20Stores`;
+      const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=otpauth://totp/CDM%20Stores:${auth.email}?secret=${secret}&issuer=CDM%20Stores`;
 
       return json({
         success: true,
@@ -1539,17 +1530,8 @@ async function handleRequest(request: Request, env: Env) {
   // Verify 2FA Setup
   if (path === '/api/auth/2fa/verify-setup' && request.method === 'POST') {
     try {
-      const authHeader = request.headers.get('Authorization');
-      if (!authHeader || !authHeader.startsWith('Bearer ')) {
-        return json({ success: false, error: 'Token não fornecido' }, 401);
-      }
-
-      const token = authHeader.substring(7);
-      const verified = await verifyJWT(token, requireJWTSecret(env));
-
-      if (!verified.valid) {
-        return json({ success: false, error: 'Token inválido' }, 401);
-      }
+      const auth = await extractAuth(request, env);
+      if ('error' in auth) return auth.error;
 
       const { code, secret, backupCodes } = await request.json();
 
@@ -1557,7 +1539,7 @@ async function handleRequest(request: Request, env: Env) {
         return json({ success: false, error: 'Código e secret obrigatórios' }, 400);
       }
 
-      // Verificar código TOTP (implemente verificação real)
+      // Verificar código TOTP
       const isValid = await verifyTOTPCode(secret, code);
       if (!isValid) {
         return json({ success: false, error: 'Código incorreto. Tente novamente.' }, 400);
@@ -1566,7 +1548,7 @@ async function handleRequest(request: Request, env: Env) {
       // Salvar secret e códigos de backup no banco
       await env.DB.prepare(
         'UPDATE users SET two_factor_enabled = 1, two_factor_secret = ?, two_factor_backup_codes = ?, updated_at = datetime("now") WHERE id = ?'
-      ).bind(secret, JSON.stringify(backupCodes), verified.userId).run();
+      ).bind(secret, JSON.stringify(backupCodes), auth.userId).run();
 
       return json({
         success: true,
@@ -1581,19 +1563,10 @@ async function handleRequest(request: Request, env: Env) {
   // Disable 2FA
   if (path === '/api/auth/2fa/disable' && request.method === 'POST') {
     try {
-      const authHeader = request.headers.get('Authorization');
-      if (!authHeader || !authHeader.startsWith('Bearer ')) {
-        return json({ success: false, error: 'Token não fornecido' }, 401);
-      }
+      const auth = await extractAuth(request, env);
+      if ('error' in auth) return auth.error;
 
-      const token = authHeader.substring(7);
-      const verified = await verifyJWT(token, requireJWTSecret(env));
-
-      if (!verified.valid) {
-        return json({ success: false, error: 'Token inválido' }, 401);
-      }
-
-      const { code, password } = await request.json();
+      const { password } = await request.json();
 
       if (!password) {
         return json({ success: false, error: 'Senha obrigatória para desativar 2FA' }, 400);
@@ -1602,7 +1575,7 @@ async function handleRequest(request: Request, env: Env) {
       // Verificar senha
       const user = await env.DB.prepare(
         'SELECT password_hash FROM users WHERE id = ? LIMIT 1'
-      ).bind(verified.userId).first();
+      ).bind(auth.userId).first();
 
       const passwordMatch = await verifyPassword(password, user.password_hash);
       if (!passwordMatch) {
@@ -1612,7 +1585,7 @@ async function handleRequest(request: Request, env: Env) {
       // Desativar 2FA
       await env.DB.prepare(
         'UPDATE users SET two_factor_enabled = 0, two_factor_secret = NULL, two_factor_backup_codes = NULL, updated_at = datetime("now") WHERE id = ?'
-      ).bind(verified.userId).run();
+      ).bind(auth.userId).run();
 
       return json({
         success: true,
@@ -1637,7 +1610,7 @@ async function handleRequest(request: Request, env: Env) {
       }
 
       const user = await env.DB.prepare(
-        'SELECT two_factor_secret, two_factor_backup_codes FROM users WHERE id = ? LIMIT 1'
+        'SELECT id, email, name, two_factor_secret, two_factor_backup_codes, two_factor_enabled FROM users WHERE id = ? LIMIT 1'
       ).bind(userId).first();
 
       if (!user || !user.two_factor_enabled) {
@@ -1648,13 +1621,13 @@ async function handleRequest(request: Request, env: Env) {
 
       // Verificar TOTP code
       if (code) {
-        isValid = await verifyTOTPCode(user.two_factor_secret, code);
+        isValid = await verifyTOTPCode(String(user.two_factor_secret), code);
       }
 
       // Verificar backup code
       if (!isValid && backupCode) {
         try {
-          const codes = JSON.parse(user.two_factor_backup_codes);
+          const codes = JSON.parse(String(user.two_factor_backup_codes));
           if (codes.includes(backupCode)) {
             isValid = true;
             // Remover código de backup usado
@@ -1672,13 +1645,28 @@ async function handleRequest(request: Request, env: Env) {
         return json({ success: false, error: 'Código de autenticação inválido' }, 401);
       }
 
-      // Gerar token de conclusão
-      const completeToken = await generateJWT(userId, user.email, requireJWTSecret(env), 300); // 5 minutos
+      // 2FA válido — criar sessão completa e retornar tokens
+      const userEmail = String(user.email);
+      const token = await generateJWT(Number(userId), userEmail, requireJWTSecret(env), 3600);
+      const refreshToken = await generateJWT(Number(userId), userEmail, requireJWTSecret(env), 86400 * 7);
+
+      const expiresAt = new Date(Date.now() + 3600 * 1000).toISOString();
+      const refreshExpiresAt = new Date(Date.now() + 86400 * 7 * 1000).toISOString();
+
+      await env.DB.prepare(
+        'INSERT INTO sessions (user_id, token, refresh_token, expires_at, refresh_expires_at, created_at) VALUES (?, ?, ?, ?, ?, datetime("now"))'
+      ).bind(userId, token, refreshToken, expiresAt, refreshExpiresAt).run();
+
+      await env.DB.prepare(
+        'UPDATE users SET last_login = datetime("now") WHERE id = ?'
+      ).bind(userId).run();
 
       return json({
         success: true,
         message: '2FA verificado com sucesso',
-        token: completeToken
+        user: { id: user.id, email: user.email, name: user.name },
+        token,
+        refreshToken
       });
     } catch (error: any) {
       return json({ success: false, error: error.message }, 500);
@@ -1773,9 +1761,48 @@ async function handleRequest(request: Request, env: Env) {
   if (path === '/api/stripe/webhook') {
     if (request.method === 'POST') {
       try {
-        const body = await request.json();
-        const event = body;
+        // Verificar assinatura do webhook Stripe (MEDIUM-006)
+        const sig = request.headers.get('stripe-signature');
+        if (!sig || !env.STRIPE_WEBHOOK_SECRET) {
+          return json({ error: 'Assinatura ausente ou webhook secret não configurado' }, 400);
+        }
 
+        const rawBody = await request.text();
+
+        // Extrair timestamp e hash da assinatura
+        const sigParts: Record<string, string> = {};
+        for (const part of sig.split(',')) {
+          const [k, v] = part.split('=');
+          if (k && v) sigParts[k] = v;
+        }
+
+        const timestamp = sigParts['t'];
+        const expectedSig = sigParts['v1'];
+
+        if (!timestamp || !expectedSig) {
+          return json({ error: 'Formato de assinatura inválido' }, 400);
+        }
+
+        // Verificar que o timestamp não é muito antigo (5 minutos)
+        const webhookAge = Math.floor(Date.now() / 1000) - parseInt(timestamp, 10);
+        if (webhookAge > 300) {
+          return json({ error: 'Webhook timestamp muito antigo' }, 400);
+        }
+
+        // Calcular HMAC-SHA256
+        const payload = `${timestamp}.${rawBody}`;
+        const keyMaterial = await crypto.subtle.importKey(
+          'raw', new TextEncoder().encode(env.STRIPE_WEBHOOK_SECRET),
+          { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']
+        );
+        const mac = await crypto.subtle.sign('HMAC', keyMaterial, new TextEncoder().encode(payload));
+        const computed = Array.from(new Uint8Array(mac)).map(b => b.toString(16).padStart(2, '0')).join('');
+
+        if (computed !== expectedSig) {
+          return json({ error: 'Assinatura inválida' }, 400);
+        }
+
+        const event = JSON.parse(rawBody);
         console.log(`[Webhook] Evento: ${event.type}`);
 
         if (event.type === 'checkout.session.completed') {
@@ -1822,6 +1849,21 @@ async function handleRequest(request: Request, env: Env) {
       }
 
       return json({ success: true, cj_order_id: cjOrderId, message: 'Pedido enviado para CJ' });
+    } catch (error: any) {
+      return json({ success: false, error: error.message }, 500);
+    }
+  }
+
+  // ===== CUPONS =====
+  // Validar cupom via API (para checkout)
+  if (path === '/api/coupons/validate' && request.method === 'POST') {
+    try {
+      const { code } = await request.json();
+      if (!code || typeof code !== 'string') {
+        return json({ success: false, error: 'Código de cupom obrigatório' }, 400);
+      }
+      const resultado = validarCupom(code);
+      return json({ success: true, valid: resultado.valido, discount: resultado.desconto, message: resultado.mensagem });
     } catch (error: any) {
       return json({ success: false, error: error.message }, 500);
     }
