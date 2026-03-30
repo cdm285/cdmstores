@@ -25,62 +25,82 @@ interface Env {
 
 // ===== AUTENTICAÇÃO =====
 
+function requireJWTSecret(env: Env): string {
+  if (!env.JWT_SECRET) throw new Error('JWT_SECRET não configurado');
+  return env.JWT_SECRET;
+}
+
 /**
- * Hash de senha usando PBKDF2
+ * Hash de senha usando PBKDF2 com salt aleatório
+ * Formato de saída: saltHex:hashHex
  */
 async function hashPassword(password: string): Promise<string> {
   const encoder = new TextEncoder();
-  const data = encoder.encode(password);
-  const hashBuffer = await crypto.subtle.digest('SHA-256', data);
-  const hashArray = Array.from(new Uint8Array(hashBuffer));
-  return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+  const salt = crypto.getRandomValues(new Uint8Array(16));
+  const keyMaterial = await crypto.subtle.importKey('raw', encoder.encode(password), 'PBKDF2', false, ['deriveBits']);
+  const hashBuffer = await crypto.subtle.deriveBits(
+    { name: 'PBKDF2', salt, iterations: 100000, hash: 'SHA-256' },
+    keyMaterial,
+    256
+  );
+  const saltHex = Array.from(salt).map(b => b.toString(16).padStart(2, '0')).join('');
+  const hashHex = Array.from(new Uint8Array(hashBuffer)).map(b => b.toString(16).padStart(2, '0')).join('');
+  return `${saltHex}:${hashHex}`;
 }
 
 /**
- * Verificar senha
+ * Verificar senha contra hash PBKDF2 armazenado
  */
-async function verifyPassword(password: string, hash: string): Promise<boolean> {
-  const newHash = await hashPassword(password);
-  return newHash === hash;
+async function verifyPassword(password: string, stored: string): Promise<boolean> {
+  const parts = stored.split(':');
+  if (parts.length !== 2) return false;
+  const [saltHex, hashHex] = parts;
+  const salt = new Uint8Array(saltHex.match(/.{2}/g)!.map(b => parseInt(b, 16)));
+  const encoder = new TextEncoder();
+  const keyMaterial = await crypto.subtle.importKey('raw', encoder.encode(password), 'PBKDF2', false, ['deriveBits']);
+  const hashBuffer = await crypto.subtle.deriveBits(
+    { name: 'PBKDF2', salt, iterations: 100000, hash: 'SHA-256' },
+    keyMaterial,
+    256
+  );
+  const newHashHex = Array.from(new Uint8Array(hashBuffer)).map(b => b.toString(16).padStart(2, '0')).join('');
+  return newHashHex === hashHex;
 }
 
 /**
- * Gerar JWT Token
+ * Gerar JWT Token assinado com HMAC-SHA256
  */
-function generateJWT(userId: number, email: string, expiresIn: number = 3600): string {
-  const header = { alg: 'HS256', typ: 'JWT' };
-  const payload = {
+async function generateJWT(userId: number, email: string, secret: string, expiresIn: number = 3600): Promise<string> {
+  const header = btoa(JSON.stringify({ alg: 'HS256', typ: 'JWT' })).replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_');
+  const payload = btoa(JSON.stringify({
     sub: userId,
-    email: email,
+    email,
     iat: Math.floor(Date.now() / 1000),
     exp: Math.floor(Date.now() / 1000) + expiresIn,
-  };
-
-  const headerEncoded = btoa(JSON.stringify(header)).replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_');
-  const payloadEncoded = btoa(JSON.stringify(payload)).replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_');
-  
-  // Assinatura simples (não é cryptograficamente segura, usar com cuidado)
-  // Em produção, use uma biblioteca JWT apropriada
-  const signature = btoa(userId + '|' + email + '|' + Date.now()).replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_');
-  
-  return `${headerEncoded}.${payloadEncoded}.${signature}`;
+  })).replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_');
+  const data = `${header}.${payload}`;
+  const key = await crypto.subtle.importKey('raw', new TextEncoder().encode(secret), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
+  const sig = await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(data));
+  const sigB64 = btoa(String.fromCharCode(...new Uint8Array(sig))).replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_');
+  return `${data}.${sigB64}`;
 }
 
 /**
- * Verificar JWT Token
+ * Verificar JWT Token com HMAC-SHA256
  */
-function verifyJWT(token: string): { valid: boolean; userId?: number; email?: string } {
+async function verifyJWT(token: string, secret: string): Promise<{ valid: boolean; userId?: number; email?: string }> {
   try {
     const parts = token.split('.');
     if (parts.length !== 3) return { valid: false };
-
     const payload = JSON.parse(atob(parts[1].replace(/-/g, '+').replace(/_/g, '/')));
-    const now = Math.floor(Date.now() / 1000);
-
-    if (payload.exp < now) return { valid: false }; // Expirado
-
+    if (payload.exp < Math.floor(Date.now() / 1000)) return { valid: false };
+    const data = `${parts[0]}.${parts[1]}`;
+    const key = await crypto.subtle.importKey('raw', new TextEncoder().encode(secret), { name: 'HMAC', hash: 'SHA-256' }, false, ['verify']);
+    const sigBytes = Uint8Array.from(atob(parts[2].replace(/-/g, '+').replace(/_/g, '/')), c => c.charCodeAt(0));
+    const valid = await crypto.subtle.verify('HMAC', key, sigBytes, new TextEncoder().encode(data));
+    if (!valid) return { valid: false };
     return { valid: true, userId: payload.sub, email: payload.email };
-  } catch (error) {
+  } catch {
     return { valid: false };
   }
 }
@@ -148,18 +168,35 @@ function generateBackupCodes(count: number = 10): string[] {
 }
 
 /**
- * Verificar código TOTP (simples - sem HMAC complexo)
- * Em produção, use biblioteca como "otpauth" ou similar
+ * Verificar código TOTP usando HMAC-SHA1 real
  */
-function verifyTOTPCode(secret: string, code: string, timeWindow: number = 30): boolean {
-  if (!code || code.length !== 6) return false;
-  if (!/^\d+$/.test(code)) return false;
-  
-  // Verificação simplificada: comparar código com pattern do secret
-  // Em produção, implementar HMAC-SHA1 com base32 decoding
-  // Por enquanto, aceitar qualquer código de 6 dígitos para demonstração
-  // TODO: Implementar HOTP/TOTP verificação real
-  return true;
+async function verifyTOTPCode(secret: string, code: string): Promise<boolean> {
+  if (!code || code.length !== 6 || !/^\d+$/.test(code)) return false;
+  // Decodificar secret base32
+  const base32Chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
+  let bits = 0, value = 0;
+  const bytes: number[] = [];
+  for (const char of secret.toUpperCase()) {
+    const idx = base32Chars.indexOf(char);
+    if (idx === -1) continue;
+    value = (value << 5) | idx;
+    bits += 5;
+    if (bits >= 8) { bytes.push((value >>> (bits - 8)) & 0xff); bits -= 8; }
+  }
+  const secretBytes = new Uint8Array(bytes);
+  const counter = Math.floor(Date.now() / 1000 / 30);
+  for (const offset of [-1, 0, 1]) {
+    const c = counter + offset;
+    const counterBytes = new Uint8Array(8);
+    let tmp = c;
+    for (let i = 7; i >= 0; i--) { counterBytes[i] = tmp & 0xff; tmp = Math.floor(tmp / 256); }
+    const key = await crypto.subtle.importKey('raw', secretBytes, { name: 'HMAC', hash: 'SHA-1' }, false, ['sign']);
+    const hmac = new Uint8Array(await crypto.subtle.sign('HMAC', key, counterBytes));
+    const idx = hmac[hmac.length - 1] & 0xf;
+    const otp = ((hmac[idx] & 0x7f) << 24 | (hmac[idx + 1] & 0xff) << 16 | (hmac[idx + 2] & 0xff) << 8 | (hmac[idx + 3] & 0xff)) % 1000000;
+    if (otp.toString().padStart(6, '0') === code) return true;
+  }
+  return false;
 }
 
 function json(data: any, status = 200) {
@@ -167,6 +204,21 @@ function json(data: any, status = 200) {
     status,
     headers: CORS_HEADERS,
   });
+}
+
+// Rate limiter simples por IP (best-effort, por isolate)
+const rateLimitMap = new Map<string, { count: number; resetAt: number }>();
+
+function checkRateLimit(ip: string, limit = 20, windowMs = 60000): boolean {
+  const now = Date.now();
+  const entry = rateLimitMap.get(ip);
+  if (!entry || now > entry.resetAt) {
+    rateLimitMap.set(ip, { count: 1, resetAt: now + windowMs });
+    return true;
+  }
+  if (entry.count >= limit) return false;
+  entry.count++;
+  return true;
 }
 
 /**
@@ -180,7 +232,7 @@ const FAQ: { [key: string]: any } = {
     'carregador|usb-c|65w': '📱 **Carregador USB-C 65W**\nPreço: R$ 49,90\nTecnologia: Carregamento rápido\nDescrição: Carregador rápido 65W compatível com múltiplos dispositivos.\n\nDigite "adicionar Carregador" para comprar!',
     'cabo|lightning': '⚡ **Cabo Lightning Original**\nPreço: R$ 29,90\nOriginal e certificado\nDescrição: Cabo Lightning original certificado para durabilidade.\n\nDigite "adicionar Cabo" para comprar!',
     'frete|entrega|quanto cobra': '📦 **Frete**\nValor: R$ 15,00\nTempo: 5-7 dias úteis\nCobertura: Brasil inteiro\n\nO frete é FIXO em R$ 15,00 em qualquer compra!',
-    'cupom|desconto|código|promo': '🎟️ **Cupons Disponíveis:**\n• NEWYEAR - R$ 10 de desconto\n• PROMO - R$ 5 de desconto\n• DESCONTO10 - R$ 10 de desconto\n• SAVE20 - R$ 20 de desconto\n\nDigite seu cupom no carrinho!',
+    'cupom|desconto|código|promo': '🎟️ Temos cupons especiais disponíveis! Cadastre-se na newsletter para receber códigos exclusivos.\n\nDigite "cupom CÓDIGO" para aplicar um cupom.',
     'rastraio|rastrear|pedido|onde está': '📍 **Rastreio de Pedidos**\nPara rastrear seu pedido, você precisa do código de rastreio.\n\nVá em "Rastreio" na página e digite seu código!\n\nNão tem o código? Responda "verificar pedido" + seu email.',
     'pagamento|pagar|stripe|cartão': '💳 **Pagamento**\nAceitamos:\n• Cartão de crédito/débito (Stripe)\n• Pagamento seguro e criptografado\n\nSeu pagamento é processado via Stripe (100% seguro).',
     'atendimento|suporte|falar|conversar': '💬 **Atendimento**\nVocê está falando comigo, um assistente automático!\n\nPara suporte humano:\n📧 Email: support@cdmstores.com\n☎️ WhatsApp: (11) 99999-9999',
@@ -253,7 +305,7 @@ function gerarWhatsApp(telefone = '5511999999999', mensagem = 'Olá! Gostaria de
 /**
  * Processa mensagem do chatbot com 8 RECURSOS
  */
-async function processChat(message: string, user_id: string | undefined, language: string, env: Env): Promise<any> {
+async function processChat(message: string, user_id: string | undefined, language: string, env: Env, authenticatedEmail?: string): Promise<any> {
   const msg = message.toLowerCase().trim();
   const faqDb = FAQ[language] || FAQ['pt'];
   const sentiment = analisarSentimento(msg);
@@ -330,41 +382,42 @@ async function processChat(message: string, user_id: string | undefined, languag
     };
   }
 
-  // 3. HISTÓRICO DE PEDIDOS - Por email
+  // 3. HISTÓRICO DE PEDIDOS - Requer autenticação
   if ((msg.includes('meu') || msg.includes('meus') || msg.includes('verificar') || msg.includes('pedidos')) && msg.includes('pedido')) {
-    // Primeiro tenta extrair email
-    const emailMatch = msg.match(/([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})/);
-    if (emailMatch) {
-      const email = emailMatch[0];
-      try {
-        const orders = await env.DB.prepare(
-          'SELECT id, total, status, created_at FROM orders WHERE customer_email = ? ORDER BY created_at DESC LIMIT 5'
-        ).bind(email).all();
-
-        if (orders.results.length > 0) {
-          let response = language === 'pt' ? `📋 **Seus Pedidos**\n\n` : `📋 **Your Orders**\n\n`;
-          orders.results.forEach((o: any, i: number) => {
-            response += `${i + 1}. Pedido #${o.id} - R$ ${o.total} (${o.status}) - ${o.created_at}\n`;
-          });
-          return { response, action: 'orders_found', data: orders.results };
-        } else {
-          return {
-            response: language === 'pt'
-              ? `ℹ️ Nenhum pedido encontrado para ${email}`
-              : `ℹ️ No orders found for ${email}`,
-            action: 'orders_found',
-            data: []
-          };
-        }
-      } catch (error) {
-        console.error('Erro histórico:', error);
-      }
+    if (!authenticatedEmail) {
+      return {
+        response: language === 'pt'
+          ? '🔐 Por favor, faça login para ver seus pedidos.\n\nAcesse sua conta em [Login](https://cdmstores.com/profile.html)'
+          : '🔐 Please log in to view your orders.\n\nAccess your account at [Login](https://cdmstores.com/profile.html)'
+      };
     }
+    try {
+      const orders = await env.DB.prepare(
+        'SELECT id, total, status, created_at FROM orders WHERE customer_email = ? ORDER BY created_at DESC LIMIT 5'
+      ).bind(authenticatedEmail).all();
 
+      if (orders.results.length > 0) {
+        let response = language === 'pt' ? `📋 **Seus Pedidos**\n\n` : `📋 **Your Orders**\n\n`;
+        orders.results.forEach((o: any, i: number) => {
+          response += `${i + 1}. Pedido #${o.id} - R$ ${o.total} (${o.status}) - ${o.created_at}\n`;
+        });
+        return { response, action: 'orders_found', data: orders.results };
+      } else {
+        return {
+          response: language === 'pt'
+            ? `ℹ️ Nenhum pedido encontrado para sua conta`
+            : `ℹ️ No orders found for your account`,
+          action: 'orders_found',
+          data: []
+        };
+      }
+    } catch (error) {
+      console.error('Erro histórico:', error);
+    }
     return {
       response: language === 'pt'
-        ? 'Para ver seus pedidos, envie um email válido!\n\nExemplo: "meus pedidos seu@email.com"'
-        : 'Send a valid email to see your orders!\n\nExample: "my orders your@email.com"'
+        ? 'Erro ao buscar pedidos. Tente novamente mais tarde.'
+        : 'Error fetching orders. Please try again later.'
     };
   }
 
@@ -387,8 +440,8 @@ async function processChat(message: string, user_id: string | undefined, languag
 
     return {
       response: language === 'pt'
-        ? '🎟️ Cupons disponíveis:\n• NEWYEAR (R$ 10)\n• PROMO (R$ 5)\n• DESCONTO10 (R$ 10)\n• SAVE20 (R$ 20)\n\nDigite "cupom CÓDIGO"'
-        : '🎟️ Available coupons:\n• NEWYEAR ($10)\n• PROMO ($5)\n• DESCONTO10 ($10)\n• SAVE20 ($20)\n\nType "coupon CODE"'
+        ? '🎟️ Temos cupons especiais disponíveis! Cadastre-se na newsletter para receber códigos exclusivos.\n\nDigite "cupom CÓDIGO" para aplicar um cupom.'
+        : '🎟️ We have special coupons available! Subscribe to our newsletter to receive exclusive codes.\n\nType "coupon CODE" to apply a coupon.'
     };
   }
 
@@ -612,10 +665,10 @@ async function handleRequest(request: Request, env: Env) {
       ).bind(email, passwordHash, name).run();
 
       const userId = result.meta.last_row_id;
-      const token = generateJWT(userId, email, 3600); // 1 hora
+      const token = await generateJWT(userId, email, requireJWTSecret(env), 3600); // 1 hora
 
       // Gerar token de verificação e enviar email
-      const verificationToken = generateJWT(userId, email, 86400); // 24 horas
+      const verificationToken = await generateJWT(userId, email, requireJWTSecret(env), 86400); // 24 horas
       await env.DB.prepare(
         'INSERT INTO password_resets (user_id, token, expires_at, created_at) VALUES (?, ?, ?, datetime("now"))'
       ).bind(userId, verificationToken, new Date(Date.now() + 86400 * 1000).toISOString()).run();
@@ -676,8 +729,8 @@ async function handleRequest(request: Request, env: Env) {
       }
 
       // Gerar token
-      const token = generateJWT(user.id, user.email, 3600);
-      const refreshToken = generateJWT(user.id, user.email, 86400 * 7); // 7 dias
+      const token = await generateJWT(user.id, user.email, requireJWTSecret(env), 3600);
+      const refreshToken = await generateJWT(user.id, user.email, requireJWTSecret(env), 86400 * 7); // 7 dias
 
       // Salvar sessão
       const expiresAt = new Date(Date.now() + 3600 * 1000).toISOString();
@@ -712,7 +765,7 @@ async function handleRequest(request: Request, env: Env) {
       }
 
       const token = authHeader.substring(7);
-      const verified = verifyJWT(token);
+      const verified = await verifyJWT(token, requireJWTSecret(env));
 
       if (!verified.valid) {
         return json({ success: false, error: 'Token inválido' }, 401);
@@ -762,7 +815,7 @@ async function handleRequest(request: Request, env: Env) {
         return json({ success: false, error: 'Refresh token obrigatório' }, 400);
       }
 
-      const verified = verifyJWT(refreshToken);
+      const verified = await verifyJWT(refreshToken, requireJWTSecret(env));
       if (!verified.valid) {
         return json({ success: false, error: 'Refresh token inválido' }, 401);
       }
@@ -777,7 +830,7 @@ async function handleRequest(request: Request, env: Env) {
       }
 
       // Gerar novo token
-      const newToken = generateJWT(verified.userId, verified.email, 3600);
+      const newToken = await generateJWT(verified.userId, verified.email, requireJWTSecret(env), 3600);
 
       return json({ success: true, token: newToken });
     } catch (error: any) {
@@ -804,7 +857,7 @@ async function handleRequest(request: Request, env: Env) {
       }
 
       // Gerar token de reset (válido por 1 hora)
-      const resetToken = generateJWT(user.id, email, 3600);
+      const resetToken = await generateJWT(user.id, email, requireJWTSecret(env), 3600);
       const expiresAt = new Date(Date.now() + 3600 * 1000).toISOString();
 
       await env.DB.prepare(
@@ -878,7 +931,7 @@ async function handleRequest(request: Request, env: Env) {
       }
 
       const token = authHeader.substring(7);
-      const verified = verifyJWT(token);
+      const verified = await verifyJWT(token, requireJWTSecret(env));
 
       if (!verified.valid) {
         return json({ success: false, error: 'Token inválido' }, 401);
@@ -909,7 +962,7 @@ async function handleRequest(request: Request, env: Env) {
       }
 
       const token = authHeader.substring(7);
-      const verified = verifyJWT(token);
+      const verified = await verifyJWT(token, requireJWTSecret(env));
 
       if (!verified.valid) {
         return json({ success: false, error: 'Token inválido' }, 401);
@@ -954,7 +1007,7 @@ async function handleRequest(request: Request, env: Env) {
       }
 
       const token = authHeader.substring(7);
-      const verified = verifyJWT(token);
+      const verified = await verifyJWT(token, requireJWTSecret(env));
 
       if (!verified.valid) {
         return json({ success: false, error: 'Token inválido' }, 401);
@@ -1001,7 +1054,7 @@ async function handleRequest(request: Request, env: Env) {
       }
 
       const token = authHeader.substring(7);
-      const verified = verifyJWT(token);
+      const verified = await verifyJWT(token, requireJWTSecret(env));
 
       if (!verified.valid) {
         return json({ success: false, error: 'Token inválido' }, 401);
@@ -1026,7 +1079,7 @@ async function handleRequest(request: Request, env: Env) {
       }
 
       const token = authHeader.substring(7);
-      const verified = verifyJWT(token);
+      const verified = await verifyJWT(token, requireJWTSecret(env));
 
       if (!verified.valid) {
         return json({ success: false, error: 'Token inválido' }, 401);
@@ -1069,7 +1122,7 @@ async function handleRequest(request: Request, env: Env) {
       }
 
       const token = authHeader.substring(7);
-      const verified = verifyJWT(token);
+      const verified = await verifyJWT(token, requireJWTSecret(env));
 
       if (!verified.valid) {
         return json({ success: false, error: 'Token inválido' }, 401);
@@ -1117,7 +1170,7 @@ async function handleRequest(request: Request, env: Env) {
       }
 
       const token = authHeader.substring(7);
-      const verified = verifyJWT(token);
+      const verified = await verifyJWT(token, requireJWTSecret(env));
 
       if (!verified.valid) {
         return json({ success: false, error: 'Token inválido' }, 401);
@@ -1153,7 +1206,7 @@ async function handleRequest(request: Request, env: Env) {
       }
 
       const token = authHeader.substring(7);
-      const verified = verifyJWT(token);
+      const verified = await verifyJWT(token, requireJWTSecret(env));
 
       if (!verified.valid) {
         return json({ success: false, error: 'Token inválido' }, 401);
@@ -1196,7 +1249,7 @@ async function handleRequest(request: Request, env: Env) {
       }
 
       const token = authHeader.substring(7);
-      const verified = verifyJWT(token);
+      const verified = await verifyJWT(token, requireJWTSecret(env));
 
       if (!verified.valid) {
         return json({ success: false, error: 'Token inválido' }, 401);
@@ -1215,7 +1268,7 @@ async function handleRequest(request: Request, env: Env) {
       }
 
       // Gerar token de verificação (válido por 24 horas)
-      const verificationToken = generateJWT(user.id, user.email, 86400);
+      const verificationToken = await generateJWT(user.id, user.email, requireJWTSecret(env), 86400);
 
       // Salvar token no banco (pode reutilizar password_resets table)
       await env.DB.prepare(
@@ -1255,7 +1308,7 @@ async function handleRequest(request: Request, env: Env) {
       }
 
       // Verificar token
-      const verified = verifyJWT(token);
+      const verified = await verifyJWT(token, requireJWTSecret(env));
       if (!verified.valid || !verified.userId) {
         return json({ success: false, error: 'Token inválido ou expirado' }, 401);
       }
@@ -1341,8 +1394,8 @@ async function handleRequest(request: Request, env: Env) {
       }
 
       // Gerar token
-      const token = generateJWT(user.id, user.email, 3600);
-      const refreshToken = generateJWT(user.id, user.email, 86400 * 7);
+      const token = await generateJWT(user.id, user.email, requireJWTSecret(env), 3600);
+      const refreshToken = await generateJWT(user.id, user.email, requireJWTSecret(env), 86400 * 7);
 
       // Salvar sessão
       const expiresAt = new Date(Date.now() + 3600 * 1000).toISOString();
@@ -1419,8 +1472,8 @@ async function handleRequest(request: Request, env: Env) {
       }
 
       // Gerar token
-      const token = generateJWT(user.id, user.email, 3600);
-      const refreshToken = generateJWT(user.id, user.email, 86400 * 7);
+      const token = await generateJWT(user.id, user.email, requireJWTSecret(env), 3600);
+      const refreshToken = await generateJWT(user.id, user.email, requireJWTSecret(env), 86400 * 7);
 
       // Salvar sessão
       const expiresAt = new Date(Date.now() + 3600 * 1000).toISOString();
@@ -1458,7 +1511,7 @@ async function handleRequest(request: Request, env: Env) {
       }
 
       const token = authHeader.substring(7);
-      const verified = verifyJWT(token);
+      const verified = await verifyJWT(token, requireJWTSecret(env));
 
       if (!verified.valid) {
         return json({ success: false, error: 'Token inválido' }, 401);
@@ -1492,7 +1545,7 @@ async function handleRequest(request: Request, env: Env) {
       }
 
       const token = authHeader.substring(7);
-      const verified = verifyJWT(token);
+      const verified = await verifyJWT(token, requireJWTSecret(env));
 
       if (!verified.valid) {
         return json({ success: false, error: 'Token inválido' }, 401);
@@ -1505,7 +1558,7 @@ async function handleRequest(request: Request, env: Env) {
       }
 
       // Verificar código TOTP (implemente verificação real)
-      const isValid = verifyTOTPCode(secret, code);
+      const isValid = await verifyTOTPCode(secret, code);
       if (!isValid) {
         return json({ success: false, error: 'Código incorreto. Tente novamente.' }, 400);
       }
@@ -1534,7 +1587,7 @@ async function handleRequest(request: Request, env: Env) {
       }
 
       const token = authHeader.substring(7);
-      const verified = verifyJWT(token);
+      const verified = await verifyJWT(token, requireJWTSecret(env));
 
       if (!verified.valid) {
         return json({ success: false, error: 'Token inválido' }, 401);
@@ -1595,7 +1648,7 @@ async function handleRequest(request: Request, env: Env) {
 
       // Verificar TOTP code
       if (code) {
-        isValid = verifyTOTPCode(user.two_factor_secret, code);
+        isValid = await verifyTOTPCode(user.two_factor_secret, code);
       }
 
       // Verificar backup code
@@ -1620,7 +1673,7 @@ async function handleRequest(request: Request, env: Env) {
       }
 
       // Gerar token de conclusão
-      const completeToken = generateJWT(userId, user.email, 300); // 5 minutos
+      const completeToken = await generateJWT(userId, user.email, requireJWTSecret(env), 300); // 5 minutos
 
       return json({
         success: true,
@@ -1776,6 +1829,12 @@ async function handleRequest(request: Request, env: Env) {
 
   // ===== CHATBOT =====
   if (path === '/api/chat' && request.method === 'POST') {
+    // Rate limiting
+    const clientIp = request.headers.get('CF-Connecting-IP') || request.headers.get('X-Forwarded-For') || 'unknown';
+    if (!checkRateLimit(clientIp)) {
+      return json({ success: false, error: 'Muitas mensagens. Aguarde um momento.' }, 429);
+    }
+
     try {
       const { message, user_id, language = 'pt' } = await request.json();
 
@@ -1783,8 +1842,17 @@ async function handleRequest(request: Request, env: Env) {
         return json({ success: false, error: 'Mensagem vazia' }, 400);
       }
 
+      // Extrair autenticação opcional para proteger recursos sensíveis
+      let authenticatedEmail: string | undefined;
+      const authHeader = request.headers.get('Authorization');
+      if (authHeader?.startsWith('Bearer ') && env.JWT_SECRET) {
+        const token = authHeader.substring(7);
+        const verified = await verifyJWT(token, env.JWT_SECRET);
+        if (verified.valid) authenticatedEmail = verified.email;
+      }
+
       // Processar mensagem com todos os 8 recursos
-      const result = await processChat(message, user_id, language, env);
+      const result = await processChat(message, user_id, language, env, authenticatedEmail);
       return json({ 
         success: true, 
         response: result.response,

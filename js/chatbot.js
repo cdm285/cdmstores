@@ -429,10 +429,10 @@ class ChatBot {
       // 8. WhatsApp
       case 'whatsapp_link':
         if (data.link) {
-          this.addMessage(
-            `💬 Você será redirecionado para WhatsApp.\n` +
-            `<a href="${data.link}" target="_blank" style="color: #25D366; font-weight: bold;">Abrir WhatsApp →</a>`,
-            'bot'
+          this.addMessageWithLink(
+            '💬 Você será redirecionado para WhatsApp.',
+            data.link,
+            'Abrir WhatsApp →'
           );
         }
         break;
@@ -462,24 +462,44 @@ class ChatBot {
    * Mostrar formulário de agendamento
    */
   showSchedulingForm() {
-    const modal = document.getElementById('chatbot-modal');
-    const formHtml = `
-      <div class="scheduling-form" id="scheduling-form">
-        <h4>📅 Agendar Atendimento</h4>
-        <input type="email" placeholder="Seu email" id="schedule-email" />
-        <input type="text" placeholder="Seu nome" id="schedule-name" />
-        <input type="tel" placeholder="Seu telefone" id="schedule-phone" />
-        <input type="datetime-local" id="schedule-date" />
-        <textarea placeholder="Motivo ou dúvida..." id="schedule-reason"></textarea>
-        <button onclick="chatbot.submitScheduling()">Agendar</button>
-      </div>
-    `;
-    // Injetar no final do modal (simplificado)
-    this.addMessage(
-      '📅 Por favor, preencha os dados:\n' +
-      'Email, Nome, Telefone e Data/Hora desejada',
-      'bot'
-    );
+    const body = document.getElementById('chatbot-body');
+
+    this.addMessage('📅 Preencha os dados para agendar seu atendimento:', 'bot');
+
+    const form = document.createElement('div');
+    form.id = 'scheduling-form';
+    form.style.cssText = 'padding:12px;background:#f0f4ff;border-radius:8px;margin:8px 0;';
+
+    const fields = [
+      { id: 'schedule-email', type: 'email', placeholder: 'Seu email' },
+      { id: 'schedule-name', type: 'text', placeholder: 'Seu nome' },
+      { id: 'schedule-phone', type: 'tel', placeholder: 'Seu telefone' },
+      { id: 'schedule-date', type: 'datetime-local', placeholder: '' },
+    ];
+
+    fields.forEach(f => {
+      const input = document.createElement('input');
+      input.type = f.type;
+      input.id = f.id;
+      if (f.placeholder) input.placeholder = f.placeholder;
+      input.style.cssText = 'display:block;width:100%;box-sizing:border-box;margin-bottom:8px;padding:8px;border:1px solid #ccc;border-radius:4px;font-size:13px;';
+      form.appendChild(input);
+    });
+
+    const textarea = document.createElement('textarea');
+    textarea.id = 'schedule-reason';
+    textarea.placeholder = 'Motivo ou dúvida...';
+    textarea.style.cssText = 'display:block;width:100%;box-sizing:border-box;margin-bottom:8px;padding:8px;border:1px solid #ccc;border-radius:4px;font-size:13px;resize:vertical;';
+    form.appendChild(textarea);
+
+    const btn = document.createElement('button');
+    btn.textContent = 'Agendar';
+    btn.style.cssText = 'width:100%;padding:10px;background:#00AFFF;color:white;border:none;border-radius:6px;cursor:pointer;font-weight:600;font-size:14px;';
+    btn.addEventListener('click', () => this.submitScheduling());
+    form.appendChild(btn);
+
+    body.appendChild(form);
+    body.scrollTop = body.scrollHeight;
   }
 
   /**
@@ -526,12 +546,43 @@ class ChatBot {
     msgDiv.className = `chatbot-message ${sender}`;
 
     const p = document.createElement('p');
-    p.innerHTML = text.replace(/\n/g, '<br>');
+    const lines = text.split('\n');
+    lines.forEach((line, i) => {
+      p.appendChild(document.createTextNode(line));
+      if (i < lines.length - 1) p.appendChild(document.createElement('br'));
+    });
 
     msgDiv.appendChild(p);
     body.appendChild(msgDiv);
 
     // Scroll para última mensagem
+    body.scrollTop = body.scrollHeight;
+  }
+
+  addMessageWithLink(text, linkUrl, linkText) {
+    const body = document.getElementById('chatbot-body');
+    const msgDiv = document.createElement('div');
+    msgDiv.className = 'chatbot-message bot';
+
+    const p = document.createElement('p');
+    const lines = text.split('\n');
+    lines.forEach((line, i) => {
+      p.appendChild(document.createTextNode(line));
+      if (i < lines.length - 1) p.appendChild(document.createElement('br'));
+    });
+    p.appendChild(document.createElement('br'));
+
+    const a = document.createElement('a');
+    a.href = linkUrl;
+    a.target = '_blank';
+    a.rel = 'noopener noreferrer';
+    a.style.color = '#25D366';
+    a.style.fontWeight = 'bold';
+    a.textContent = linkText;
+    p.appendChild(a);
+
+    msgDiv.appendChild(p);
+    body.appendChild(msgDiv);
     body.scrollTop = body.scrollHeight;
   }
 
@@ -547,5 +598,5 @@ class ChatBot {
 
 // Inicializar quando DOM estiver pronto
 document.addEventListener('DOMContentLoaded', () => {
-  new ChatBot();
+  window.chatbot = new ChatBot();
 });
