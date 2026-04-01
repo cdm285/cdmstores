@@ -44,7 +44,10 @@ function base64urlDecode(s: string): Uint8Array {
 
 function base32Decode(base32: string): Uint8Array {
   const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
-  const clean = base32.toUpperCase().replace(/=+$/, '');
+  // Remove padding characters without regex backtracking
+  let end = base32.length;
+  while (end > 0 && base32[end - 1] === '=') end--;
+  const clean = base32.slice(0, end).toUpperCase();
   let bits = 0;
   let value = 0;
   let index = 0;
@@ -131,7 +134,8 @@ async function verifyPassword(password: string, storedHash: string): Promise<boo
   if (storedHash.startsWith('pbkdf2:')) {
     const parts = storedHash.split(':');
     if (parts.length !== 3) return false;
-    const salt = Uint8Array.from(parts[1].match(/.{2}/g)!.map(h => parseInt(h, 16)));
+    const salt = Uint8Array.from((parts[1].match(/.{2}/g) ?? []).map(h => parseInt(h, 16)));
+    if (salt.length === 0) return false;
     const expectedHash = parts[2];
     const encoder = new TextEncoder();
     const keyMaterial = await crypto.subtle.importKey('raw', encoder.encode(password), 'PBKDF2', false, ['deriveBits']);
@@ -708,8 +712,8 @@ async function handleRequest(request: Request, env: Env) {
         return json({ success: false, error: 'Campos obrigatórios: email, password, name' }, 400);
       }
 
-      // Validar email
-      if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) {
+      // Validar email (sem permitir pontos consecutivos ou domínio inválido)
+      if (!/^[^\s@.][^\s@]*@[^\s@]+\.[a-zA-Z]{2,}$/.test(email) || email.includes('..')) {
         return json({ success: false, error: 'Email inválido' }, 400);
       }
 
@@ -1892,8 +1896,12 @@ async function handleRequest(request: Request, env: Env) {
         }
 
         // Verificar tolerância de 5 minutos
+        const tsNum = parseInt(timestamp, 10);
+        if (!Number.isInteger(tsNum)) {
+          return new Response(JSON.stringify({ error: 'Timestamp inválido' }), { status: 400, headers: { 'Content-Type': 'application/json' } });
+        }
         const now = Math.floor(Date.now() / 1000);
-        if (Math.abs(now - parseInt(timestamp, 10)) > 300) {
+        if (Math.abs(now - tsNum) > 300) {
           return new Response(JSON.stringify({ error: 'Timestamp expirado' }), { status: 400, headers: { 'Content-Type': 'application/json' } });
         }
 

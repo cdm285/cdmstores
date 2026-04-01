@@ -55,6 +55,10 @@ router.post('/webhook', async (req, env, { DB }) => {
       return json({ success: false, error: 'Webhook não configurado' }, { status: 500 });
     }
 
+    if (!env.STRIPE_SECRET_KEY) {
+      return json({ success: false, error: 'Stripe não configurado' }, { status: 500 });
+    }
+
     const body = await req.text();
     const sig = req.headers.get('stripe-signature');
 
@@ -62,7 +66,7 @@ router.post('/webhook', async (req, env, { DB }) => {
       return json({ success: false, error: 'Assinatura obrigatória' }, { status: 400 });
     }
 
-    const stripe = new Stripe(env.STRIPE_SECRET_KEY || '');
+    const stripe = new Stripe(env.STRIPE_SECRET_KEY);
     let event;
     try {
       event = stripe.webhooks.constructEvent(
