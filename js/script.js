@@ -4,8 +4,8 @@ const translations = {
         "nav.products": "Produtos",
         "nav.support": "Atendimento",
         "nav.track": "Rastreio",
-        "hero.title": "Bem-vindo à CDM STORES",
-        "hero.subtitle": "Produtos premium com entrega rápida, segura e rastreio profissional.",
+        "hero.title": "Eletrônicos Premium, Entrega Garantida.",
+        "hero.subtitle": "Produtos de alta qualidade com entrega rápida, pagamento seguro e rastreio profissional.",
         "hero.cta": "Usar Cupom",
         "products.title": "Nossos Produtos",
         "products.p1.title": "Fone Bluetooth",
@@ -66,8 +66,8 @@ const translations = {
         "nav.products": "Products",
         "nav.support": "Support",
         "nav.track": "Tracking",
-        "hero.title": "Welcome to CDM STORES",
-        "hero.subtitle": "Premium products with fast, secure delivery and pro tracking.",
+        "hero.title": "Premium Electronics, Guaranteed Delivery.",
+        "hero.subtitle": "High-quality products with fast shipping, secure payment and professional tracking.",
         "hero.cta": "Use Coupon",
         "products.title": "Our Products",
         "products.p1.title": "Bluetooth Headphones",
@@ -128,8 +128,8 @@ const translations = {
         "nav.products": "Productos",
         "nav.support": "Atención",
         "nav.track": "Seguimiento",
-        "hero.title": "Bienvenido a CDM STORES",
-        "hero.subtitle": "Productos premium con entrega rápida, segura y rastreo profesional.",
+        "hero.title": "Electrónicos Premium, Entrega Garantizada.",
+        "hero.subtitle": "Productos de alta calidad con envío rápido, pago seguro y rastreo profesional.",
         "hero.cta": "Usar cupón",
         "products.title": "Nuestros productos",
         "products.p1.title": "Auriculares Bluetooth",
@@ -376,24 +376,62 @@ function applyTranslations(lang) {
 }
 
 function initLanguageSwitcher() {
-    // Suporta tanto o novo padrão (button.lang-btn) quanto o antigo (img[data-lang])
-    const buttons = document.querySelectorAll(".lang-btn[data-lang], .lang-selector img[data-lang]");
+    const selector = ".desktop-lang-btn[data-lang], .mobile-lang-btn[data-lang]";
+    const buttons = document.querySelectorAll(selector);
     buttons.forEach((btn) => {
         btn.addEventListener("click", () => {
             applyTranslations(btn.dataset.lang);
-            // Atualizar estado visual active nos botões
-            document.querySelectorAll(".lang-btn").forEach(b => {
+            document.querySelectorAll(selector).forEach(b => {
                 b.classList.toggle("active", b.dataset.lang === btn.dataset.lang);
                 b.setAttribute("aria-pressed", b.dataset.lang === btn.dataset.lang ? "true" : "false");
             });
         });
     });
     applyTranslations(state.lang);
-    // Marcar o idioma atual como ativo
-    document.querySelectorAll(".lang-btn").forEach(b => {
+    document.querySelectorAll(selector).forEach(b => {
         const isActive = b.dataset.lang === state.lang;
         b.classList.toggle("active", isActive);
         b.setAttribute("aria-pressed", isActive ? "true" : "false");
+    });
+}
+
+function initMobileNav() {
+    const hamburger = document.getElementById("hamburger-btn");
+    const nav = document.getElementById("mobile-nav");
+    const overlay = document.getElementById("mobile-nav-overlay");
+    const closeBtn = document.getElementById("mobile-nav-close");
+    if (!hamburger || !nav || !overlay) return;
+
+    function openNav() {
+        hamburger.classList.add("is-open");
+        nav.classList.add("is-open");
+        overlay.classList.add("is-open");
+        hamburger.setAttribute("aria-expanded", "true");
+        nav.setAttribute("aria-hidden", "false");
+        document.body.classList.add("nav-open");
+    }
+
+    function closeNav() {
+        hamburger.classList.remove("is-open");
+        nav.classList.remove("is-open");
+        overlay.classList.remove("is-open");
+        hamburger.setAttribute("aria-expanded", "false");
+        nav.setAttribute("aria-hidden", "true");
+        document.body.classList.remove("nav-open");
+    }
+
+    hamburger.addEventListener("click", openNav);
+    overlay.addEventListener("click", closeNav);
+    if (closeBtn) closeBtn.addEventListener("click", closeNav);
+
+    // Close when any nav link is tapped
+    nav.querySelectorAll(".mobile-nav-link, .mobile-nav-cta").forEach(el => {
+        el.addEventListener("click", closeNav);
+    });
+
+    // Close on Escape key
+    document.addEventListener("keydown", (e) => {
+        if (e.key === "Escape" && nav.classList.contains("is-open")) closeNav();
     });
 }
 
@@ -697,6 +735,7 @@ document.addEventListener("DOMContentLoaded", () => {
     }, 100);
 
     initLanguageSwitcher();
+    initMobileNav();
     initHeaderScroll();
     initProductButtons();
     initCheckout();
