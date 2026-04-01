@@ -9,18 +9,39 @@ binding = "DB"
 database_name = "cdmstores"
 database_id = "a22156d2-037a-400d-9408-d064020b4ca8"
 
-# Variáveis de ambiente
+# Variáveis de ambiente não-secretas
 [env.production]
-vars = { ENVIRONMENT = "production" }
+vars = { ENVIRONMENT = "production", APP_URL = "https://cdmstores.com" }
 
 [env.development]
-vars = { ENVIRONMENT = "development" }
+vars = { ENVIRONMENT = "development", APP_URL = "http://localhost:8787" }
 
-# Variáveis secretas (use wrangler secret put)
-# wrangler secret put STRIPE_SECRET_KEY
-# wrangler secret put STRIPE_WEBHOOK_SECRET
-# wrangler secret put CJ_API_KEY
-# wrangler secret put CJ_API_SECRET
+# ── Variáveis secretas ─────────────────────────────────────────────────────
+# Configure com os comandos abaixo ANTES do primeiro deploy em produção:
+#
+# OBRIGATÓRIAS:
+#   wrangler secret put JWT_SECRET              # string aleatória ≥64 bytes hex
+#   wrangler secret put STRIPE_SECRET_KEY       # sk_live_... (Stripe dashboard)
+#   wrangler secret put STRIPE_WEBHOOK_SECRET   # whsec_... (Stripe → Webhooks)
+#   wrangler secret put ADMIN_KEY               # string aleatória ≥32 bytes hex
+#
+# PARA E-MAIL (reset de senha, verificação):
+#   wrangler secret put RESEND_API_KEY          # re_... (resend.com/api-keys)
+#
+# PARA DROPSHIPPING:
+#   wrangler secret put CJ_API_KEY
+#   wrangler secret put CJ_API_SECRET
+#
+# PARA OAUTH (opcional):
+#   wrangler secret put GOOGLE_CLIENT_ID
+#   wrangler secret put GOOGLE_CLIENT_SECRET
+#   wrangler secret put FACEBOOK_APP_ID
+#   wrangler secret put FACEBOOK_APP_SECRET
+#
+# Gerar JWT_SECRET:
+#   node -e "console.log(require('crypto').randomBytes(64).toString('hex'))"
+# Gerar ADMIN_KEY:
+#   node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
 
 # CORS para seu domínio
 [[routes]]
