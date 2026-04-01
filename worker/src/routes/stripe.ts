@@ -3,11 +3,14 @@ import { json } from 'itty-router';
 import Stripe from 'stripe';
 
 const router = Router({ base: '/api/stripe' });
-const stripe = new Stripe(env.STRIPE_SECRET_KEY);
 
 // POST /api/stripe/create-payment - Criar sessão de pagamento
 router.post('/create-payment', async (req, env) => {
   try {
+    if (!env.STRIPE_SECRET_KEY) {
+      return json({ success: false, error: 'Stripe não configurado' }, { status: 500 });
+    }
+    const stripe = new Stripe(env.STRIPE_SECRET_KEY);
     const { orderId, items, total, customerEmail } = await req.json();
     
     if (!orderId || !total) {
@@ -48,9 +51,18 @@ router.post('/create-payment', async (req, env) => {
 // POST /api/stripe/webhook - Webhook do Stripe
 router.post('/webhook', async (req, env, { DB }) => {
   try {
+    if (!env.STRIPE_WEBHOOK_SECRET) {
+      return json({ success: false, error: 'Webhook não configurado' }, { status: 500 });
+    }
+
     const body = await req.text();
     const sig = req.headers.get('stripe-signature');
-    
+
+    if (!sig) {
+      return json({ success: false, error: 'Assinatura obrigatória' }, { status: 400 });
+    }
+
+    const stripe = new Stripe(env.STRIPE_SECRET_KEY || '');
     let event;
     try {
       event = stripe.webhooks.constructEvent(
@@ -72,13 +84,12 @@ router.post('/webhook', async (req, env, { DB }) => {
         'UPDATE orders SET status = ?, stripe_payment_id = ?, updated_at = datetime("now") WHERE id = ?'
       ).bind('paid', session.id, orderId).run();
       
-      // Aqui você criaria o pedido no CJdropshipping
       console.log(`Pedido ${orderId} pago com sucesso!`);
     }
     
     return json({ success: true, received: true });
   } catch (error) {
-    return json({ success: false, error: error.message }, { status: 500 });
+    return json({ success: false, error: 'Erro interno' }, { status: 500 });
   }
 });
 

@@ -24,9 +24,13 @@ router.get('/:id', async (req, { DB }) => {
   }
 });
 
-// GET /api/orders/customer/:email - Listar pedidos do cliente
+// GET /api/orders/customer/:email - Listar pedidos do cliente (requer autenticação)
 router.get('/customer/:email', async (req, { DB }) => {
   try {
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return json({ success: false, error: 'Token não fornecido' }, { status: 401 });
+    }
     const { email } = req.params;
     
     const orders = await DB.prepare(

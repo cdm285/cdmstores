@@ -35,8 +35,13 @@ router.get('/:id', async (req, { DB }) => {
 });
 
 // POST /api/products - Criar novo produto (admin)
-router.post('/', async (req, { DB }) => {
+router.post('/', async (req, { DB, ADMIN_KEY }) => {
   try {
+    const adminKey = req.headers.get('X-Admin-Key');
+    if (!ADMIN_KEY || adminKey !== ADMIN_KEY) {
+      return json({ success: false, error: 'Não autorizado' }, { status: 401 });
+    }
+
     const { name, description, price, image_url, stock } = await req.json();
     
     const result = await DB.prepare(

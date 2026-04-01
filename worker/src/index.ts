@@ -3,10 +3,84 @@
 
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin': 'https://cdmstores.com',
-  'Access-Control-Allow-Methods': 'GET, POST, DELETE, OPTIONS',
+  'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
   'Access-Control-Allow-Headers': 'Content-Type, Authorization',
   'Content-Type': 'application/json',
 };
+
+const SECURITY_HEADERS = {
+  'X-Content-Type-Options': 'nosniff',
+  'X-Frame-Options': 'DENY',
+  'X-XSS-Protection': '1; mode=block',
+  'Referrer-Policy': 'strict-origin-when-cross-origin',
+  'Strict-Transport-Security': 'max-age=31536000; includeSubDomains',
+  'Content-Security-Policy': "default-src 'none'; frame-ancestors 'none'",
+};
+
+// ===== UTILIDADES CRIPTOGRÁFICAS =====
+
+function base64url(s: string): string {
+  return btoa(s).replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_');
+}
+
+function arrayBufferToBase64url(buffer: ArrayBuffer): string {
+  const bytes = new Uint8Array(buffer);
+  let str = '';
+  for (let i = 0; i < bytes.length; i++) {
+    str += String.fromCharCode(bytes[i]);
+  }
+  return btoa(str).replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_');
+}
+
+function base64urlDecode(s: string): Uint8Array {
+  const padded = s.replace(/-/g, '+').replace(/_/g, '/');
+  const binary = atob(padded);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) {
+    bytes[i] = binary.charCodeAt(i);
+  }
+  return bytes;
+}
+
+function base32Decode(base32: string): Uint8Array {
+  const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
+  const clean = base32.toUpperCase().replace(/=+$/, '');
+  let bits = 0;
+  let value = 0;
+  let index = 0;
+  const output = new Uint8Array(Math.floor(clean.length * 5 / 8));
+  for (let i = 0; i < clean.length; i++) {
+    const charIndex = alphabet.indexOf(clean[i]);
+    if (charIndex === -1) continue;
+    value = (value << 5) | charIndex;
+    bits += 5;
+    if (bits >= 8) {
+      output[index++] = (value >>> (bits - 8)) & 0xff;
+      bits -= 8;
+    }
+  }
+  return output.slice(0, index);
+}
+
+async function computeTOTP(key: Uint8Array, counter: number): Promise<string> {
+  const counterBuffer = new ArrayBuffer(8);
+  const view = new DataView(counterBuffer);
+  view.setUint32(0, Math.floor(counter / 0x100000000), false);
+  view.setUint32(4, counter >>> 0, false);
+  const cryptoKey = await crypto.subtle.importKey(
+    'raw', key, { name: 'HMAC', hash: 'SHA-1' }, false, ['sign']
+  );
+  const hmacBuffer = await crypto.subtle.sign('HMAC', cryptoKey, counterBuffer);
+  const hmac = new Uint8Array(hmacBuffer);
+  const offset = hmac[hmac.length - 1] & 0x0f;
+  const code = (
+    ((hmac[offset] & 0x7f) << 24) |
+    ((hmac[offset + 1] & 0xff) << 16) |
+    ((hmac[offset + 2] & 0xff) << 8) |
+    (hmac[offset + 3] & 0xff)
+  ) % 1_000_000;
+  return code.toString().padStart(6, '0');
+}
 
 interface Env {
   DB: D1Database;
@@ -15,6 +89,7 @@ interface Env {
   STRIPE_PUBLISHABLE_KEY?: string;
   CJ_API_KEY?: string;
   JWT_SECRET?: string;
+  ADMIN_KEY?: string;
   RESEND_API_KEY?: string;
   APP_URL?: string;
   GOOGLE_CLIENT_ID?: string;
@@ -23,31 +98,62 @@ interface Env {
   FACEBOOK_APP_SECRET?: string;
 }
 
+function getJWTSecret(env: Env): string {
+  if (!env.JWT_SECRET) {
+    throw new Error('JWT_SECRET não configurado');
+  }
+  return env.JWT_SECRET;
+}
+
 // ===== AUTENTICAÇÃO =====
 
 /**
- * Hash de senha usando PBKDF2
+ * Hash de senha usando PBKDF2 com salt aleatório
  */
 async function hashPassword(password: string): Promise<string> {
   const encoder = new TextEncoder();
-  const data = encoder.encode(password);
-  const hashBuffer = await crypto.subtle.digest('SHA-256', data);
-  const hashArray = Array.from(new Uint8Array(hashBuffer));
-  return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+  const salt = crypto.getRandomValues(new Uint8Array(16));
+  const keyMaterial = await crypto.subtle.importKey('raw', encoder.encode(password), 'PBKDF2', false, ['deriveBits']);
+  const hashBuffer = await crypto.subtle.deriveBits(
+    { name: 'PBKDF2', salt, iterations: 100_000, hash: 'SHA-256' },
+    keyMaterial,
+    256
+  );
+  const saltHex = Array.from(salt).map(b => b.toString(16).padStart(2, '0')).join('');
+  const hashHex = Array.from(new Uint8Array(hashBuffer)).map(b => b.toString(16).padStart(2, '0')).join('');
+  return `pbkdf2:${saltHex}:${hashHex}`;
 }
 
 /**
- * Verificar senha
+ * Verificar senha (suporta PBKDF2 e legado SHA-256)
  */
-async function verifyPassword(password: string, hash: string): Promise<boolean> {
-  const newHash = await hashPassword(password);
-  return newHash === hash;
+async function verifyPassword(password: string, storedHash: string): Promise<boolean> {
+  if (storedHash.startsWith('pbkdf2:')) {
+    const parts = storedHash.split(':');
+    if (parts.length !== 3) return false;
+    const salt = Uint8Array.from(parts[1].match(/.{2}/g)!.map(h => parseInt(h, 16)));
+    const expectedHash = parts[2];
+    const encoder = new TextEncoder();
+    const keyMaterial = await crypto.subtle.importKey('raw', encoder.encode(password), 'PBKDF2', false, ['deriveBits']);
+    const hashBuffer = await crypto.subtle.deriveBits(
+      { name: 'PBKDF2', salt, iterations: 100_000, hash: 'SHA-256' },
+      keyMaterial,
+      256
+    );
+    const hashHex = Array.from(new Uint8Array(hashBuffer)).map(b => b.toString(16).padStart(2, '0')).join('');
+    return hashHex === expectedHash;
+  }
+  // Legado: SHA-256 sem salt (migrar usuários no próximo login)
+  const encoder = new TextEncoder();
+  const hashBuffer = await crypto.subtle.digest('SHA-256', encoder.encode(password));
+  const hashHex = Array.from(new Uint8Array(hashBuffer)).map(b => b.toString(16).padStart(2, '0')).join('');
+  return hashHex === storedHash;
 }
 
 /**
- * Gerar JWT Token
+ * Gerar JWT Token com assinatura HMAC-SHA256
  */
-function generateJWT(userId: number, email: string, expiresIn: number = 3600): string {
+async function generateJWT(userId: number, email: string, expiresIn: number = 3600, secret: string): Promise<string> {
   const header = { alg: 'HS256', typ: 'JWT' };
   const payload = {
     sub: userId,
@@ -56,31 +162,50 @@ function generateJWT(userId: number, email: string, expiresIn: number = 3600): s
     exp: Math.floor(Date.now() / 1000) + expiresIn,
   };
 
-  const headerEncoded = btoa(JSON.stringify(header)).replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_');
-  const payloadEncoded = btoa(JSON.stringify(payload)).replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_');
-  
-  // Assinatura simples (não é cryptograficamente segura, usar com cuidado)
-  // Em produção, use uma biblioteca JWT apropriada
-  const signature = btoa(userId + '|' + email + '|' + Date.now()).replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_');
-  
-  return `${headerEncoded}.${payloadEncoded}.${signature}`;
+  const headerEncoded = base64url(JSON.stringify(header));
+  const payloadEncoded = base64url(JSON.stringify(payload));
+  const signingInput = `${headerEncoded}.${payloadEncoded}`;
+
+  const key = await crypto.subtle.importKey(
+    'raw',
+    new TextEncoder().encode(secret),
+    { name: 'HMAC', hash: 'SHA-256' },
+    false,
+    ['sign']
+  );
+  const signatureBuffer = await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(signingInput));
+  const signatureEncoded = arrayBufferToBase64url(signatureBuffer);
+
+  return `${signingInput}.${signatureEncoded}`;
 }
 
 /**
- * Verificar JWT Token
+ * Verificar JWT Token com validação de assinatura HMAC-SHA256
  */
-function verifyJWT(token: string): { valid: boolean; userId?: number; email?: string } {
+async function verifyJWT(token: string, secret: string): Promise<{ valid: boolean; userId?: number; email?: string }> {
   try {
     const parts = token.split('.');
     if (parts.length !== 3) return { valid: false };
 
+    const signingInput = `${parts[0]}.${parts[1]}`;
+    const key = await crypto.subtle.importKey(
+      'raw',
+      new TextEncoder().encode(secret),
+      { name: 'HMAC', hash: 'SHA-256' },
+      false,
+      ['verify']
+    );
+    const signatureBytes = base64urlDecode(parts[2]);
+    const isValid = await crypto.subtle.verify('HMAC', key, signatureBytes, new TextEncoder().encode(signingInput));
+    if (!isValid) return { valid: false };
+
     const payload = JSON.parse(atob(parts[1].replace(/-/g, '+').replace(/_/g, '/')));
     const now = Math.floor(Date.now() / 1000);
 
-    if (payload.exp < now) return { valid: false }; // Expirado
+    if (payload.exp < now) return { valid: false };
 
     return { valid: true, userId: payload.sub, email: payload.email };
-  } catch (error) {
+  } catch {
     return { valid: false };
   }
 }
@@ -124,48 +249,47 @@ async function sendEmail(env: Env, to: string, subject: string, html: string): P
 }
 
 /**
- * Gerar TOTP Secret (base32)
+ * Gerar TOTP Secret (base32) com entropia criptográfica
  */
 function generateTOTPSecret(): string {
   const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
-  let secret = '';
-  for (let i = 0; i < 32; i++) {
-    secret += chars.charAt(Math.floor(Math.random() * chars.length));
-  }
-  return secret;
+  const bytes = crypto.getRandomValues(new Uint8Array(20));
+  return Array.from(bytes).map(b => chars[b % 32]).join('');
 }
 
 /**
- * Gerar códigos de backup (para 2FA)
+ * Gerar códigos de backup (para 2FA) com entropia criptográfica
  */
 function generateBackupCodes(count: number = 10): string[] {
-  const codes = [];
+  const codes: string[] = [];
   for (let i = 0; i < count; i++) {
-    const code = Math.random().toString(36).substring(2, 10).toUpperCase();
-    codes.push(code);
+    const bytes = crypto.getRandomValues(new Uint8Array(5));
+    codes.push(Array.from(bytes).map(b => b.toString(16).padStart(2, '0')).join('').toUpperCase());
   }
   return codes;
 }
 
 /**
- * Verificar código TOTP (simples - sem HMAC complexo)
- * Em produção, use biblioteca como "otpauth" ou similar
+ * Verificar código TOTP real com HMAC-SHA1
  */
-function verifyTOTPCode(secret: string, code: string, timeWindow: number = 30): boolean {
+async function verifyTOTPCode(secret: string, code: string, timeWindow: number = 1): Promise<boolean> {
   if (!code || code.length !== 6) return false;
-  if (!/^\d+$/.test(code)) return false;
-  
-  // Verificação simplificada: comparar código com pattern do secret
-  // Em produção, implementar HMAC-SHA1 com base32 decoding
-  // Por enquanto, aceitar qualquer código de 6 dígitos para demonstração
-  // TODO: Implementar HOTP/TOTP verificação real
-  return true;
+  if (!/^\d{6}$/.test(code)) return false;
+
+  const key = base32Decode(secret);
+  const counter = Math.floor(Date.now() / 1000 / 30);
+
+  for (let i = -timeWindow; i <= timeWindow; i++) {
+    const totp = await computeTOTP(key, counter + i);
+    if (totp === code) return true;
+  }
+  return false;
 }
 
 function json(data: any, status = 200) {
   return new Response(JSON.stringify(data), {
     status,
-    headers: CORS_HEADERS,
+    headers: { ...CORS_HEADERS, ...SECURITY_HEADERS },
   });
 }
 
@@ -445,7 +569,7 @@ async function handleRequest(request: Request, env: Env) {
   const path = url.pathname;
 
   if (request.method === 'OPTIONS') {
-    return new Response('ok', { headers: CORS_HEADERS });
+    return new Response('ok', { headers: { ...CORS_HEADERS, ...SECURITY_HEADERS } });
   }
 
   // Health check
@@ -585,13 +709,13 @@ async function handleRequest(request: Request, env: Env) {
       }
 
       // Validar email
-      if (!email.includes('@')) {
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) {
         return json({ success: false, error: 'Email inválido' }, 400);
       }
 
       // Validar senha
-      if (password.length < 6) {
-        return json({ success: false, error: 'Senha deve ter no mínimo 6 caracteres' }, 400);
+      if (password.length < 8) {
+        return json({ success: false, error: 'Senha deve ter no mínimo 8 caracteres' }, 400);
       }
 
       // Verificar se email já existe
@@ -612,10 +736,11 @@ async function handleRequest(request: Request, env: Env) {
       ).bind(email, passwordHash, name).run();
 
       const userId = result.meta.last_row_id;
-      const token = generateJWT(userId, email, 3600); // 1 hora
+      const jwtSecret = getJWTSecret(env);
+      const token = await generateJWT(userId, email, 3600, jwtSecret); // 1 hora
 
       // Gerar token de verificação e enviar email
-      const verificationToken = generateJWT(userId, email, 86400); // 24 horas
+      const verificationToken = await generateJWT(userId, email, 86400, jwtSecret); // 24 horas
       await env.DB.prepare(
         'INSERT INTO password_resets (user_id, token, expires_at, created_at) VALUES (?, ?, ?, datetime("now"))'
       ).bind(userId, verificationToken, new Date(Date.now() + 86400 * 1000).toISOString()).run();
@@ -675,9 +800,16 @@ async function handleRequest(request: Request, env: Env) {
         return json({ success: false, error: 'Email ou senha incorretos' }, 401);
       }
 
+      // Migrar hash legado (SHA-256 → PBKDF2) de forma transparente no login
+      if (typeof user.password_hash === 'string' && !user.password_hash.startsWith('pbkdf2:')) {
+        const upgradedHash = await hashPassword(password);
+        await env.DB.prepare('UPDATE users SET password_hash = ? WHERE id = ?').bind(upgradedHash, user.id).run();
+      }
+
       // Gerar token
-      const token = generateJWT(user.id, user.email, 3600);
-      const refreshToken = generateJWT(user.id, user.email, 86400 * 7); // 7 dias
+      const jwtSecret = getJWTSecret(env);
+      const token = await generateJWT(user.id, user.email, 3600, jwtSecret);
+      const refreshToken = await generateJWT(user.id, user.email, 86400 * 7, jwtSecret); // 7 dias
 
       // Salvar sessão
       const expiresAt = new Date(Date.now() + 3600 * 1000).toISOString();
@@ -712,7 +844,7 @@ async function handleRequest(request: Request, env: Env) {
       }
 
       const token = authHeader.substring(7);
-      const verified = verifyJWT(token);
+      const verified = await verifyJWT(token, getJWTSecret(env));
 
       if (!verified.valid) {
         return json({ success: false, error: 'Token inválido' }, 401);
@@ -762,7 +894,7 @@ async function handleRequest(request: Request, env: Env) {
         return json({ success: false, error: 'Refresh token obrigatório' }, 400);
       }
 
-      const verified = verifyJWT(refreshToken);
+      const verified = await verifyJWT(refreshToken, getJWTSecret(env));
       if (!verified.valid) {
         return json({ success: false, error: 'Refresh token inválido' }, 401);
       }
@@ -777,7 +909,7 @@ async function handleRequest(request: Request, env: Env) {
       }
 
       // Gerar novo token
-      const newToken = generateJWT(verified.userId, verified.email, 3600);
+      const newToken = await generateJWT(verified.userId!, verified.email!, 3600, getJWTSecret(env));
 
       return json({ success: true, token: newToken });
     } catch (error: any) {
@@ -804,16 +936,25 @@ async function handleRequest(request: Request, env: Env) {
       }
 
       // Gerar token de reset (válido por 1 hora)
-      const resetToken = generateJWT(user.id, email, 3600);
+      const resetToken = await generateJWT(user.id, email, 3600, getJWTSecret(env));
       const expiresAt = new Date(Date.now() + 3600 * 1000).toISOString();
 
       await env.DB.prepare(
         'INSERT INTO password_resets (user_id, token, expires_at, created_at) VALUES (?, ?, ?, datetime("now"))'
       ).bind(user.id, resetToken, expiresAt).run();
 
-      // TODO: Enviar email com link de reset
-      // const resetLink = `https://cdmstores.com/reset-password?token=${resetToken}`;
-      // await sendEmail(email, 'Reset de Senha', `Clique aqui: ${resetLink}`);
+      // Enviar email com link de reset
+      const resetLink = `${env.APP_URL || 'https://cdmstores.com'}/reset-password?token=${resetToken}`;
+      const subject = 'Redefinição de senha - CDM Stores';
+      const html = `
+        <h2>Redefinição de senha</h2>
+        <p>Você solicitou a redefinição da sua senha na CDM Stores.</p>
+        <p><a href="${resetLink}" style="background: #00AFFF; color: white; padding: 12px 24px; border-radius: 6px; text-decoration: none; display: inline-block;">Redefinir Senha</a></p>
+        <p>Ou copie e cole este link no seu navegador:</p>
+        <p><code>${resetLink}</code></p>
+        <p>Este link expira em 1 hora. Se você não solicitou isso, ignore este email.</p>
+      `;
+      await sendEmail(env, email, subject, html);
 
       return json({ success: true, message: 'Link de reset enviado para o email' });
     } catch (error: any) {
@@ -830,8 +971,8 @@ async function handleRequest(request: Request, env: Env) {
         return json({ success: false, error: 'Token e nova senha obrigatórios' }, 400);
       }
 
-      if (newPassword.length < 6) {
-        return json({ success: false, error: 'Senha deve ter no mínimo 6 caracteres' }, 400);
+      if (newPassword.length < 8) {
+        return json({ success: false, error: 'Senha deve ter no mínimo 8 caracteres' }, 400);
       }
 
       // Verificar token
@@ -878,7 +1019,7 @@ async function handleRequest(request: Request, env: Env) {
       }
 
       const token = authHeader.substring(7);
-      const verified = verifyJWT(token);
+      const verified = await verifyJWT(token, getJWTSecret(env));
 
       if (!verified.valid) {
         return json({ success: false, error: 'Token inválido' }, 401);
@@ -909,7 +1050,7 @@ async function handleRequest(request: Request, env: Env) {
       }
 
       const token = authHeader.substring(7);
-      const verified = verifyJWT(token);
+      const verified = await verifyJWT(token, getJWTSecret(env));
 
       if (!verified.valid) {
         return json({ success: false, error: 'Token inválido' }, 401);
@@ -939,6 +1080,11 @@ async function handleRequest(request: Request, env: Env) {
         'UPDATE users SET password_hash = ?, updated_at = datetime("now") WHERE id = ?'
       ).bind(newHash, verified.userId).run();
 
+      // Invalidar todas as sessões existentes (forçar re-login)
+      await env.DB.prepare(
+        'DELETE FROM sessions WHERE user_id = ?'
+      ).bind(verified.userId).run();
+
       return json({ success: true, message: 'Senha alterada com sucesso!' });
     } catch (error: any) {
       return json({ success: false, error: error.message }, 500);
@@ -954,7 +1100,7 @@ async function handleRequest(request: Request, env: Env) {
       }
 
       const token = authHeader.substring(7);
-      const verified = verifyJWT(token);
+      const verified = await verifyJWT(token, getJWTSecret(env));
 
       if (!verified.valid) {
         return json({ success: false, error: 'Token inválido' }, 401);
@@ -1001,7 +1147,7 @@ async function handleRequest(request: Request, env: Env) {
       }
 
       const token = authHeader.substring(7);
-      const verified = verifyJWT(token);
+      const verified = await verifyJWT(token, getJWTSecret(env));
 
       if (!verified.valid) {
         return json({ success: false, error: 'Token inválido' }, 401);
@@ -1026,7 +1172,7 @@ async function handleRequest(request: Request, env: Env) {
       }
 
       const token = authHeader.substring(7);
-      const verified = verifyJWT(token);
+      const verified = await verifyJWT(token, getJWTSecret(env));
 
       if (!verified.valid) {
         return json({ success: false, error: 'Token inválido' }, 401);
@@ -1069,7 +1215,7 @@ async function handleRequest(request: Request, env: Env) {
       }
 
       const token = authHeader.substring(7);
-      const verified = verifyJWT(token);
+      const verified = await verifyJWT(token, getJWTSecret(env));
 
       if (!verified.valid) {
         return json({ success: false, error: 'Token inválido' }, 401);
@@ -1117,7 +1263,7 @@ async function handleRequest(request: Request, env: Env) {
       }
 
       const token = authHeader.substring(7);
-      const verified = verifyJWT(token);
+      const verified = await verifyJWT(token, getJWTSecret(env));
 
       if (!verified.valid) {
         return json({ success: false, error: 'Token inválido' }, 401);
@@ -1153,7 +1299,7 @@ async function handleRequest(request: Request, env: Env) {
       }
 
       const token = authHeader.substring(7);
-      const verified = verifyJWT(token);
+      const verified = await verifyJWT(token, getJWTSecret(env));
 
       if (!verified.valid) {
         return json({ success: false, error: 'Token inválido' }, 401);
@@ -1196,7 +1342,7 @@ async function handleRequest(request: Request, env: Env) {
       }
 
       const token = authHeader.substring(7);
-      const verified = verifyJWT(token);
+      const verified = await verifyJWT(token, getJWTSecret(env));
 
       if (!verified.valid) {
         return json({ success: false, error: 'Token inválido' }, 401);
@@ -1215,7 +1361,7 @@ async function handleRequest(request: Request, env: Env) {
       }
 
       // Gerar token de verificação (válido por 24 horas)
-      const verificationToken = generateJWT(user.id, user.email, 86400);
+      const verificationToken = await generateJWT(user.id, user.email, 86400, getJWTSecret(env));
 
       // Salvar token no banco (pode reutilizar password_resets table)
       await env.DB.prepare(
@@ -1255,7 +1401,7 @@ async function handleRequest(request: Request, env: Env) {
       }
 
       // Verificar token
-      const verified = verifyJWT(token);
+      const verified = await verifyJWT(token, getJWTSecret(env));
       if (!verified.valid || !verified.userId) {
         return json({ success: false, error: 'Token inválido ou expirado' }, 401);
       }
@@ -1341,8 +1487,8 @@ async function handleRequest(request: Request, env: Env) {
       }
 
       // Gerar token
-      const token = generateJWT(user.id, user.email, 3600);
-      const refreshToken = generateJWT(user.id, user.email, 86400 * 7);
+      const token = await generateJWT(user.id, user.email, 3600, getJWTSecret(env));
+      const refreshToken = await generateJWT(user.id, user.email, 86400 * 7, getJWTSecret(env));
 
       // Salvar sessão
       const expiresAt = new Date(Date.now() + 3600 * 1000).toISOString();
@@ -1419,8 +1565,8 @@ async function handleRequest(request: Request, env: Env) {
       }
 
       // Gerar token
-      const token = generateJWT(user.id, user.email, 3600);
-      const refreshToken = generateJWT(user.id, user.email, 86400 * 7);
+      const token = await generateJWT(user.id, user.email, 3600, getJWTSecret(env));
+      const refreshToken = await generateJWT(user.id, user.email, 86400 * 7, getJWTSecret(env));
 
       // Salvar sessão
       const expiresAt = new Date(Date.now() + 3600 * 1000).toISOString();
@@ -1458,7 +1604,7 @@ async function handleRequest(request: Request, env: Env) {
       }
 
       const token = authHeader.substring(7);
-      const verified = verifyJWT(token);
+      const verified = await verifyJWT(token, getJWTSecret(env));
 
       if (!verified.valid) {
         return json({ success: false, error: 'Token inválido' }, 401);
@@ -1492,7 +1638,7 @@ async function handleRequest(request: Request, env: Env) {
       }
 
       const token = authHeader.substring(7);
-      const verified = verifyJWT(token);
+      const verified = await verifyJWT(token, getJWTSecret(env));
 
       if (!verified.valid) {
         return json({ success: false, error: 'Token inválido' }, 401);
@@ -1505,7 +1651,7 @@ async function handleRequest(request: Request, env: Env) {
       }
 
       // Verificar código TOTP (implemente verificação real)
-      const isValid = verifyTOTPCode(secret, code);
+      const isValid = await verifyTOTPCode(secret, code);
       if (!isValid) {
         return json({ success: false, error: 'Código incorreto. Tente novamente.' }, 400);
       }
@@ -1534,7 +1680,7 @@ async function handleRequest(request: Request, env: Env) {
       }
 
       const token = authHeader.substring(7);
-      const verified = verifyJWT(token);
+      const verified = await verifyJWT(token, getJWTSecret(env));
 
       if (!verified.valid) {
         return json({ success: false, error: 'Token inválido' }, 401);
@@ -1595,7 +1741,7 @@ async function handleRequest(request: Request, env: Env) {
 
       // Verificar TOTP code
       if (code) {
-        isValid = verifyTOTPCode(user.two_factor_secret, code);
+        isValid = await verifyTOTPCode(user.two_factor_secret, code);
       }
 
       // Verificar backup code
@@ -1620,7 +1766,7 @@ async function handleRequest(request: Request, env: Env) {
       }
 
       // Gerar token de conclusão
-      const completeToken = generateJWT(userId, user.email, 300); // 5 minutos
+      const completeToken = await generateJWT(userId, user.email, 300, getJWTSecret(env)); // 5 minutos
 
       return json({
         success: true,
@@ -1720,10 +1866,54 @@ async function handleRequest(request: Request, env: Env) {
   if (path === '/api/stripe/webhook') {
     if (request.method === 'POST') {
       try {
-        const body = await request.json();
-        const event = body;
+        if (!env.STRIPE_WEBHOOK_SECRET) {
+          return new Response(JSON.stringify({ error: 'Webhook não configurado' }), { status: 500, headers: { 'Content-Type': 'application/json' } });
+        }
 
-        console.log(`[Webhook] Evento: ${event.type}`);
+        const rawBody = await request.text();
+        const sig = request.headers.get('stripe-signature');
+
+        if (!sig) {
+          return new Response(JSON.stringify({ error: 'Assinatura obrigatória' }), { status: 400, headers: { 'Content-Type': 'application/json' } });
+        }
+
+        // Verificar assinatura Stripe (HMAC-SHA256)
+        const sigParts: Record<string, string> = {};
+        sig.split(',').forEach(part => {
+          const [k, v] = part.split('=');
+          if (k && v) sigParts[k] = v;
+        });
+
+        const timestamp = sigParts['t'];
+        const v1Signature = sigParts['v1'];
+
+        if (!timestamp || !v1Signature) {
+          return new Response(JSON.stringify({ error: 'Assinatura inválida' }), { status: 400, headers: { 'Content-Type': 'application/json' } });
+        }
+
+        // Verificar tolerância de 5 minutos
+        const now = Math.floor(Date.now() / 1000);
+        if (Math.abs(now - parseInt(timestamp, 10)) > 300) {
+          return new Response(JSON.stringify({ error: 'Timestamp expirado' }), { status: 400, headers: { 'Content-Type': 'application/json' } });
+        }
+
+        const signingPayload = `${timestamp}.${rawBody}`;
+        const key = await crypto.subtle.importKey(
+          'raw',
+          new TextEncoder().encode(env.STRIPE_WEBHOOK_SECRET),
+          { name: 'HMAC', hash: 'SHA-256' },
+          false,
+          ['sign']
+        );
+        const signatureBuffer = await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(signingPayload));
+        const computedSignature = Array.from(new Uint8Array(signatureBuffer))
+          .map(b => b.toString(16).padStart(2, '0')).join('');
+
+        if (computedSignature !== v1Signature) {
+          return new Response(JSON.stringify({ error: 'Assinatura inválida' }), { status: 400, headers: { 'Content-Type': 'application/json' } });
+        }
+
+        const event = JSON.parse(rawBody);
 
         if (event.type === 'checkout.session.completed') {
           const session = event.data.object;
@@ -1744,7 +1934,7 @@ async function handleRequest(request: Request, env: Env) {
         });
       } catch (error: any) {
         console.error('[Webhook Error]', error.message);
-        return json({ error: error.message }, 500);
+        return new Response(JSON.stringify({ error: 'Erro interno' }), { status: 500, headers: { 'Content-Type': 'application/json' } });
       }
     } else if (request.method === 'GET' || request.method === 'HEAD') {
       return new Response('', { status: 200 });
