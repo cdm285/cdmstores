@@ -13,6 +13,11 @@ database_id = "a22156d2-037a-400d-9408-d064020b4ca8"
 [env.production]
 vars = { ENVIRONMENT = "production" }
 
+[[env.production.d1_databases]]
+binding = "DB"
+database_name = "cdmstores"
+database_id = "a22156d2-037a-400d-9408-d064020b4ca8"
+
 [env.development]
 vars = { ENVIRONMENT = "development" }
 
