@@ -10,8 +10,8 @@
  * │  MEMORY READ        agent05ShortMemory (read) + agent06LongMemory     │
  * │  EPISODIC           agent08EpisodicMemory (if email in entities)      │
  * │  ─── ROUTE BRANCH ─────────────────────────────────────────────────── │
- * │  FAST PATH          intent-mapped action agent → formatting           │
- * │  FULL PATH          agent04Context + agent07SemanticMemory            │
+ * │  TIER 4 FAST PATH   agent10ActionRouter dispatches 11–17              │
+ * │  FULL AI PATH       agent04Context + agent07SemanticMemory            │
  * │                     + agent09Reasoning + personalityAgent + styleAgent│
  * │  ─── POST ─────────────────────────────────────────────────────────── │
  * │  QUALITY CHECK      qualityAgent + validationAgent                    │
@@ -25,6 +25,9 @@ import { createContext, contextToOutput, addTrace, ContextInput, ExtendedAgentCo
 import { createPipeline }                    from '../core/pipeline.js';
 import type { AgentEnv, OrchestratorOutput } from '../core/types.js';
 
+// ── Tier 4 action router ───────────────────────────────────────────────────────
+import { agent10ActionRouter, buildRequestFromContext } from './10-action-router.js';
+
 // ── Numbered agents (new architecture) ───────────────────────────────────────
 import { agent01NLP }            from './01-nlp.js';
 import { agent02Intent }         from './02-intent.js';
@@ -37,69 +40,13 @@ import { agent08EpisodicMemory } from './08-episodic-memory.js';
 import { agent09Reasoning }      from './09-reasoning.js';
 
 // ── Existing action / quality / personality agents ────────────────────────────
-import {
-  cartAgent, orderAgent, trackingAgent, couponAgent,
-  productAgent, schedulingAgent, whatsAppAgent,
-  notificationAgent, paymentAgent, fallbackAgent,
-} from './actions.js';
+import { whatsAppAgent }                                                         from './actions.js';
+import { qualityAgent, validationAgent, selfRepairAgent }                        from './quality.js';
+import { emotionAgent, personalityAgent, styleAgent }                            from './personality.js';
+import { securityAgent, contentFilterAgent }                                     from './security.js';
 
-import { qualityAgent, validationAgent, selfRepairAgent } from './quality.js';
-import { emotionAgent, personalityAgent, styleAgent }     from './personality.js';
-import { securityAgent, contentFilterAgent }              from './security.js';
-
-// ─── Intent → action agent map ────────────────────────────────────────────────
-const ACTION_MAP: Record<string, (ctx: ExtendedAgentContext, msg: string) => Promise<string | null>> = {
-  tracking      : async (ctx) => {
-    const code = ctx.entities?.tracking_code as string | undefined;
-    const r    = await trackingAgent.run(ctx, code ?? '');
-    return r.response ?? r.data?.response as string ?? null;
-  },
-  coupon        : async (ctx, msg) => {
-    const r = await couponAgent.run(ctx, msg);
-    applyActionResult(ctx, r);
-    return r.response ?? null;
-  },
-  cart_action   : async (ctx) => {
-    const raw = ctx.entities?.product_id;
-    const r   = await cartAgent.run(ctx, typeof raw === 'number' ? raw : Number(raw ?? 0));
-    applyActionResult(ctx, r);
-    return r.response ?? null;
-  },
-  product_query : async (ctx, _msg) => {
-    const id = ctx.entities?.product_id;
-    const r  = await productAgent.run(ctx, id !== undefined ? Number(id) : undefined);
-    applyActionResult(ctx, r);
-    return r.response ?? null;
-  },
-  order_history : async (ctx) => {
-    const email = ctx.entities?.email as string | undefined;
-    const r     = await orderAgent.run(ctx, email ?? '');
-    return r.response ?? null;
-  },
-  schedule      : async (ctx, _msg) => {
-    const r = await schedulingAgent.run(ctx);
-    applyActionResult(ctx, r);
-    return r.response ?? null;
-  },
-  whatsapp      : async (ctx) => {
-    const r = await whatsAppAgent.run(ctx);
-    applyActionResult(ctx, r);
-    return r.response ?? null;
-  },
-  notification  : async (ctx) => {
-    const r = await notificationAgent.run(ctx);
-    applyActionResult(ctx, r);
-    return r.response ?? null;
-  },
-  payment       : async (ctx, _msg) => {
-    const r = await paymentAgent.run(ctx);
-    applyActionResult(ctx, r);
-    return r.response ?? null;
-  },
-};
-
-// ─── Helper: transfer AgentResult fields to context ───────────────────────────
-function applyActionResult(ctx: ExtendedAgentContext, r: { action?: string; actionPayload?: Record<string, unknown> }): void {
+// ─── Helper: apply ActionResult fields to context ─────────────────────────────
+function applyActionResult(ctx: ExtendedAgentContext, r: { action?: string; actionPayload?: Record<string, unknown>; response?: string }): void {
   if (r.action)        ctx.lastAction        = r.action;
   if (r.actionPayload) ctx.lastActionPayload = r.actionPayload ?? {};
 }
@@ -175,18 +122,24 @@ export class MainOrchestrator {
 
     let finalResponse: string | null = null;
 
-    if (route === 'fast' && intent && intent !== 'unknown') {
-      const actionFn = ACTION_MAP[intent];
-      if (actionFn) {
-        finalResponse = await actionFn(ctx, msg);
+    // ── 7a. Tier 4 fast path — ActionRouter ──────────────────────────────────
+    if (route === 'fast' && intent && intent !== 'unknown' && intent !== 'greeting' && intent !== 'farewell') {
+      const actionReq = buildRequestFromContext(ctx);
+      if (actionReq) {
+        const actionResult = await agent10ActionRouter.execute(ctx, actionReq);
+        applyActionResult(ctx, actionResult);
+        if (actionResult.success && actionResult.response) {
+          finalResponse = actionResult.response;
+        }
+        // On failure, fall through to full AI path (graceful degradation)
       }
     }
 
-    // Greetings / farewells — handled without AI
+    // ── 7b. Greetings / farewells — no AI needed ─────────────────────────────
     if (!finalResponse && (intent === 'greeting' || intent === 'farewell')) {
       const greetMap: Record<string, Record<string, string>> = {
-        greeting: { pt: '👋 Olá! Como posso te ajudar hoje com a CDM STORES?', en: '👋 Hello! How can I help you with CDM STORES today?', es: '👋 �Hola! ¿Cómo puedo ayudarte con CDM STORES hoy?' },
-        farewell: { pt: '😊 Até logo! Foi um prazer te atender!', en: '😊 Goodbye! It was a pleasure helping you!', es: '😊 ¡Hasta luego! ¡Fue un placer atenderte!' },
+        greeting: { pt: '👋 Olá! Como posso te ajudar hoje com a CDM STORES?', en: '👋 Hello! How can I help you with CDM STORES today?', es: '👋 ¡Hola! ¿Cómo puedo ayudarte con CDM STORES hoy?' },
+        farewell: { pt: '😊 Até logo! Foi um prazer te atender!',               en: '😊 Goodbye! It was a pleasure helping you!',          es: '😊 ¡Hasta luego! ¡Fue un placer atenderte!'          },
       };
       finalResponse = greetMap[intent]?.[ctx.detectedLang] ?? greetMap[intent]?.pt ?? null;
     }
