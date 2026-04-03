@@ -27,6 +27,7 @@
  */
 
 import { addTrace, ExtendedAgentContext } from './agent-context.js';
+import type { ActionRequest, ActionResult }          from './action-schema.js';
 
 // ─── Step types ───────────────────────────────────────────────────────────────
 /** A single async operation that receives and mutates the context. */
@@ -56,6 +57,13 @@ export interface StepReport {
   error?     : string;
 }
 
+export interface Tier4ActionReport {
+  actionType  : string;
+  success     : boolean;
+  latencyMs   : number;
+  error?      : string;
+}
+
 export interface PipelineReport {
   pipelineName   : string;
   success        : boolean;
@@ -64,6 +72,7 @@ export interface PipelineReport {
   stepsSkipped   : number;
   stepsFailed    : number;
   steps          : StepReport[];
+  tier4Actions?  : Tier4ActionReport[];
 }
 
 // ─── Pipeline class ───────────────────────────────────────────────────────────
@@ -245,4 +254,57 @@ export async function runTier(
   if (ctx.flags.debug) {
     console.log(`[Tier:${name}] ${fns.length} agents, ${errors.length} errors, ${Date.now() - start}ms`);
   }
+}
+
+// ─── Tier 4 runner ───────────────────────────────────────────────────────────
+/**
+ * Run Tier 4 action requests in parallel.
+ *
+ * @param ctx      Agent context (mutated in-place by each action agent)
+ * @param requests Array of typed ActionRequests to dispatch
+ * @param dispatch The router function — typically `agent10ActionRouter.execute`
+ * @returns        Structured per-action reports (used for PipelineReport.tier4Actions)
+ *
+ * Example:
+ *   const t4 = await runTier4(ctx, [req1, req2], agent10ActionRouter.execute.bind(agent10ActionRouter));
+ */
+export async function runTier4(
+  ctx      : ExtendedAgentContext,
+  requests : ActionRequest[],
+  dispatch : (ctx: ExtendedAgentContext, req: ActionRequest) => Promise<ActionResult>,
+): Promise<Tier4ActionReport[]> {
+  const settled = await Promise.allSettled(
+    requests.map(async (req): Promise<Tier4ActionReport> => {
+      const t0     = Date.now();
+      const result = await dispatch(ctx, req);
+      return {
+        actionType : req.payload.type,
+        success    : result.success,
+        latencyMs  : Date.now() - t0,
+        error      : result.error,
+      };
+    }),
+  );
+
+  const reports: Tier4ActionReport[] = settled.map((r, i) => {
+    if (r.status === 'fulfilled') return r.value;
+    return {
+      actionType : requests[i].payload.type,
+      success    : false,
+      latencyMs  : 0,
+      error      : (r.reason as Error)?.message ?? 'unknown error',
+    };
+  });
+
+  // Write structured log to ctx.meta for downstream surfacing
+  const existing = (ctx.meta.tier4Actions as Tier4ActionReport[] | undefined) ?? [];
+  ctx.meta.tier4Actions = [...existing, ...reports];
+
+  if (ctx.flags.debug) {
+    const ok  = reports.filter(r => r.success).length;
+    const err = reports.length - ok;
+    console.log(`[Tier4] ${reports.length} actions — ${ok} ok, ${err} failed`);
+  }
+
+  return reports;
 }
