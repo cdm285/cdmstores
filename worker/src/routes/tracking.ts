@@ -33,7 +33,7 @@ router.get('/:code', async (req, { DB }) => {
       }
     });
   } catch (error) {
-    return json({ success: false, error: error.message }, { status: 500 });
+    return json({ success: false, error: (error as Error).message }, { status: 500 });
   }
 });
 
@@ -55,7 +55,7 @@ router.get('/status/:orderId', async (req, { DB }) => {
       data: order 
     });
   } catch (error) {
-    return json({ success: false, error: error.message }, { status: 500 });
+    return json({ success: false, error: (error as Error).message }, { status: 500 });
   }
 });
 

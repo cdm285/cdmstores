@@ -6,7 +6,7 @@ const router = Router({ base: '/api/cj' });
 // POST /api/cj/create-order - Criar pedido no CJdropshipping
 router.post('/create-order', async (req, env, { DB }) => {
   try {
-    const { orderId } = await req.json();
+    const { orderId } = await req.json() as { orderId: string };
     
     if (!orderId) {
       return json({ success: false, error: 'orderId obrigatório' }, { status: 400 });
@@ -59,7 +59,7 @@ router.post('/create-order', async (req, env, { DB }) => {
       message: 'Pedido criado no CJdropshipping'
     });
   } catch (error) {
-    return json({ success: false, error: error.message }, { status: 500 });
+    return json({ success: false, error: (error as Error).message }, { status: 500 });
   }
 });
 
@@ -83,14 +83,14 @@ router.get('/tracking/:cjOrderId', async (req, env, { DB }) => {
       }
     });
   } catch (error) {
-    return json({ success: false, error: error.message }, { status: 500 });
+    return json({ success: false, error: (error as Error).message }, { status: 500 });
   }
 });
 
 // POST /api/cj/webhook - Webhook do CJdropshipping para atualizações
 router.post('/webhook', async (req, env, { DB }) => {
   try {
-    const { cj_order_id, status, tracking_number, estimated_delivery } = await req.json();
+    const { cj_order_id, status, tracking_number, estimated_delivery } = await req.json() as { cj_order_id: string; status: string; tracking_number: string; estimated_delivery: string };
     
     // Atualizar pedido com informações do CJ
     await DB.prepare(
@@ -103,7 +103,7 @@ router.post('/webhook', async (req, env, { DB }) => {
     
     return json({ success: true, message: 'Webhook processado' });
   } catch (error) {
-    return json({ success: false, error: error.message }, { status: 500 });
+    return json({ success: false, error: (error as Error).message }, { status: 500 });
   }
 });
 

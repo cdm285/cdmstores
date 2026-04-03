@@ -20,7 +20,7 @@ router.get('/:id', async (req, { DB }) => {
     
     return json({ success: true, data: order });
   } catch (error) {
-    return json({ success: false, error: error.message }, { status: 500 });
+    return json({ success: false, error: (error as Error).message }, { status: 500 });
   }
 });
 
@@ -36,7 +36,7 @@ router.get('/customer/:email', async (req, { DB }) => {
     
     return json({ success: true, data: orders.results });
   } catch (error) {
-    return json({ success: false, error: error.message }, { status: 500 });
+    return json({ success: false, error: (error as Error).message }, { status: 500 });
   }
 });
 
@@ -50,7 +50,7 @@ router.post('/', async (req, { DB }) => {
       total,
       shipping_address,
       shipping_cost
-    } = await req.json();
+    } = await req.json() as { customer_name: string; customer_email: string; items: Array<{ product_id: string; quantity: number; price: number }>; total: number; shipping_address: string; shipping_cost: number };
     
     if (!customer_email || !items || !total) {
       return json({ success: false, error: 'Dados incompletos' }, { status: 400 });
@@ -79,7 +79,7 @@ router.post('/', async (req, { DB }) => {
       status: 'pending'
     }, { status: 201 });
   } catch (error) {
-    return json({ success: false, error: error.message }, { status: 500 });
+    return json({ success: false, error: (error as Error).message }, { status: 500 });
   }
 });
 

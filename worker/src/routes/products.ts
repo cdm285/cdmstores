@@ -12,7 +12,7 @@ router.get('/', async (req, { DB }) => {
     
     return json({ success: true, data: products.results });
   } catch (error) {
-    return json({ success: false, error: error.message }, { status: 500 });
+    return json({ success: false, error: (error as Error).message }, { status: 500 });
   }
 });
 
@@ -30,14 +30,14 @@ router.get('/:id', async (req, { DB }) => {
     
     return json({ success: true, data: product });
   } catch (error) {
-    return json({ success: false, error: error.message }, { status: 500 });
+    return json({ success: false, error: (error as Error).message }, { status: 500 });
   }
 });
 
 // POST /api/products - Criar novo produto (admin)
 router.post('/', async (req, { DB }) => {
   try {
-    const { name, description, price, image_url, stock } = await req.json();
+    const { name, description, price, image_url, stock } = await req.json() as { name: string; description: string; price: number; image_url: string; stock: number };
     
     const result = await DB.prepare(
       'INSERT INTO products (name, description, price, image_url, stock, active, created_at) VALUES (?, ?, ?, ?, ?, 1, datetime("now"))'
@@ -45,7 +45,7 @@ router.post('/', async (req, { DB }) => {
     
     return json({ success: true, id: result.meta.last_row_id }, { status: 201 });
   } catch (error) {
-    return json({ success: false, error: error.message }, { status: 500 });
+    return json({ success: false, error: (error as Error).message }, { status: 500 });
   }
 });
 

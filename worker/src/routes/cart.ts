@@ -6,7 +6,7 @@ const router = Router({ base: '/api/cart' });
 // POST /api/cart/add - Adicionar ao carrinho
 router.post('/add', async (req, { DB }) => {
   try {
-    const { product_id, quantity, customer_id } = await req.json();
+    const { product_id, quantity, customer_id } = await req.json() as { product_id: string; quantity: number; customer_id?: string };
     
     if (!product_id || !quantity) {
       return json({ success: false, error: 'product_id e quantity obrigatórios' }, { status: 400 });
@@ -28,17 +28,17 @@ router.post('/add', async (req, { DB }) => {
       item: { product_id, quantity }
     });
   } catch (error) {
-    return json({ success: false, error: error.message }, { status: 500 });
+    return json({ success: false, error: (error as Error).message }, { status: 500 });
   }
 });
 
 // DELETE /api/cart/remove - Remover do carrinho
 router.delete('/remove', async (req) => {
   try {
-    const { product_id } = await req.json();
+    const { product_id } = await req.json() as { product_id: string };
     return json({ success: true, message: 'Item removido do carrinho' });
   } catch (error) {
-    return json({ success: false, error: error.message }, { status: 500 });
+    return json({ success: false, error: (error as Error).message }, { status: 500 });
   }
 });
 
@@ -60,7 +60,7 @@ router.get('/calculate-shipping', async (req, { DB }) => {
       estimated_days: 7
     });
   } catch (error) {
-    return json({ success: false, error: error.message }, { status: 500 });
+    return json({ success: false, error: (error as Error).message }, { status: 500 });
   }
 });
 

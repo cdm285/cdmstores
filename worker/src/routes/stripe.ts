@@ -3,12 +3,12 @@ import { json } from 'itty-router';
 import Stripe from 'stripe';
 
 const router = Router({ base: '/api/stripe' });
-const stripe = new Stripe(env.STRIPE_SECRET_KEY);
 
 // POST /api/stripe/create-payment - Criar sessão de pagamento
-router.post('/create-payment', async (req, env) => {
+router.post('/create-payment', async (req, env: { STRIPE_SECRET_KEY: string; STRIPE_WEBHOOK_SECRET: string }) => {
   try {
-    const { orderId, items, total, customerEmail } = await req.json();
+    const stripe = new Stripe(env.STRIPE_SECRET_KEY);
+    const { orderId, items, total, customerEmail } = await req.json() as { orderId: string; items: Array<{ name: string; price: number; quantity: number }>; total: number; customerEmail: string };
     
     if (!orderId || !total) {
       return json({ success: false, error: 'Dados incompletos' }, { status: 400 });
@@ -41,15 +41,20 @@ router.post('/create-payment', async (req, env) => {
       session_id: session.id
     });
   } catch (error) {
-    return json({ success: false, error: error.message }, { status: 500 });
+    return json({ success: false, error: (error as Error).message }, { status: 500 });
   }
 });
 
 // POST /api/stripe/webhook - Webhook do Stripe
-router.post('/webhook', async (req, env, { DB }) => {
+router.post('/webhook', async (req, env: { STRIPE_SECRET_KEY: string; STRIPE_WEBHOOK_SECRET: string }, { DB }) => {
   try {
+    const stripe = new Stripe(env.STRIPE_SECRET_KEY);
     const body = await req.text();
     const sig = req.headers.get('stripe-signature');
+
+    if (!sig) {
+      return json({ success: false, error: 'Assinatura ausente' }, { status: 400 });
+    }
     
     let event;
     try {
@@ -65,7 +70,7 @@ router.post('/webhook', async (req, env, { DB }) => {
     // Processar eventos
     if (event.type === 'checkout.session.completed') {
       const session = event.data.object;
-      const orderId = session.metadata.order_id;
+      const orderId = session.metadata?.order_id;
       
       // Atualizar status do pedido para "paid"
       await DB.prepare(
@@ -78,7 +83,7 @@ router.post('/webhook', async (req, env, { DB }) => {
     
     return json({ success: true, received: true });
   } catch (error) {
-    return json({ success: false, error: error.message }, { status: 500 });
+    return json({ success: false, error: (error as Error).message }, { status: 500 });
   }
 });
 
