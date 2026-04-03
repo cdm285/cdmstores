@@ -15,13 +15,27 @@ const SECURITY_HEADERS: Record<string, string> = {
   'Pragma': 'no-cache',
 };
 
+const ALLOWED_ORIGINS = new Set([
+  'https://cdmstores.com',
+  'https://www.cdmstores.com',
+  'http://localhost',
+  'http://localhost:8787',
+  'http://localhost:3000',
+]);
+
+function resolveOrigin(request: Request): string {
+  const origin = request.headers.get('Origin') || '';
+  return ALLOWED_ORIGINS.has(origin) ? origin : 'https://cdmstores.com';
+}
+
 const CORS_HEADERS: Record<string, string> = {
   ...SECURITY_HEADERS,
-  'Access-Control-Allow-Origin': 'https://cdmstores.com',
+  'Access-Control-Allow-Origin': 'https://cdmstores.com', // substituído dinamicamente no fetch
   'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
   'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Turnstile-Token',
   'Access-Control-Allow-Credentials': 'true',
   'Access-Control-Max-Age': '86400',
+  'Vary': 'Origin',
 };
 
 interface Env {
@@ -2590,8 +2604,17 @@ async function handleRequest(request: Request, env: Env) {
   return json({ error: 'Not found', path }, 404);
 }
 
+async function fetchWithCors(request: Request, env: Env): Promise<Response> {
+  const origin = resolveOrigin(request);
+  const response = await handleRequest(request, env);
+  const headers = new Headers(response.headers);
+  headers.set('Access-Control-Allow-Origin', origin);
+  headers.set('Vary', 'Origin');
+  return new Response(response.body, { status: response.status, statusText: response.statusText, headers });
+}
+
 export default {
-  fetch: (request: Request, env: Env) => handleRequest(request, env),
+  fetch: (request: Request, env: Env) => fetchWithCors(request, env),
   scheduled: async (_controller: ScheduledController, env: Env) => {
     // [BAIXA-02 CORRIGIDO] Limpeza de registros expirados para manter DB enxuto
     try {
