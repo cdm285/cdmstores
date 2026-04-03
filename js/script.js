@@ -420,9 +420,22 @@ function initMobileNav() {
         document.body.classList.remove("nav-open");
     }
 
+    // Use both click and touchend to ensure reliability on all mobile browsers
+    function handleHamburgerActivate(e) {
+        e.preventDefault();
+        openNav();
+    }
+
     hamburger.addEventListener("click", openNav);
+    // touchend with preventDefault prevents the 300ms ghost-click delay
+    hamburger.addEventListener("touchend", handleHamburgerActivate, { passive: false });
+
     overlay.addEventListener("click", closeNav);
-    if (closeBtn) closeBtn.addEventListener("click", closeNav);
+    overlay.addEventListener("touchend", (e) => { e.preventDefault(); closeNav(); }, { passive: false });
+    if (closeBtn) {
+        closeBtn.addEventListener("click", closeNav);
+        closeBtn.addEventListener("touchend", (e) => { e.preventDefault(); closeNav(); }, { passive: false });
+    }
 
     // Close when any nav link is tapped
     nav.querySelectorAll(".mobile-nav-link, .mobile-nav-cta").forEach(el => {

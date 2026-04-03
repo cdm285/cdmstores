@@ -52,6 +52,8 @@ jobs:
   deploy-pages:
     name: Pages (Frontend)
     runs-on: ubuntu-latest
+    # Só faz deploy real no push para main; PRs não sobrescrevem produção
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
 
     steps:
       - name: Checkout
@@ -62,4 +64,4 @@ jobs:
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          command: pages deploy . --project-name cdmstores --branch main
+          command: pages deploy . --project-name cdmstores --branch main --commit-dirty=true

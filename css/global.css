@@ -150,7 +150,8 @@ body {
 
 /* Premium logo image — desktop */
 .premium-logo-img {
-    height: 44px;
+    height: auto;
+    max-height: 46px;
     width: auto;
     max-width: 240px;
     object-fit: contain;
@@ -171,7 +172,8 @@ body {
 
 @media (max-width: 768px) {
     .premium-logo-img {
-        height: 30px;
+        height: auto;
+        max-height: 32px;
         filter:
             drop-shadow(0 0 8px rgba(0,162,255,0.5))
             contrast(1.1)
@@ -330,6 +332,11 @@ body {
     padding: 8px;
     transition: border-color var(--transition), background var(--transition);
     flex-shrink: 0;
+    /* Mobile tap optimizations — removes 300ms delay and blue flash */
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+    user-select: none;
+    -webkit-user-select: none;
 }
 .hamburger:hover {
     background: var(--bg-subtle);
