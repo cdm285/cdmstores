@@ -97,32 +97,69 @@
     </div>
 
     <header class="header" id="site-header">
-        <div class="left-area">
-            <nav class="menu" aria-label="Navegação principal">
-                <a href="../index.html" data-i18n="nav.home">Início</a>
-                <a href="../index.html#produtos" data-i18n="nav.products">Produtos</a>
-                <a href="rastreio.html" data-i18n="nav.track" aria-current="page">Rastreio</a>
-            </nav>
-        </div>
-        <div class="logo-area">
-            <a href="../index.html" aria-label="CDM STORES - Página inicial">
-                <img src="../assets/logo.png" class="logo" alt="CDM STORES">
+
+        <!-- LOGO -->
+        <div class="header-logo">
+            <a href="../index.html" aria-label="CDM STORES">
+                <img src="../assets/logo-premium.png" class="premium-logo-img" alt="CDM STORES" fetchpriority="high">
             </a>
         </div>
-        <div class="right-area">
-            <div class="lang-selector" role="group" aria-label="Selecionar idioma">
-                <button class="lang-btn active" data-lang="pt" title="Português">
-                    <img src="../assets/br.png" alt="Português" width="24" height="24">
-                </button>
-                <button class="lang-btn" data-lang="en" title="English">
-                    <img src="../assets/us.png" alt="English" width="24" height="24">
-                </button>
-                <button class="lang-btn" data-lang="es" title="Español">
-                    <img src="../assets/es.png" alt="Español" width="24" height="24">
-                </button>
+
+        <!-- NAV DESKTOP -->
+        <div class="header-nav-container">
+            <nav class="header-nav" aria-label="Navegação principal">
+                <a href="../index.html" class="nav-link" data-i18n="nav.home">Início</a>
+                <a href="../index.html#produtos" class="nav-link" data-i18n="nav.products">Produtos</a>
+                <a href="rastreio.html" class="nav-link" aria-current="page" data-i18n="nav.track">Rastreio</a>
+            </nav>
+            <div class="desktop-lang" role="group" aria-label="Idioma">
+                <button class="desktop-lang-btn active" data-lang="pt" aria-pressed="true">PT</button>
+                <span class="desktop-lang-sep">|</span>
+                <button class="desktop-lang-btn" data-lang="en" aria-pressed="false">EN</button>
+                <span class="desktop-lang-sep">|</span>
+                <button class="desktop-lang-btn" data-lang="es" aria-pressed="false">ES</button>
             </div>
         </div>
+
+        <!-- ACTIONS DESKTOP -->
+        <div class="header-actions">
+            <a href="../index.html#produtos" class="header-cta" data-i18n="nav.products">Produtos</a>
+        </div>
+
+        <!-- HAMBURGER (mobile only) -->
+        <button class="hamburger" id="hamburger-btn" aria-label="Abrir menu" aria-expanded="false" aria-controls="mobile-nav">
+            <span class="hamburger-line"></span>
+            <span class="hamburger-line"></span>
+            <span class="hamburger-line"></span>
+        </button>
+
     </header>
+
+    <!-- MOBILE OFF-CANVAS NAV -->
+    <div class="mobile-nav" id="mobile-nav" aria-hidden="true" role="dialog" aria-modal="true" aria-label="Menu de navegação">
+        <div class="mobile-nav-header">
+            <a href="../index.html" class="mobile-nav-logo">CDM STORES</a>
+            <button class="mobile-nav-close" id="mobile-nav-close" aria-label="Fechar menu">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+            </button>
+        </div>
+        <nav class="mobile-nav-links" aria-label="Menu mobile">
+            <a href="../index.html" class="mobile-nav-link" data-i18n="nav.home">Início</a>
+            <a href="../index.html#produtos" class="mobile-nav-link" data-i18n="nav.products">Produtos</a>
+            <a href="rastreio.html" class="mobile-nav-link" aria-current="page" data-i18n="nav.track">Rastreio</a>
+        </nav>
+        <div class="mobile-nav-footer">
+            <div class="mobile-nav-lang-label">Idioma</div>
+            <div class="mobile-lang" role="group" aria-label="Idioma">
+                <button class="mobile-lang-btn active" data-lang="pt" aria-pressed="true">PT</button>
+                <span class="mobile-lang-sep">|</span>
+                <button class="mobile-lang-btn" data-lang="en" aria-pressed="false">EN</button>
+                <span class="mobile-lang-sep">|</span>
+                <button class="mobile-lang-btn" data-lang="es" aria-pressed="false">ES</button>
+            </div>
+        </div>
+    </div>
+    <div class="mobile-nav-overlay" id="mobile-nav-overlay" aria-hidden="true"></div>
 
     <main class="rastreio-wrap">
         <h2 data-i18n="tracking.title">Rastrear Pedido</h2>

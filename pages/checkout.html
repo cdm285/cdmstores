@@ -17,32 +17,70 @@
     </div>
 
     <header class="header" id="site-header">
-        <div class="left-area">
-            <nav class="menu" aria-label="Navegação principal">
-                <a href="../index.html" data-i18n="nav.home">Início</a>
-                <a href="../index.html#produtos" data-i18n="nav.products">Produtos</a>
-                <a href="rastreio.html" data-i18n="nav.track">Rastreio</a>
-            </nav>
-        </div>
-        <div class="logo-area">
-            <a href="../index.html" aria-label="CDM STORES - Página inicial">
-                <img src="../assets/logo.png" class="logo" alt="CDM STORES">
+
+        <!-- LOGO -->
+        <div class="header-logo">
+            <a href="../index.html" aria-label="CDM STORES">
+                <img src="../assets/logo-premium.png" class="premium-logo-img" alt="CDM STORES" fetchpriority="high">
             </a>
         </div>
-        <div class="right-area">
-            <div class="lang-selector" role="group" aria-label="Selecionar idioma">
-                <button class="lang-btn active" data-lang="pt" title="Português">
-                    <img src="../assets/br.png" alt="Português" width="24" height="24">
-                </button>
-                <button class="lang-btn" data-lang="en" title="English">
-                    <img src="../assets/us.png" alt="English" width="24" height="24">
-                </button>
-                <button class="lang-btn" data-lang="es" title="Español">
-                    <img src="../assets/es.png" alt="Español" width="24" height="24">
-                </button>
+
+        <!-- NAV DESKTOP -->
+        <div class="header-nav-container">
+            <nav class="header-nav" aria-label="Navegação principal">
+                <a href="../index.html" class="nav-link" data-i18n="nav.home">Início</a>
+                <a href="../index.html#produtos" class="nav-link" data-i18n="nav.products">Produtos</a>
+                <a href="rastreio.html" class="nav-link" data-i18n="nav.track">Rastreio</a>
+            </nav>
+            <div class="desktop-lang" role="group" aria-label="Idioma">
+                <button class="desktop-lang-btn active" data-lang="pt" aria-pressed="true">PT</button>
+                <span class="desktop-lang-sep">|</span>
+                <button class="desktop-lang-btn" data-lang="en" aria-pressed="false">EN</button>
+                <span class="desktop-lang-sep">|</span>
+                <button class="desktop-lang-btn" data-lang="es" aria-pressed="false">ES</button>
             </div>
         </div>
+
+        <!-- ACTIONS DESKTOP -->
+        <div class="header-actions">
+            <a href="../index.html" class="header-cta" data-i18n="nav.home">Voltar</a>
+        </div>
+
+        <!-- HAMBURGER (mobile only) -->
+        <button class="hamburger" id="hamburger-btn" aria-label="Abrir menu" aria-expanded="false" aria-controls="mobile-nav">
+            <span class="hamburger-line"></span>
+            <span class="hamburger-line"></span>
+            <span class="hamburger-line"></span>
+        </button>
+
     </header>
+
+    <!-- MOBILE OFF-CANVAS NAV -->
+    <div class="mobile-nav" id="mobile-nav" aria-hidden="true" role="dialog" aria-modal="true" aria-label="Menu de navegação">
+        <div class="mobile-nav-header">
+            <a href="../index.html" class="mobile-nav-logo">CDM STORES</a>
+            <button class="mobile-nav-close" id="mobile-nav-close" aria-label="Fechar menu">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+            </button>
+        </div>
+        <nav class="mobile-nav-links" aria-label="Menu mobile">
+            <a href="../index.html" class="mobile-nav-link" data-i18n="nav.home">Início</a>
+            <a href="../index.html#produtos" class="mobile-nav-link" data-i18n="nav.products">Produtos</a>
+            <a href="rastreio.html" class="mobile-nav-link" data-i18n="nav.track">Rastreio</a>
+            <a href="checkout.html" class="mobile-nav-link">Checkout</a>
+        </nav>
+        <div class="mobile-nav-footer">
+            <div class="mobile-nav-lang-label">Idioma</div>
+            <div class="mobile-lang" role="group" aria-label="Idioma">
+                <button class="mobile-lang-btn active" data-lang="pt" aria-pressed="true">PT</button>
+                <span class="mobile-lang-sep">|</span>
+                <button class="mobile-lang-btn" data-lang="en" aria-pressed="false">EN</button>
+                <span class="mobile-lang-sep">|</span>
+                <button class="mobile-lang-btn" data-lang="es" aria-pressed="false">ES</button>
+            </div>
+        </div>
+    </div>
+    <div class="mobile-nav-overlay" id="mobile-nav-overlay" aria-hidden="true"></div>
 
     <section class="checkout">
         <div class="checkout-card">
@@ -117,13 +155,54 @@
             summary.innerHTML = html;
         }
 
-        function checkoutStripe() {
+        // [ALTA-15 CORRIGIDO] Email nunca exposto em URL — enviado via POST ao backend
+        async function checkoutStripe() {
             const email = document.getElementById('checkout-email').value;
             if (!email || !email.includes('@')) {
                 cdmStore.mostrarNotificacao('Digite um email válido', 'warning');
                 return;
             }
-            window.location.href = `https://cdmstores.com/api/stripe/checkout?email=${encodeURIComponent(email)}`;
+
+            const cart = JSON.parse(localStorage.getItem('cdm_cart') || '[]');
+            if (!cart.length) {
+                cdmStore.mostrarNotificacao('Carrinho vazio', 'warning');
+                return;
+            }
+
+            const btn = document.getElementById('btn-stripe');
+            btn.disabled = true;
+            btn.textContent = 'Processando...';
+
+            try {
+                // Primeiro criar o pedido
+                const orderRes = await fetch('https://cdmstores.com/api/orders', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    credentials: 'include',
+                    body: JSON.stringify({
+                        customer_email: email,
+                        items: cart.map(i => ({ product_id: i.product_id || i.id, quantity: i.quantity }))
+                    })
+                });
+                const orderData = await orderRes.json();
+                if (!orderData.success) throw new Error(orderData.error || 'Erro ao criar pedido');
+
+                // Criar sessão Stripe
+                const payRes = await fetch('https://cdmstores.com/api/stripe/create-payment', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    credentials: 'include',
+                    body: JSON.stringify({ orderId: orderData.order_id, items: cart })
+                });
+                const payData = await payRes.json();
+                if (!payData.success || !payData.checkout_url) throw new Error(payData.error || 'Erro ao iniciar pagamento');
+
+                window.location.href = payData.checkout_url;
+            } catch (err) {
+                cdmStore.mostrarNotificacao(err.message || 'Erro ao processar pagamento', 'error');
+                btn.disabled = false;
+                btn.textContent = '🔒 Pagar com Stripe';
+            }
         }
 
         document.addEventListener('DOMContentLoaded', updateCartDisplay);

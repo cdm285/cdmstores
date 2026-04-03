@@ -2,17 +2,26 @@
   "name": "cdmstores-backend",
   "version": "1.0.0",
   "description": "Backend Cloudflare Workers para CDM STORES",
-  "main": "src/index.ts",
   "scripts": {
     "dev": "wrangler dev",
-    "deploy": "wrangler deploy",
-    "db:local": "wrangler d1 execute cdmstores --file=./migrations/001_init.sql --local",
-    "db:remote": "wrangler d1 execute cdmstores --file=./migrations/001_init.sql --remote"
+    "dev:staging": "wrangler dev --env staging",
+    "deploy": "wrangler deploy --env production",
+    "deploy:staging": "wrangler deploy --env staging",
+    "preview": "wrangler dev --remote --env staging",
+    "db:local": "wrangler d1 execute cdmstores --file=./migrations/001_init.sql --local && wrangler d1 execute cdmstores --file=./migrations/002_seed.sql --local && wrangler d1 execute cdmstores --file=./migrations/003_chatbot_features.sql --local && wrangler d1 execute cdmstores --file=./migrations/004_authentication.sql --local && wrangler d1 execute cdmstores --file=./migrations/005_two_factor_auth.sql --local && wrangler d1 execute cdmstores --file=./migrations/006_security_hardening.sql --local",
+    "db:remote": "wrangler d1 execute cdmstores --file=./migrations/001_init.sql --remote && wrangler d1 execute cdmstores --file=./migrations/002_seed.sql --remote && wrangler d1 execute cdmstores --file=./migrations/003_chatbot_features.sql --remote && wrangler d1 execute cdmstores --file=./migrations/004_authentication.sql --remote && wrangler d1 execute cdmstores --file=./migrations/005_two_factor_auth.sql --remote && wrangler d1 execute cdmstores --file=./migrations/006_security_hardening.sql --remote",
+    "secrets:list": "wrangler secret list --env production",
+    "tail": "wrangler tail --env production",
+    "tail:staging": "wrangler tail --env staging"
   },
-  "dependencies": {},
+  "dependencies": {
+    "itty-router": "^5.0.23",
+    "stripe": "^14.0.0"
+  },
   "devDependencies": {
+    "@cloudflare/workers-types": "^4.20241218.0",
     "@types/node": "^20.10.5",
     "typescript": "^5.3.3",
-    "wrangler": "^3.34.0"
+    "wrangler": "^4.80.0"
   }
 }

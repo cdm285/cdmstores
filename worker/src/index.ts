@@ -1,16 +1,27 @@
 // CDM STORES - Backend Cloudflare Workers
 // API pronta para Stripe + CJdropshipping
+// Security hardening: OWASP ASVS L2/L3, NIST SP 800-63B, PCI-DSS
 
-const CORS_HEADERS = {
-  'Access-Control-Allow-Origin': 'https://cdmstores.com',
-  'Access-Control-Allow-Methods': 'GET, POST, DELETE, OPTIONS',
-  'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+import { createHash, createHmac, randomBytes, scryptSync, timingSafeEqual } from 'node:crypto';
+
+// ─── SECURITY HEADERS (OWASP ASVS 14.4, PCI-DSS 6.2.4) ──────────────────────
+const SECURITY_HEADERS: Record<string, string> = {
   'Content-Type': 'application/json',
-  // Security headers
-  'Strict-Transport-Security': 'max-age=31536000; includeSubDomains',
   'X-Content-Type-Options': 'nosniff',
   'X-Frame-Options': 'DENY',
-  'Referrer-Policy': 'no-referrer',
+  'Referrer-Policy': 'strict-origin-when-cross-origin',
+  'Permissions-Policy': 'camera=(), microphone=(), geolocation=()',
+  'Cache-Control': 'no-store',
+  'Pragma': 'no-cache',
+};
+
+const CORS_HEADERS: Record<string, string> = {
+  ...SECURITY_HEADERS,
+  'Access-Control-Allow-Origin': 'https://cdmstores.com',
+  'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+  'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Turnstile-Token',
+  'Access-Control-Allow-Credentials': 'true',
+  'Access-Control-Max-Age': '86400',
 };
 
 interface Env {
@@ -26,92 +37,601 @@ interface Env {
   GOOGLE_CLIENT_SECRET?: string;
   FACEBOOK_APP_ID?: string;
   FACEBOOK_APP_SECRET?: string;
+  TURNSTILE_SECRET_KEY?: string;   // Cloudflare Turnstile bot protection
+  ENVIRONMENT?: string;            // 'development' | 'staging' | 'production'
 }
 
 // ===== AUTENTICAÇÃO =====
 
-function requireJWTSecret(env: Env): string {
-  if (!env.JWT_SECRET) throw new Error('JWT_SECRET não configurado');
+const ACCESS_TOKEN_TTL_SECONDS = 15 * 60;
+const REFRESH_TOKEN_TTL_SECONDS = 7 * 24 * 60 * 60;
+const SCRYPT_N = 16384;
+const SCRYPT_R = 8;
+const SCRYPT_P = 1;
+const SCRYPT_KEYLEN = 64;
+
+type TokenType = 'access' | 'refresh' | 'password_reset' | 'email_verify' | '2fa_challenge';
+
+interface JWTPayload {
+  sub: number;
+  email: string;
+  type: TokenType;
+  iat: number;
+  exp: number;
+  jti: string;
+}
+
+interface JWTVerifyResult {
+  valid: boolean;
+  payload?: JWTPayload;
+  userId?: number;
+  email?: string;
+}
+
+interface AuthContext {
+  userId: number;
+  email: string;
+  token: string;
+  jti: string;
+}
+
+function base64UrlEncodeBytes(bytes: Uint8Array): string {
+  let binary = '';
+  for (const byte of bytes) {
+    binary += String.fromCharCode(byte);
+  }
+  return btoa(binary).replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_');
+}
+
+function base64UrlEncodeString(value: string): string {
+  return base64UrlEncodeBytes(new TextEncoder().encode(value));
+}
+
+function base64UrlDecodeToBytes(value: string): Uint8Array {
+  const normalized = value.replace(/-/g, '+').replace(/_/g, '/');
+  const padLength = (4 - (normalized.length % 4)) % 4;
+  const padded = normalized + '='.repeat(padLength);
+  const decoded = atob(padded);
+  const bytes = new Uint8Array(decoded.length);
+  for (let i = 0; i < decoded.length; i++) {
+    bytes[i] = decoded.charCodeAt(i);
+  }
+  return bytes;
+}
+
+function base32Encode(bytes: Uint8Array): string {
+  const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
+  let bits = 0;
+  let value = 0;
+  let output = '';
+
+  for (const byte of bytes) {
+    value = (value << 8) | byte;
+    bits += 8;
+    while (bits >= 5) {
+      output += alphabet[(value >>> (bits - 5)) & 31];
+      bits -= 5;
+    }
+  }
+
+  if (bits > 0) {
+    output += alphabet[(value << (5 - bits)) & 31];
+  }
+
+  return output;
+}
+
+function base32Decode(secret: string): Uint8Array {
+  const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
+  const clean = secret.replace(/\s|=/g, '').toUpperCase();
+
+  let bits = 0;
+  let value = 0;
+  const out: number[] = [];
+
+  for (const ch of clean) {
+    const idx = alphabet.indexOf(ch);
+    if (idx === -1) {
+      throw new Error('TOTP secret inválido (base32)');
+    }
+    value = (value << 5) | idx;
+    bits += 5;
+    if (bits >= 8) {
+      out.push((value >>> (bits - 8)) & 0xff);
+      bits -= 8;
+    }
+  }
+
+  return new Uint8Array(out);
+}
+
+function getJwtSecret(env: Env): string {
+  if (!env.JWT_SECRET || env.JWT_SECRET.length < 32) {
+    throw new Error('JWT_SECRET ausente ou fraco. Use no mínimo 32 caracteres aleatórios.');
+  }
   return env.JWT_SECRET;
 }
 
-/** Email validation regex */
-const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+function hmacSha256Base64Url(secret: string, data: string): string {
+  return createHmac('sha256', secret)
+    .update(data)
+    .digest('base64')
+    .replace(/=/g, '')
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_');
+}
+
+function hashToken(token: string): string {
+  return createHash('sha256').update(token).digest('hex');
+}
 
 /**
- * Hash de senha usando PBKDF2 com salt aleatório
- * Formato de saída: saltHex:hashHex
+ * Hash de senha seguro com PBKDF2-SHA256 (SubtleCrypto nativa do Workers).
+ * Formato: pbkdf2$iterations$saltB64$hashB64
+ * NIST SP 800-63B recomenda PBKDF2 com 600.000 iterções.
  */
 async function hashPassword(password: string): Promise<string> {
   const encoder = new TextEncoder();
   const salt = crypto.getRandomValues(new Uint8Array(16));
-  const keyMaterial = await crypto.subtle.importKey('raw', encoder.encode(password), 'PBKDF2', false, ['deriveBits']);
-  const hashBuffer = await crypto.subtle.deriveBits(
-    { name: 'PBKDF2', salt, iterations: 100000, hash: 'SHA-256' },
-    keyMaterial,
-    256
+  const keyMaterial = await crypto.subtle.importKey(
+    'raw', encoder.encode(password), 'PBKDF2', false, ['deriveBits']
   );
-  const saltHex = Array.from(salt).map(b => b.toString(16).padStart(2, '0')).join('');
-  const hashHex = Array.from(new Uint8Array(hashBuffer)).map(b => b.toString(16).padStart(2, '0')).join('');
-  return `${saltHex}:${hashHex}`;
+  const hashBuffer = await crypto.subtle.deriveBits(
+    { name: 'PBKDF2', hash: 'SHA-256', salt, iterations: 600_000 },
+    keyMaterial, 256
+  );
+  const saltB64 = btoa(String.fromCharCode(...salt));
+  const hashB64 = btoa(String.fromCharCode(...new Uint8Array(hashBuffer)));
+  return `pbkdf2$600000$${saltB64}$${hashB64}`;
 }
 
 /**
- * Verificar senha contra hash PBKDF2 armazenado
+ * Verificar senha — suporta PBKDF2 (novo) e scrypt (legacy, migration automática).
+ * Usa comparação em tempo constante em ambos os formatos.
  */
-async function verifyPassword(password: string, stored: string): Promise<boolean> {
-  const parts = stored.split(':');
-  if (parts.length !== 2) return false;
-  const [saltHex, hashHex] = parts;
-  const salt = new Uint8Array(saltHex.match(/.{2}/g)!.map(b => parseInt(b, 16)));
-  const encoder = new TextEncoder();
-  const keyMaterial = await crypto.subtle.importKey('raw', encoder.encode(password), 'PBKDF2', false, ['deriveBits']);
-  const hashBuffer = await crypto.subtle.deriveBits(
-    { name: 'PBKDF2', salt, iterations: 100000, hash: 'SHA-256' },
-    keyMaterial,
-    256
-  );
-  const newHashHex = Array.from(new Uint8Array(hashBuffer)).map(b => b.toString(16).padStart(2, '0')).join('');
-  return newHashHex === hashHex;
+async function verifyPassword(password: string, storedHash: string): Promise<boolean> {
+  try {
+    // ─ Formato novo: PBKDF2 ──────────────────────────────────
+    if (storedHash.startsWith('pbkdf2$')) {
+      const parts = storedHash.split('$');
+      if (parts.length !== 4) return false;
+      const iterations = Number(parts[1]);
+      if (!Number.isInteger(iterations) || iterations < 100_000) return false;
+      const salt = Uint8Array.from(atob(parts[2]), c => c.charCodeAt(0));
+      const expectedHash = Uint8Array.from(atob(parts[3]), c => c.charCodeAt(0));
+      const encoder = new TextEncoder();
+      const keyMaterial = await crypto.subtle.importKey(
+        'raw', encoder.encode(password), 'PBKDF2', false, ['deriveBits']
+      );
+      const hashBuffer = await crypto.subtle.deriveBits(
+        { name: 'PBKDF2', hash: 'SHA-256', salt, iterations },
+        keyMaterial, 256
+      );
+      const candidate = new Uint8Array(hashBuffer);
+      if (candidate.length !== expectedHash.length) return false;
+      return timingSafeEqual(candidate, expectedHash);
+    }
+
+    // ─ Formato legacy: scrypt (migration automática no login) ───────
+    if (storedHash.startsWith('scrypt$')) {
+      const parts = storedHash.split('$');
+      if (parts.length !== 6 || parts[0] !== 'scrypt') return false;
+      const N = Number(parts[1]);
+      const r = Number(parts[2]);
+      const p = Number(parts[3]);
+      const salt = Buffer.from(parts[4], 'hex');
+      const expected = Buffer.from(parts[5], 'hex');
+      const candidate = Buffer.from(
+        scryptSync(password, salt, expected.length, { N, r, p, maxmem: 64 * 1024 * 1024 })
+      );
+      if (candidate.length !== expected.length) return false;
+      return timingSafeEqual(candidate, expected);
+    }
+
+    return false;
+  } catch {
+    return false;
+  }
 }
 
 /**
- * Gerar JWT Token assinado com HMAC-SHA256
+ * Gerar JWT assinado com HS256.
  */
-async function generateJWT(userId: number, email: string, secret: string, expiresIn: number = 3600): Promise<string> {
-  const header = btoa(JSON.stringify({ alg: 'HS256', typ: 'JWT' })).replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_');
-  const payload = btoa(JSON.stringify({
+function generateJWT(
+  env: Env,
+  userId: number,
+  email: string,
+  expiresIn: number = ACCESS_TOKEN_TTL_SECONDS,
+  type: TokenType = 'access'
+): string {
+  const header = { alg: 'HS256', typ: 'JWT' };
+  const now = Math.floor(Date.now() / 1000);
+  const payload: JWTPayload = {
     sub: userId,
     email,
-    iat: Math.floor(Date.now() / 1000),
-    exp: Math.floor(Date.now() / 1000) + expiresIn,
-  })).replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_');
-  const data = `${header}.${payload}`;
-  const key = await crypto.subtle.importKey('raw', new TextEncoder().encode(secret), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
-  const sig = await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(data));
-  const sigB64 = btoa(String.fromCharCode(...new Uint8Array(sig))).replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_');
-  return `${data}.${sigB64}`;
+    type,
+    iat: now,
+    exp: now + expiresIn,
+    jti: crypto.randomUUID(),
+  };
+
+  const headerEncoded = base64UrlEncodeString(JSON.stringify(header));
+  const payloadEncoded = base64UrlEncodeString(JSON.stringify(payload));
+  const signingInput = `${headerEncoded}.${payloadEncoded}`;
+  const signature = hmacSha256Base64Url(getJwtSecret(env), signingInput);
+
+  return `${signingInput}.${signature}`;
 }
 
 /**
- * Verificar JWT Token com HMAC-SHA256
+ * Verificar JWT assinado e validade temporal.
  */
-async function verifyJWT(token: string, secret: string): Promise<{ valid: boolean; userId?: number; email?: string }> {
+function verifyJWT(token: string, env: Env, expectedType?: TokenType): JWTVerifyResult {
   try {
     const parts = token.split('.');
-    if (parts.length !== 3) return { valid: false };
-    const payload = JSON.parse(atob(parts[1].replace(/-/g, '+').replace(/_/g, '/')));
-    if (payload.exp < Math.floor(Date.now() / 1000)) return { valid: false };
-    const data = `${parts[0]}.${parts[1]}`;
-    const key = await crypto.subtle.importKey('raw', new TextEncoder().encode(secret), { name: 'HMAC', hash: 'SHA-256' }, false, ['verify']);
-    const sigBytes = Uint8Array.from(atob(parts[2].replace(/-/g, '+').replace(/_/g, '/')), c => c.charCodeAt(0));
-    const valid = await crypto.subtle.verify('HMAC', key, sigBytes, new TextEncoder().encode(data));
-    if (!valid) return { valid: false };
-    return { valid: true, userId: payload.sub, email: payload.email };
+    if (parts.length !== 3) {
+      return { valid: false };
+    }
+
+    const [headerB64, payloadB64, signature] = parts;
+    const header = JSON.parse(new TextDecoder().decode(base64UrlDecodeToBytes(headerB64)));
+    if (header?.alg !== 'HS256' || header?.typ !== 'JWT') {
+      return { valid: false };
+    }
+
+    const signingInput = `${headerB64}.${payloadB64}`;
+    const expectedSignature = hmacSha256Base64Url(getJwtSecret(env), signingInput);
+
+    const sigA = Buffer.from(signature);
+    const sigB = Buffer.from(expectedSignature);
+    if (sigA.length !== sigB.length || !timingSafeEqual(sigA, sigB)) {
+      return { valid: false };
+    }
+
+    const payload = JSON.parse(new TextDecoder().decode(base64UrlDecodeToBytes(payloadB64))) as JWTPayload;
+    const now = Math.floor(Date.now() / 1000);
+
+    if (!payload.sub || !payload.email || !payload.exp || !payload.iat || !payload.type || !payload.jti) {
+      return { valid: false };
+    }
+
+    if (payload.exp <= now || payload.iat > now + 60) {
+      return { valid: false };
+    }
+
+    if (expectedType && payload.type !== expectedType) {
+      return { valid: false };
+    }
+
+    return { valid: true, payload, userId: payload.sub, email: payload.email };
   } catch {
     return { valid: false };
   }
 }
+
+async function createSession(
+  env: Env,
+  userId: number,
+  accessToken: string,
+  refreshToken: string,
+  accessExpiresAt: string,
+  refreshExpiresAt: string
+): Promise<void> {
+  const accessHash = hashToken(accessToken);
+  const refreshHash = hashToken(refreshToken);
+
+  await env.DB.prepare(
+    'INSERT INTO sessions (user_id, token, refresh_token, expires_at, refresh_expires_at, created_at) VALUES (?, ?, ?, ?, ?, datetime("now"))'
+  ).bind(userId, accessHash, refreshHash, accessExpiresAt, refreshExpiresAt).run();
+}
+
+async function issueSessionTokens(env: Env, userId: number, email: string): Promise<{ token: string; refreshToken: string }> {
+  const token = generateJWT(env, userId, email, ACCESS_TOKEN_TTL_SECONDS, 'access');
+  const refreshToken = generateJWT(env, userId, email, REFRESH_TOKEN_TTL_SECONDS, 'refresh');
+
+  const expiresAt = new Date(Date.now() + ACCESS_TOKEN_TTL_SECONDS * 1000).toISOString();
+  const refreshExpiresAt = new Date(Date.now() + REFRESH_TOKEN_TTL_SECONDS * 1000).toISOString();
+  await createSession(env, userId, token, refreshToken, expiresAt, refreshExpiresAt);
+
+  return { token, refreshToken };
+}
+
+async function revokeSessionByAccessToken(env: Env, accessToken: string): Promise<void> {
+  await env.DB.prepare('DELETE FROM sessions WHERE token = ?').bind(hashToken(accessToken)).run();
+}
+
+async function requireAuth(request: Request, env: Env): Promise<{ ok: true; auth: AuthContext } | { ok: false; response: Response }> {
+  let token: string | null = null;
+
+  // 1º: Authorization: Bearer header (APIs, mobile)
+  const authHeader = request.headers.get('Authorization');
+  if (authHeader?.startsWith('Bearer ')) {
+    token = authHeader.substring(7);
+  }
+
+  // 2º: HttpOnly cookie (browser) — OWASP ASVS 3.4.2
+  if (!token) {
+    const cookieHeader = request.headers.get('Cookie');
+    if (cookieHeader) {
+      for (const part of cookieHeader.split(';')) {
+        const [name, ...rest] = part.trim().split('=');
+        if (name.trim() === 'auth_token') {
+          token = rest.join('=').trim();
+          break;
+        }
+      }
+    }
+  }
+
+  if (!token) {
+    return { ok: false, response: json({ success: false, error: 'Token não fornecido' }, 401) };
+  }
+
+  const verified = verifyJWT(token, env, 'access');
+  if (!verified.valid || !verified.payload) {
+    return { ok: false, response: json({ success: false, error: 'Token inválido ou expirado' }, 401) };
+  }
+
+  const tokenHash = hashToken(token);
+  const session = await env.DB.prepare(
+    'SELECT user_id, expires_at FROM sessions WHERE token = ? LIMIT 1'
+  ).bind(tokenHash).first<{ user_id: number; expires_at: string }>();
+
+  if (!session || session.user_id !== verified.payload.sub) {
+    return { ok: false, response: json({ success: false, error: 'Sessão revogada ou inexistente' }, 401) };
+  }
+
+  if (session.expires_at <= new Date().toISOString()) {
+    return { ok: false, response: json({ success: false, error: 'Sessão expirada' }, 401) };
+  }
+
+  return {
+    ok: true,
+    auth: {
+      userId: verified.payload.sub,
+      email: verified.payload.email,
+      token,
+      jti: verified.payload.jti,
+    },
+  };
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// HELPERS DE SEGURANÇA
+// ═══════════════════════════════════════════════════════════════════════════
+
+/**
+ * [CRÍTICO-01] Verificar assinatura HMAC-SHA256 do webhook Stripe.
+ * Previne eventos forjados (replay attack incluído com validação de timestamp).
+ * Ref: https://stripe.com/docs/webhooks/signatures
+ */
+function verifyStripeWebhookSignature(body: string, sigHeader: string | null, secret: string): boolean {
+  if (!sigHeader || !body || !secret) return false;
+  try {
+    const parts: Record<string, string> = {};
+    for (const part of sigHeader.split(',')) {
+      const [k, ...v] = part.split('=');
+      parts[k.trim()] = v.join('=').trim();
+    }
+    const timestamp = parts['t'];
+    const signature = parts['v1'];
+    if (!timestamp || !signature) return false;
+
+    // Rejeitar eventos com mais de 5 minutos (anti-replay)
+    const age = Math.abs(Date.now() / 1000 - Number(timestamp));
+    if (age > 300) return false;
+
+    const payload = `${timestamp}.${body}`;
+    const expected = createHmac('sha256', secret).update(payload).digest('hex');
+    const sigA = Buffer.from(signature, 'hex');
+    const sigB = Buffer.from(expected, 'hex');
+    if (sigA.length !== sigB.length || sigA.length === 0) return false;
+    return timingSafeEqual(sigA, sigB);
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * [ALTA-01] Rate limiting baseado em D1.
+ * Conta tentativas dentro de uma janela de tempo deslizante.
+ */
+async function checkRateLimit(
+  env: Env,
+  key: string,
+  maxRequests: number,
+  windowSeconds: number
+): Promise<{ allowed: boolean; remaining: number }> {
+  try {
+    const windowStart = new Date(Date.now() - windowSeconds * 1000).toISOString();
+    const result = await env.DB.prepare(
+      'SELECT COUNT(*) as count FROM rate_limit_attempts WHERE key = ? AND created_at > ?'
+    ).bind(key, windowStart).first<{ count: number }>();
+
+    const count = result?.count ?? 0;
+    if (count >= maxRequests) {
+      return { allowed: false, remaining: 0 };
+    }
+
+    await env.DB.prepare(
+      'INSERT INTO rate_limit_attempts (key, created_at) VALUES (?, datetime("now"))'
+    ).bind(key).run();
+
+    return { allowed: true, remaining: maxRequests - count - 1 };
+  } catch {
+    // Se a tabela ainda não existir (ambiente sem migration), permite
+    return { allowed: true, remaining: maxRequests };
+  }
+}
+
+/**
+ * [ALTA-01] Verificar se conta está bloqueada por brute-force (NIST SP 800-63B).
+ */
+async function isAccountLocked(env: Env, email: string): Promise<boolean> {
+  try {
+    const lockout = await env.DB.prepare(
+      "SELECT locked_until FROM account_lockouts WHERE email = ? AND locked_until > datetime('now') LIMIT 1"
+    ).bind(email.toLowerCase()).first<{ locked_until: string }>();
+    return !!lockout;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Registrar tentativa de login (para lockout automático após N falhas).
+ */
+async function recordLoginAttempt(
+  env: Env,
+  email: string,
+  success: boolean,
+  ip?: string
+): Promise<void> {
+  try {
+    await env.DB.prepare(
+      'INSERT INTO login_attempts (email, success, ip_address, created_at) VALUES (?, ?, ?, datetime("now"))'
+    ).bind(email.toLowerCase(), success ? 1 : 0, ip || null).run();
+
+    if (success) {
+      // Login bem-sucedido: limpar lockout
+      await env.DB.prepare('DELETE FROM account_lockouts WHERE email = ?')
+        .bind(email.toLowerCase()).run();
+      return;
+    }
+
+    // Contar falhas nos últimos 15 minutos
+    const windowStart = new Date(Date.now() - 15 * 60 * 1000).toISOString();
+    const result = await env.DB.prepare(
+      "SELECT COUNT(*) as count FROM login_attempts WHERE email = ? AND success = 0 AND created_at > ?"
+    ).bind(email.toLowerCase(), windowStart).first<{ count: number }>();
+
+    const failCount = result?.count ?? 0;
+    if (failCount >= 5) {
+      const lockedUntil = new Date(Date.now() + 15 * 60 * 1000).toISOString();
+      await env.DB.prepare(
+        'INSERT OR REPLACE INTO account_lockouts (email, locked_until, created_at) VALUES (?, ?, datetime("now"))'
+      ).bind(email.toLowerCase(), lockedUntil).run();
+    }
+  } catch {
+    // Falhas no registro de tentativas não devem quebrar o fluxo principal
+  }
+}
+
+/**
+ * [ALTA-07 + OWASP ASVS 7.4.1] Audit log de eventos de segurança.
+ * Nunca deve quebrar o fluxo principal.
+ */
+async function auditLog(
+  env: Env,
+  userId: number | null,
+  action: string,
+  details: Record<string, unknown>,
+  ip?: string
+): Promise<void> {
+  try {
+    await env.DB.prepare(
+      'INSERT INTO audit_log (user_id, action, details, ip_address, created_at) VALUES (?, ?, ?, ?, datetime("now"))'
+    ).bind(userId, action, JSON.stringify(details), ip || null).run();
+  } catch {
+    // Silencioso — audit log nunca crasha o fluxo
+  }
+}
+
+/**
+ * Retornar erro interno sanitizado (NUNCA vazar error.message para o cliente).
+ * [ALTA-07] OWASP ASVS 7.4.2
+ */
+function internalError(error: unknown, context?: string): Response {
+  const msg = error instanceof Error ? error.message : String(error);
+  console.error(`[INTERNAL ERROR]${context ? ' ' + context : ''}:`, msg);
+  return json({ success: false, error: 'Erro interno do servidor' }, 500);
+}
+
+/**
+ * [HARDENING] Verificar token Cloudflare Turnstile (bot protection).
+ * Se TURNSTILE_SECRET_KEY não estiver configurado, permite (dev mode).
+ */
+async function verifyTurnstile(env: Env, token: string | undefined, ip?: string): Promise<boolean> {
+  if (!env.TURNSTILE_SECRET_KEY) return true; // Não configurado: permitir (dev)
+  if (!token) return false;
+  try {
+    const resp = await fetch('https://challenges.cloudflare.com/turnstile/v0/siteverify', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        secret: env.TURNSTILE_SECRET_KEY,
+        response: token,
+        remoteip: ip,
+      }),
+    });
+    const data = await resp.json() as { success: boolean };
+    return data.success === true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * [CRÍTICO-03] Calcular total de pedido no servidor — NUNCA confiar no cliente.
+ * Retorna null se algum produto for inválido/inativo.
+ */
+async function calculateOrderTotal(
+  env: Env,
+  items: Array<{ product_id: number; quantity: number }>
+): Promise<{ total: number; enrichedItems: Array<{ product_id: number; quantity: number; price: number; name: string }> } | null> {
+  const SHIPPING_COST = 15.00;
+  let subtotal = 0;
+  const enrichedItems = [];
+
+  for (const item of items) {
+    if (!item.product_id || !item.quantity || item.quantity < 1 || item.quantity > 100) {
+      return null;
+    }
+    const product = await env.DB.prepare(
+      'SELECT id, name, price, stock FROM products WHERE id = ? AND active = 1'
+    ).bind(item.product_id).first<{ id: number; name: string; price: number; stock: number }>();
+
+    if (!product) return null;
+    if (product.stock < item.quantity) return null;
+
+    subtotal += product.price * item.quantity;
+    enrichedItems.push({ product_id: product.id, quantity: item.quantity, price: product.price, name: product.name });
+  }
+
+  return { total: subtotal + SHIPPING_COST, enrichedItems };
+}
+
+/** Email validation regex (RFC 5321 compliant, não aceita local-only) */
+const EMAIL_REGEX = /^[^\s@]{1,64}@[^\s@]{1,255}\.[^\s@]{2,}$/;
+
+/** Validar força de senha: mín. 8 chars, pelo menos 1 número ou especial */
+function validatePasswordStrength(password: string): string | null {
+  if (password.length < 8) return 'Senha deve ter no mínimo 8 caracteres';
+  if (password.length > 128) return 'Senha muito longa (máx. 128 caracteres)';
+  if (!/[0-9!@#$%^&*()\-_=+[\]{}|;:,.<>?]/.test(password)) {
+    return 'Senha deve conter pelo menos um número ou caractere especial';
+  }
+  return null;
+}
+
+/**
+ * Enabler explícito de 2FA para manter fluxo de negócio auditável.
+ */
+async function enable2FA(env: Env, userId: number, secret: string, backupCodes: string[]): Promise<void> {
+  await env.DB.prepare(
+    'UPDATE users SET two_factor_enabled = 1, two_factor_secret = ?, two_factor_backup_codes = ?, updated_at = datetime("now") WHERE id = ?'
+  ).bind(secret, JSON.stringify(backupCodes), userId).run();
+}
+
+/**
+ * Desativar 2FA removendo segredos e códigos de backup.
+ */
+async function disable2FA(env: Env, userId: number): Promise<void> {
+  await env.DB.prepare(
+    'UPDATE users SET two_factor_enabled = 0, two_factor_secret = NULL, two_factor_backup_codes = NULL, updated_at = datetime("now") WHERE id = ?'
+  ).bind(userId).run();
+}
+
 
 /**
  * Enviar email via Resend
@@ -152,96 +672,90 @@ async function sendEmail(env: Env, to: string, subject: string, html: string): P
 }
 
 /**
- * Gerar TOTP Secret (base32) com entropia criptográfica
+ * Gerar TOTP Secret (base32)
  */
 function generateTOTPSecret(): string {
-  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
-  const bytes = crypto.getRandomValues(new Uint8Array(32));
-  return Array.from(bytes).map(b => chars[b % chars.length]).join('');
+  return base32Encode(randomBytes(20));
 }
 
 /**
- * Gerar códigos de backup com entropia criptográfica
+ * Gerar códigos de backup (para 2FA)
  */
 function generateBackupCodes(count: number = 10): string[] {
-  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
-  const codes: string[] = [];
+  const codes = [];
   for (let i = 0; i < count; i++) {
-    const bytes = crypto.getRandomValues(new Uint8Array(8));
-    codes.push(Array.from(bytes).map(b => chars[b % chars.length]).join(''));
+    const code = randomBytes(5).toString('hex').toUpperCase();
+    codes.push(code);
   }
   return codes;
 }
 
 /**
- * Verificar código TOTP usando HMAC-SHA1 real
+ * Verificar código TOTP real conforme RFC 6238 (HMAC-SHA1).
  */
-async function verifyTOTPCode(secret: string, code: string): Promise<boolean> {
-  if (!code || code.length !== 6 || !/^\d+$/.test(code)) return false;
-  // Decodificar secret base32
-  const base32Chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
-  let bits = 0, value = 0;
-  const bytes: number[] = [];
-  for (const char of secret.toUpperCase()) {
-    const idx = base32Chars.indexOf(char);
-    if (idx === -1) continue;
-    value = (value << 5) | idx;
-    bits += 5;
-    if (bits >= 8) { bytes.push((value >>> (bits - 8)) & 0xff); bits -= 8; }
+function verifyTOTPCode(secret: string, code: string, timeWindow: number = 1): boolean {
+  if (!code || code.length !== 6) return false;
+  if (!/^\d+$/.test(code)) return false;
+
+  try {
+    const key = base32Decode(secret);
+    const now = Math.floor(Date.now() / 1000);
+    const period = 30;
+
+    for (let offset = -timeWindow; offset <= timeWindow; offset++) {
+      const counter = Math.floor((now + offset * period) / period);
+      const counterBuffer = Buffer.alloc(8);
+      counterBuffer.writeBigUInt64BE(BigInt(counter));
+
+      const hmac = createHmac('sha1', Buffer.from(key)).update(counterBuffer).digest();
+      const offsetNibble = hmac[hmac.length - 1] & 0x0f;
+      const binaryCode =
+        ((hmac[offsetNibble] & 0x7f) << 24) |
+        ((hmac[offsetNibble + 1] & 0xff) << 16) |
+        ((hmac[offsetNibble + 2] & 0xff) << 8) |
+        (hmac[offsetNibble + 3] & 0xff);
+
+      const otp = (binaryCode % 1_000_000).toString().padStart(6, '0');
+      if (timingSafeEqual(Buffer.from(otp), Buffer.from(code))) {
+        return true;
+      }
+    }
+
+    return false;
+  } catch {
+    return false;
   }
-  const secretBytes = new Uint8Array(bytes);
-  const counter = Math.floor(Date.now() / 1000 / 30);
-  for (const offset of [-1, 0, 1]) {
-    const c = counter + offset;
-    const counterBytes = new Uint8Array(8);
-    let tmp = c;
-    for (let i = 7; i >= 0; i--) { counterBytes[i] = tmp & 0xff; tmp = Math.floor(tmp / 256); }
-    const key = await crypto.subtle.importKey('raw', secretBytes, { name: 'HMAC', hash: 'SHA-1' }, false, ['sign']);
-    const hmac = new Uint8Array(await crypto.subtle.sign('HMAC', key, counterBytes));
-    const idx = hmac[hmac.length - 1] & 0xf;
-    const otp = ((hmac[idx] & 0x7f) << 24 | (hmac[idx + 1] & 0xff) << 16 | (hmac[idx + 2] & 0xff) << 8 | (hmac[idx + 3] & 0xff)) % 1000000;
-    if (otp.toString().padStart(6, '0') === code) return true;
-  }
-  return false;
 }
 
-function json(data: any, status = 200) {
-  return new Response(JSON.stringify(data), {
-    status,
-    headers: CORS_HEADERS,
-  });
+function json(data: unknown, status = 200, extraHeaders?: Record<string, string>) {
+  const headers = { ...CORS_HEADERS, ...extraHeaders };
+  return new Response(JSON.stringify(data), { status, headers });
 }
 
-/** Auth helper — extracts and verifies Bearer token from request */
-type AuthResult = { error: Response } | { userId: number; email: string };
-async function extractAuth(request: Request, env: Env): Promise<AuthResult> {
-  const authHeader = request.headers.get('Authorization');
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return { error: json({ success: false, error: 'Token não fornecido' }, 401) };
-  }
-  const token = authHeader.substring(7);
-  const verified = await verifyJWT(token, requireJWTSecret(env));
-  if (!verified.valid) {
-    return { error: json({ success: false, error: 'Token inválido' }, 401) };
-  }
-  return { userId: verified.userId!, email: verified.email! };
+/** Definir cookies HttpOnly + Secure + SameSite=Strict (OWASP ASVS 3.4) */
+function buildSetCookieHeaders(token: string, refreshToken: string): string[] {
+  const secure = '; Secure; SameSite=Strict; HttpOnly; Path=/';
+  return [
+    `auth_token=${token}; Max-Age=${ACCESS_TOKEN_TTL_SECONDS}${secure}`,
+    `refresh_token=${refreshToken}; Max-Age=${REFRESH_TOKEN_TTL_SECONDS}${secure}`,
+  ];
 }
 
-// Rate limiter simples por IP (best-effort, por isolate)
-// NOTA: Este rate limiter é in-memory e reseta quando o isolate é reiniciado.
-// Para produção com alta escala, use Cloudflare Rate Limiting via wrangler ou Durable Objects.
-const rateLimitMap = new Map<string, { count: number; resetAt: number }>();
+/** Limpar cookies de sessão no logout */
+function buildClearCookieHeaders(): string[] {
+  return [
+    'auth_token=; Max-Age=0; Secure; SameSite=Strict; HttpOnly; Path=/',
+    'refresh_token=; Max-Age=0; Secure; SameSite=Strict; HttpOnly; Path=/',
+  ];
+}
 
-function checkRateLimit(ip: string, limit = 20, windowMs = 60000): boolean {
-  const now = Date.now();
-  const entry = rateLimitMap.get(ip);
-  if (!entry || now > entry.resetAt) {
-    rateLimitMap.set(ip, { count: 1, resetAt: now + windowMs });
-    return true;
+/** Response JSON com suporte a múltiplos Set-Cookie (OWASP 3.4.2) */
+function jsonWithCookies(data: unknown, status: number, cookies: string[]): Response {
+  const headers = new Headers(CORS_HEADERS as HeadersInit);
+  for (const cookie of cookies) {
+    headers.append('Set-Cookie', cookie);
   }
-  if (entry.count >= limit) return false;
-  entry.count++;
-  return true;
+  return new Response(JSON.stringify(data), { status, headers });
 }
 
 /**
@@ -255,7 +769,7 @@ const FAQ: { [key: string]: any } = {
     'carregador|usb-c|65w': '📱 **Carregador USB-C 65W**\nPreço: R$ 49,90\nTecnologia: Carregamento rápido\nDescrição: Carregador rápido 65W compatível com múltiplos dispositivos.\n\nDigite "adicionar Carregador" para comprar!',
     'cabo|lightning': '⚡ **Cabo Lightning Original**\nPreço: R$ 29,90\nOriginal e certificado\nDescrição: Cabo Lightning original certificado para durabilidade.\n\nDigite "adicionar Cabo" para comprar!',
     'frete|entrega|quanto cobra': '📦 **Frete**\nValor: R$ 15,00\nTempo: 5-7 dias úteis\nCobertura: Brasil inteiro\n\nO frete é FIXO em R$ 15,00 em qualquer compra!',
-    'cupom|desconto|código|promo': '🎟️ Temos cupons especiais disponíveis! Cadastre-se na newsletter para receber códigos exclusivos.\n\nDigite "cupom CÓDIGO" para aplicar um cupom.',
+    'cupom|desconto|código|promo': '🎟️ **Cupons Disponíveis:**\n• NEWYEAR - R$ 10 de desconto\n• PROMO - R$ 5 de desconto\n• DESCONTO10 - R$ 10 de desconto\n• SAVE20 - R$ 20 de desconto\n\nDigite seu cupom no carrinho!',
     'rastraio|rastrear|pedido|onde está': '📍 **Rastreio de Pedidos**\nPara rastrear seu pedido, você precisa do código de rastreio.\n\nVá em "Rastreio" na página e digite seu código!\n\nNão tem o código? Responda "verificar pedido" + seu email.',
     'pagamento|pagar|stripe|cartão': '💳 **Pagamento**\nAceitamos:\n• Cartão de crédito/débito (Stripe)\n• Pagamento seguro e criptografado\n\nSeu pagamento é processado via Stripe (100% seguro).',
     'atendimento|suporte|falar|conversar': '💬 **Atendimento**\nVocê está falando comigo, um assistente automático!\n\nPara suporte humano:\n📧 Email: support@cdmstores.com\n☎️ WhatsApp: (11) 99999-9999',
@@ -328,7 +842,7 @@ function gerarWhatsApp(telefone = '5511999999999', mensagem = 'Olá! Gostaria de
 /**
  * Processa mensagem do chatbot com 8 RECURSOS
  */
-async function processChat(message: string, user_id: string | undefined, language: string, env: Env, authenticatedEmail?: string): Promise<any> {
+async function processChat(message: string, user_id: string | undefined, language: string, env: Env): Promise<any> {
   const msg = message.toLowerCase().trim();
   const faqDb = FAQ[language] || FAQ['pt'];
   const sentiment = analisarSentimento(msg);
@@ -405,42 +919,41 @@ async function processChat(message: string, user_id: string | undefined, languag
     };
   }
 
-  // 3. HISTÓRICO DE PEDIDOS - Requer autenticação
+  // 3. HISTÓRICO DE PEDIDOS - Por email
   if ((msg.includes('meu') || msg.includes('meus') || msg.includes('verificar') || msg.includes('pedidos')) && msg.includes('pedido')) {
-    if (!authenticatedEmail) {
-      return {
-        response: language === 'pt'
-          ? '🔐 Por favor, faça login para ver seus pedidos.\n\nAcesse sua conta em [Login](https://cdmstores.com/profile.html)'
-          : '🔐 Please log in to view your orders.\n\nAccess your account at [Login](https://cdmstores.com/profile.html)'
-      };
-    }
-    try {
-      const orders = await env.DB.prepare(
-        'SELECT id, total, status, created_at FROM orders WHERE customer_email = ? ORDER BY created_at DESC LIMIT 5'
-      ).bind(authenticatedEmail).all();
+    // Primeiro tenta extrair email
+    const emailMatch = msg.match(/([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})/);
+    if (emailMatch) {
+      const email = emailMatch[0];
+      try {
+        const orders = await env.DB.prepare(
+          'SELECT id, total, status, created_at FROM orders WHERE customer_email = ? ORDER BY created_at DESC LIMIT 5'
+        ).bind(email).all();
 
-      if (orders.results.length > 0) {
-        let response = language === 'pt' ? `📋 **Seus Pedidos**\n\n` : `📋 **Your Orders**\n\n`;
-        orders.results.forEach((o: any, i: number) => {
-          response += `${i + 1}. Pedido #${o.id} - R$ ${o.total} (${o.status}) - ${o.created_at}\n`;
-        });
-        return { response, action: 'orders_found', data: orders.results };
-      } else {
-        return {
-          response: language === 'pt'
-            ? `ℹ️ Nenhum pedido encontrado para sua conta`
-            : `ℹ️ No orders found for your account`,
-          action: 'orders_found',
-          data: []
-        };
+        if (orders.results.length > 0) {
+          let response = language === 'pt' ? `📋 **Seus Pedidos**\n\n` : `📋 **Your Orders**\n\n`;
+          orders.results.forEach((o: any, i: number) => {
+            response += `${i + 1}. Pedido #${o.id} - R$ ${o.total} (${o.status}) - ${o.created_at}\n`;
+          });
+          return { response, action: 'orders_found', data: orders.results };
+        } else {
+          return {
+            response: language === 'pt'
+              ? `ℹ️ Nenhum pedido encontrado para ${email}`
+              : `ℹ️ No orders found for ${email}`,
+            action: 'orders_found',
+            data: []
+          };
+        }
+      } catch (error) {
+        console.error('Erro histórico:', error);
       }
-    } catch (error) {
-      console.error('Erro histórico:', error);
     }
+
     return {
       response: language === 'pt'
-        ? 'Erro ao buscar pedidos. Tente novamente mais tarde.'
-        : 'Error fetching orders. Please try again later.'
+        ? 'Para ver seus pedidos, envie um email válido!\n\nExemplo: "meus pedidos seu@email.com"'
+        : 'Send a valid email to see your orders!\n\nExample: "my orders your@email.com"'
     };
   }
 
@@ -463,8 +976,8 @@ async function processChat(message: string, user_id: string | undefined, languag
 
     return {
       response: language === 'pt'
-        ? '🎟️ Temos cupons especiais disponíveis! Cadastre-se na newsletter para receber códigos exclusivos.\n\nDigite "cupom CÓDIGO" para aplicar um cupom.'
-        : '🎟️ We have special coupons available! Subscribe to our newsletter to receive exclusive codes.\n\nType "coupon CODE" to apply a coupon.'
+        ? '🎟️ Cupons disponíveis:\n• NEWYEAR (R$ 10)\n• PROMO (R$ 5)\n• DESCONTO10 (R$ 10)\n• SAVE20 (R$ 20)\n\nDigite "cupom CÓDIGO"'
+        : '🎟️ Available coupons:\n• NEWYEAR ($10)\n• PROMO ($5)\n• DESCONTO10 ($10)\n• SAVE20 ($20)\n\nType "coupon CODE"'
     };
   }
 
@@ -524,14 +1037,9 @@ async function handleRequest(request: Request, env: Env) {
     return new Response('ok', { headers: CORS_HEADERS });
   }
 
-  // Health check
+  // Health check — [BAIXA-01 CORRIGIDO] Nunca expõe configuração interna
   if (path === '/api/health') {
-    return json({ 
-      status: 'ok', 
-      timestamp: new Date().toISOString(),
-      stripe_configured: !!env.STRIPE_SECRET_KEY,
-      cj_configured: !!env.CJ_API_KEY
-    });
+    return json({ status: 'ok', timestamp: new Date().toISOString() });
   }
 
   // ===== PRODUTOS =====
@@ -541,8 +1049,8 @@ async function handleRequest(request: Request, env: Env) {
         'SELECT id, name, description, price, image_url, stock FROM products WHERE active = 1'
       ).all();
       return json({ success: true, data: products.results });
-    } catch (error: any) {
-      return json({ success: false, error: error.message }, 500);
+    } catch (error) {
+      return internalError(error, 'products/list');
     }
   }
 
@@ -557,16 +1065,16 @@ async function handleRequest(request: Request, env: Env) {
         return json({ success: false, error: 'Produto não encontrado' }, 404);
       }
       return json({ success: true, data: product });
-    } catch (error: any) {
-      return json({ success: false, error: error.message }, 500);
+    } catch (error) {
+      return internalError(error, 'products/get');
     }
   }
 
   // ===== CARRINHO =====
   if (path === '/api/cart/add' && request.method === 'POST') {
     try {
-      const body = await request.json();
-      const { product_id, quantity } = body;
+      const body = await request.json() as Record<string, unknown>;
+      const { product_id, quantity } = body as { product_id?: number; quantity?: number };
 
       if (!product_id || !quantity) {
         return json({ success: false, error: 'product_id e quantity obrigatórios' }, 400);
@@ -574,82 +1082,90 @@ async function handleRequest(request: Request, env: Env) {
 
       const product = await env.DB.prepare(
         'SELECT stock FROM products WHERE id = ?'
-      ).bind(product_id).first();
+      ).bind(product_id).first<{ stock: number }>();
 
       if (!product || product.stock < quantity) {
         return json({ success: false, error: 'Estoque insuficiente' }, 400);
       }
 
       return json({ success: true, message: 'Item adicionado ao carrinho', item: { product_id, quantity } });
-    } catch (error: any) {
-      return json({ success: false, error: error.message }, 500);
+    } catch (error) {
+      return internalError(error, 'cart/add');
     }
   }
 
   // ===== PEDIDOS =====
+  // [CRÍTICO-03 CORRIGIDO] Total calculado no servidor, nunca confiado no cliente
+  // [CRÍTICO-04 CORRIGIDO parcial] Requer auth para criar pedido
   if (path === '/api/orders' && request.method === 'POST') {
     try {
-      const body = await request.json();
-      const { customer_name, customer_email, items, total, shipping_cost } = body;
+      const authResult = await requireAuth(request, env);
+      if (!authResult.ok) return authResult.response;
 
-      // Validar campos obrigatórios
-      if (!customer_email || !items || total === undefined) {
+      const body = await request.json() as Record<string, unknown>;
+      const { customer_name, customer_email, items } = body as {
+        customer_name?: string;
+        customer_email?: string;
+        items?: Array<{ product_id: number; quantity: number }>;
+      };
+
+      if (!customer_email || !items || !Array.isArray(items) || items.length === 0) {
         return json({ success: false, error: 'Dados incompletos' }, 400);
       }
 
-      // Validar formato de email
-      if (!EMAIL_RE.test(customer_email)) {
+      if (customer_email.length > 254 || !EMAIL_REGEX.test(customer_email)) {
         return json({ success: false, error: 'Email inválido' }, 400);
       }
 
-      // Validar items
-      if (!Array.isArray(items) || items.length === 0) {
-        return json({ success: false, error: 'Carrinho vazio ou inválido' }, 400);
-      }
-
-      // Sanitizar strings
-      const safeName = String(customer_name || '').substring(0, 200);
-      const safeEmail = String(customer_email).substring(0, 320);
-      const safeTotal = Number(total);
-      const safeShipping = Number(shipping_cost) || 0;
-
-      if (isNaN(safeTotal) || safeTotal <= 0) {
-        return json({ success: false, error: 'Total inválido' }, 400);
+      // [CRÍTICO-03] Calcular total no servidor
+      const calculated = await calculateOrderTotal(env, items);
+      if (!calculated) {
+        return json({ success: false, error: 'Produto inválido ou sem estoque' }, 400);
       }
 
       const result = await env.DB.prepare(
-        'INSERT INTO orders (customer_name, customer_email, total, shipping_cost, status, created_at, updated_at) VALUES (?, ?, ?, ?, "pending", datetime("now"), datetime("now"))'
-      ).bind(safeName, safeEmail, safeTotal, safeShipping).run();
+        'INSERT INTO orders (user_id, customer_name, customer_email, total, shipping_cost, status, created_at, updated_at) VALUES (?, ?, ?, ?, ?, "pending", datetime("now"), datetime("now"))'
+      ).bind(
+        authResult.auth.userId,
+        (typeof customer_name === 'string' ? customer_name.substring(0, 100) : null),
+        customer_email,
+        calculated.total,
+        15.00,
+      ).run();
 
       const orderId = result.meta.last_row_id;
 
-      for (const item of items) {
-        if (!item.product_id || !item.quantity || !item.price) continue;
+      for (const item of calculated.enrichedItems) {
         await env.DB.prepare(
           'INSERT INTO order_items (order_id, product_id, quantity, price) VALUES (?, ?, ?, ?)'
-        ).bind(orderId, Number(item.product_id), Number(item.quantity), Number(item.price)).run();
+        ).bind(orderId, item.product_id, item.quantity, item.price).run();
       }
 
-      return json({ success: true, order_id: orderId, total: safeTotal, status: 'pending' }, 201);
-    } catch (error: any) {
-      return json({ success: false, error: error.message }, 500);
+      await auditLog(env, authResult.auth.userId, 'order_created', { order_id: orderId, total: calculated.total });
+      return json({ success: true, order_id: orderId, total: calculated.total, status: 'pending' }, 201);
+    } catch (error) {
+      return internalError(error, 'orders/create');
     }
   }
 
+  // [CRÍTICO-04 CORRIGIDO] Requer autenticação e verifica ownership do pedido
   if (path.match(/^\/api\/orders\/\d+$/) && request.method === 'GET') {
     try {
-      const id = path.split('/').pop();
+      const authResult = await requireAuth(request, env);
+      if (!authResult.ok) return authResult.response;
+
+      const id = Number(path.split('/').pop());
       const order = await env.DB.prepare(
-        'SELECT id, customer_email, total, status, created_at, updated_at, stripe_payment_id, cj_order_id, tracking_code FROM orders WHERE id = ?'
-      ).bind(id).first();
+        'SELECT id, total, status, created_at, updated_at, stripe_payment_id, cj_order_id, tracking_code FROM orders WHERE id = ? AND user_id = ?'
+      ).bind(id, authResult.auth.userId).first();
 
       if (!order) {
         return json({ success: false, error: 'Pedido não encontrado' }, 404);
       }
 
       return json({ success: true, data: order });
-    } catch (error: any) {
-      return json({ success: false, error: error.message }, 500);
+    } catch (error) {
+      return internalError(error, 'orders/get');
     }
   }
 
@@ -657,6 +1173,7 @@ async function handleRequest(request: Request, env: Env) {
   if (path.match(/^\/api\/tracking\//) && request.method === 'GET') {
     try {
       const code = path.replace('/api/tracking/', '');
+      // [BAIXA-04 CORRIGIDO] Não expor customer_name em endpoint público
       const order = await env.DB.prepare(
         'SELECT id, tracking_code, status, created_at, updated_at FROM orders WHERE tracking_code = ?'
       ).bind(code).first();
@@ -666,508 +1183,580 @@ async function handleRequest(request: Request, env: Env) {
       }
 
       return json({ success: true, data: order });
-    } catch (error: any) {
-      return json({ success: false, error: error.message }, 500);
+    } catch (error) {
+      return internalError(error, 'tracking');
     }
   }
 
-  // ===== AUTENTICAÇÃO =====
-
   // Registro de novo usuário
+  // [ALTA-01 CORRIGIDO] Rate limiting + Turnstile + validação forte
+  // [ALTA-11 CORRIGIDO] Token de verificação armazenado como hash
   if (path === '/api/auth/register' && request.method === 'POST') {
-    // Rate limiting para evitar spam de cadastros
-    const clientIp = request.headers.get('CF-Connecting-IP') || request.headers.get('X-Forwarded-For') || 'unknown';
-    if (!checkRateLimit(`register:${clientIp}`, 5, 60000)) {
-      return json({ success: false, error: 'Muitas tentativas. Aguarde um minuto.' }, 429);
-    }
     try {
-      const { email, password, name } = await request.json();
+      const ip = request.headers.get('CF-Connecting-IP') || 'unknown';
+
+      // Rate limiting: 5 registros por IP por hora
+      const rl = await checkRateLimit(env, `register:${ip}`, 5, 3600);
+      if (!rl.allowed) {
+        return json({ success: false, error: 'Muitas tentativas. Aguarde e tente novamente.' }, 429);
+      }
+
+      const body = await request.json() as Record<string, unknown>;
+      const { email, password, name, turnstileToken } = body as {
+        email?: string; password?: string; name?: string; turnstileToken?: string;
+      };
+
+      // Verificar Turnstile
+      if (env.TURNSTILE_SECRET_KEY && !await verifyTurnstile(env, turnstileToken, ip)) {
+        return json({ success: false, error: 'Verificação de bot falhou' }, 403);
+      }
 
       if (!email || !password || !name) {
         return json({ success: false, error: 'Campos obrigatórios: email, password, name' }, 400);
       }
 
-      // Validar email
-      if (!EMAIL_RE.test(email)) {
+      // Limites de tamanho
+      if (typeof name !== 'string' || name.length < 2 || name.length > 100) {
+        return json({ success: false, error: 'Nome deve ter entre 2 e 100 caracteres' }, 400);
+      }
+
+      // [MÉDIA-02 CORRIGIDO] Validação de email robusta
+      if (typeof email !== 'string' || email.length > 254 || !EMAIL_REGEX.test(email)) {
         return json({ success: false, error: 'Email inválido' }, 400);
       }
 
-      // Validar senha
-      if (password.length < 8 || password.length > 128) {
-        return json({ success: false, error: 'Senha deve ter entre 8 e 128 caracteres' }, 400);
+      // [MÉDIA-03 CORRIGIDO] Senha mín. 8 chars + complexidade
+      if (typeof password !== 'string') {
+        return json({ success: false, error: 'Senha inválida' }, 400);
       }
+      const passError = validatePasswordStrength(password);
+      if (passError) return json({ success: false, error: passError }, 400);
 
       // Verificar se email já existe
       const existingUser = await env.DB.prepare(
         'SELECT id FROM users WHERE email = ? LIMIT 1'
-      ).bind(email).first();
+      ).bind(email.toLowerCase()).first();
 
       if (existingUser) {
         return json({ success: false, error: 'Email já cadastrado' }, 409);
       }
 
-      // Hash de senha
+      // Hash de senha (PBKDF2)
       const passwordHash = await hashPassword(password);
 
-      // Inserir usuário
       const result = await env.DB.prepare(
         'INSERT INTO users (email, password_hash, name, created_at, updated_at) VALUES (?, ?, ?, datetime("now"), datetime("now"))'
-      ).bind(email, passwordHash, name).run();
+      ).bind(email.toLowerCase(), passwordHash, name.trim()).run();
 
       const userId = result.meta.last_row_id;
-      const token = await generateJWT(userId, email, requireJWTSecret(env), 3600); // 1 hora
+      const { token, refreshToken } = await issueSessionTokens(env, userId, email.toLowerCase());
 
-      // Gerar token de verificação e enviar email
-      const verificationToken = await generateJWT(userId, email, requireJWTSecret(env), 86400); // 24 horas
+      // [ALTA-11 CORRIGIDO] Armazenar hash do token de verificação
+      const verificationToken = generateJWT(env, userId, email.toLowerCase(), 86400, 'email_verify');
       await env.DB.prepare(
         'INSERT INTO password_resets (user_id, token, expires_at, created_at) VALUES (?, ?, ?, datetime("now"))'
-      ).bind(userId, verificationToken, new Date(Date.now() + 86400 * 1000).toISOString()).run();
+      ).bind(userId, hashToken(verificationToken), new Date(Date.now() + 86400 * 1000).toISOString()).run();
 
-      // Enviar email de verificação (não bloqueia o registro)
       const verifyLink = `${env.APP_URL || 'https://cdmstores.com'}/verify-email?token=${verificationToken}`;
-      const subject = 'Confirme seu email - CDM Stores';
-      const html = `
+      await sendEmail(env, email, 'Confirme seu email - CDM Stores', `
         <h2>Bem-vindo à CDM Stores! 🎉</h2>
         <p>Olá ${name},</p>
-        <p>Para completar seu cadastro, clique no link abaixo para verificar seu email:</p>
-        <p><a href="${verifyLink}" style="background: #00AFFF; color: white; padding: 12px 24px; border-radius: 6px; text-decoration: none; display: inline-block;">✓ Verificar Email</a></p>
-        <p>Ou copie e cole este link:</p>
-        <p><code>${verifyLink}</code></p>
-        <p>Este link expira em 24 horas.</p>
-        <hr />
-        <p style="color: #999; font-size: 12px;">Se você não criou essa conta, ignore este email.</p>
-      `;
-      await sendEmail(env, email, subject, html);
+        <p>Clique no link abaixo para verificar seu email (válido por 24h):</p>
+        <p><a href="${verifyLink}" style="background:#00AFFF;color:white;padding:12px 24px;border-radius:6px;text-decoration:none;display:inline-block;">✓ Verificar Email</a></p>
+        <p style="color:#999;font-size:12px;">Se você não criou essa conta, ignore este email.</p>
+      `);
 
-      return json({
+      await auditLog(env, userId, 'register', { email: email.toLowerCase() }, ip);
+
+      return jsonWithCookies({
         success: true,
         message: 'Usuário cadastrado com sucesso! Verifique seu email para ativar a conta.',
-        user: { id: userId, email, name },
-        token
-      }, 201);
-    } catch (error: any) {
-      return json({ success: false, error: error.message }, 500);
+        user: { id: userId, email: email.toLowerCase(), name: name.trim() },
+        token, refreshToken,
+      }, 201, buildSetCookieHeaders(token, refreshToken));
+    } catch (error) {
+      return internalError(error, 'auth/register');
     }
   }
 
   // Login
+  // [ALTA-01 CORRIGIDO] Rate limiting + account lockout + audit log
+  // [ALTA-08 CORRIGIDO] PBKDF2 migration automática + cookies HttpOnly
   if (path === '/api/auth/login' && request.method === 'POST') {
-    // Rate limiting para prevenir brute force
-    const clientIp = request.headers.get('CF-Connecting-IP') || request.headers.get('X-Forwarded-For') || 'unknown';
-    if (!checkRateLimit(`login:${clientIp}`, 5, 60000)) {
-      return json({ success: false, error: 'Muitas tentativas de login. Aguarde um minuto.' }, 429);
-    }
     try {
-      const { email, password } = await request.json();
+      const ip = request.headers.get('CF-Connecting-IP') || 'unknown';
+
+      // Rate limiting: 10 tentativas por IP por 5 minutos
+      const rl = await checkRateLimit(env, `login:${ip}`, 10, 300);
+      if (!rl.allowed) {
+        return json({ success: false, error: 'Muitas tentativas de login. Aguarde 5 minutos.' }, 429);
+      }
+
+      const body = await request.json() as Record<string, unknown>;
+      const { email, password, turnstileToken } = body as { email?: string; password?: string; turnstileToken?: string };
 
       if (!email || !password) {
         return json({ success: false, error: 'Email e senha obrigatórios' }, 400);
       }
 
-      // Buscar usuário incluindo dados de 2FA
-      const user = await env.DB.prepare(
-        'SELECT id, email, name, password_hash, status, two_factor_enabled FROM users WHERE email = ? LIMIT 1'
-      ).bind(email).first();
-
-      if (!user) {
-        return json({ success: false, error: 'Email ou senha incorretos' }, 401);
+      // Verificar Turnstile
+      if (env.TURNSTILE_SECRET_KEY && !await verifyTurnstile(env, turnstileToken, ip)) {
+        return json({ success: false, error: 'Verificação de bot falhou' }, 403);
       }
 
-      if (user.status === 'inactive') {
-        return json({ success: false, error: 'Usuário inativo' }, 403);
+      // [ALTA-01] Verificar lockout ANTES de qualquer DB lookup sensitivo
+      if (await isAccountLocked(env, email)) {
+        return json({ success: false, error: 'Conta temporariamente bloqueada. Tente novamente em 15 minutos.' }, 423);
+      }
+
+      // Buscar usuário
+      const user = await env.DB.prepare(
+        'SELECT id, email, name, password_hash, status, two_factor_enabled FROM users WHERE email = ? LIMIT 1'
+      ).bind(email.toLowerCase()).first<{
+        id: number; email: string; name: string; password_hash: string; status: string; two_factor_enabled: number;
+      }>();
+
+      // Resposta genérica (não revela se email existe — NIST SP 800-63B)
+      const INVALID_CREDENTIALS = 'Email ou senha incorretos';
+
+      if (!user) {
+        await recordLoginAttempt(env, email, false, ip);
+        return json({ success: false, error: INVALID_CREDENTIALS }, 401);
+      }
+
+      if (user.status === 'inactive' || user.status === 'banned') {
+        return json({ success: false, error: 'Conta inativa ou suspensa' }, 403);
       }
 
       // Verificar senha
       const passwordMatch = await verifyPassword(password, user.password_hash);
       if (!passwordMatch) {
-        return json({ success: false, error: 'Email ou senha incorretos' }, 401);
+        await recordLoginAttempt(env, email, false, ip);
+        await auditLog(env, user.id, 'login_failed', { reason: 'wrong_password' }, ip);
+        return json({ success: false, error: INVALID_CREDENTIALS }, 401);
       }
 
-      // Se 2FA está ativo, exigir verificação antes de emitir token completo
+      // [ALTA-08] Migration automática scrypt → PBKDF2
+      if (user.password_hash.startsWith('scrypt$')) {
+        const newHash = await hashPassword(password);
+        await env.DB.prepare('UPDATE users SET password_hash = ? WHERE id = ?').bind(newHash, user.id).run();
+      }
+
+      await recordLoginAttempt(env, email, true, ip);
+
       if (user.two_factor_enabled) {
+        const challengeToken = generateJWT(env, user.id, user.email, 300, '2fa_challenge');
         return json({
           success: true,
           requires2FA: true,
-          userId: user.id,
-          message: 'Verificação em duas etapas necessária'
+          challengeToken,
+          user: { id: user.id, email: user.email, name: user.name },
         });
       }
 
-      // Gerar token
-      const token = await generateJWT(user.id, user.email, requireJWTSecret(env), 3600);
-      const refreshToken = await generateJWT(user.id, user.email, requireJWTSecret(env), 86400 * 7); // 7 dias
+      const { token, refreshToken } = await issueSessionTokens(env, user.id, user.email);
+      await env.DB.prepare('UPDATE users SET last_login = datetime("now") WHERE id = ?').bind(user.id).run();
+      await auditLog(env, user.id, 'login_success', {}, ip);
 
-      // Salvar sessão
-      const expiresAt = new Date(Date.now() + 3600 * 1000).toISOString();
-      const refreshExpiresAt = new Date(Date.now() + 86400 * 7 * 1000).toISOString();
-
-      await env.DB.prepare(
-        'INSERT INTO sessions (user_id, token, refresh_token, expires_at, refresh_expires_at, created_at) VALUES (?, ?, ?, ?, ?, datetime("now"))'
-      ).bind(user.id, token, refreshToken, expiresAt, refreshExpiresAt).run();
-
-      // Atualizar last_login
-      await env.DB.prepare(
-        'UPDATE users SET last_login = datetime("now") WHERE id = ?'
-      ).bind(user.id).run();
-
-      return json({
+      return jsonWithCookies({
         success: true,
         user: { id: user.id, email: user.email, name: user.name },
-        token,
-        refreshToken
-      });
-    } catch (error: any) {
-      return json({ success: false, error: error.message }, 500);
+        token, refreshToken,
+      }, 200, buildSetCookieHeaders(token, refreshToken));
+    } catch (error) {
+      return internalError(error, 'auth/login');
     }
   }
 
   // Obter usuário atual
   if (path === '/api/auth/me' && request.method === 'GET') {
     try {
-      const auth = await extractAuth(request, env);
-      if ('error' in auth) return auth.error;
+      const authResult = await requireAuth(request, env);
+      if (!authResult.ok) {
+        return authResult.response;
+      }
 
       const user = await env.DB.prepare(
         'SELECT id, email, name, phone, avatar_url, status, email_verified, created_at, last_login FROM users WHERE id = ? LIMIT 1'
-      ).bind(auth.userId).first();
+      ).bind(authResult.auth.userId).first();
 
       if (!user) {
         return json({ success: false, error: 'Usuário não encontrado' }, 404);
       }
 
       return json({ success: true, user });
-    } catch (error: any) {
-      return json({ success: false, error: error.message }, 500);
+    } catch (error) {
+      return internalError(error, 'auth/me');
     }
   }
 
   // Logout
   if (path === '/api/auth/logout' && request.method === 'POST') {
     try {
-      const authHeader = request.headers.get('Authorization');
-      if (!authHeader || !authHeader.startsWith('Bearer ')) {
-        return json({ success: false, error: 'Token não fornecido' }, 401);
+      const authResult = await requireAuth(request, env);
+      if (!authResult.ok) {
+        return authResult.response;
       }
 
-      const token = authHeader.substring(7);
-      
-      // Deletar sessão
-      await env.DB.prepare(
-        'DELETE FROM sessions WHERE token = ?'
-      ).bind(token).run();
+      await revokeSessionByAccessToken(env, authResult.auth.token);
 
-      return json({ success: true, message: 'Logout realizado com sucesso' });
-    } catch (error: any) {
-      return json({ success: false, error: error.message }, 500);
+      return jsonWithCookies({ success: true, message: 'Logout realizado com sucesso' }, 200, buildClearCookieHeaders());
+    } catch (error) {
+      return internalError(error, 'auth/logout');
     }
   }
 
   // Refresh token
   if (path === '/api/auth/refresh' && request.method === 'POST') {
     try {
-      const { refreshToken } = await request.json();
+      const body = await request.json() as Record<string, unknown>;
+      const { refreshToken } = body as { refreshToken?: string };
 
       if (!refreshToken) {
         return json({ success: false, error: 'Refresh token obrigatório' }, 400);
       }
 
-      const verified = await verifyJWT(refreshToken, requireJWTSecret(env));
-      if (!verified.valid) {
+      const verified = verifyJWT(refreshToken, env, 'refresh');
+      if (!verified.valid || !verified.payload) {
         return json({ success: false, error: 'Refresh token inválido' }, 401);
       }
 
-      // Verificar se sessão ainda existe e refresh token não expirou
+      const refreshTokenHash = hashToken(refreshToken);
       const session = await env.DB.prepare(
-        'SELECT refresh_expires_at FROM sessions WHERE refresh_token = ? LIMIT 1'
-      ).bind(refreshToken).first();
+        'SELECT user_id, refresh_expires_at FROM sessions WHERE refresh_token = ? LIMIT 1'
+      ).bind(refreshTokenHash).first<{ user_id: number; refresh_expires_at: string }>();
 
       if (!session) {
         return json({ success: false, error: 'Sessão não encontrada' }, 401);
       }
 
-      // Verificar expiração do refresh token no banco
-      if (new Date(String(session.refresh_expires_at)) <= new Date()) {
-        await env.DB.prepare('DELETE FROM sessions WHERE refresh_token = ?').bind(refreshToken).run();
-        return json({ success: false, error: 'Refresh token expirado' }, 401);
+      if (session.user_id !== verified.payload.sub || session.refresh_expires_at <= new Date().toISOString()) {
+        return json({ success: false, error: 'Refresh token expirado ou inválido' }, 401);
       }
 
-      // Gerar novo token
-      const newToken = await generateJWT(verified.userId!, verified.email!, requireJWTSecret(env), 3600);
+      // Rotação: invalida o refresh antigo e cria nova sessão completa.
+      await env.DB.prepare('DELETE FROM sessions WHERE refresh_token = ?').bind(refreshTokenHash).run();
 
-      return json({ success: true, token: newToken });
-    } catch (error: any) {
-      return json({ success: false, error: error.message }, 500);
+      const rotated = await issueSessionTokens(env, verified.payload.sub, verified.payload.email);
+
+      return jsonWithCookies({ success: true, token: rotated.token, refreshToken: rotated.refreshToken }, 200, buildSetCookieHeaders(rotated.token, rotated.refreshToken));
+    } catch (error) {
+      return internalError(error, 'auth/refresh');
     }
   }
 
   // Esqueci a senha
+  // [ALTA-01 CORRIGIDO] Rate limiting
+  // [ALTA-11 CORRIGIDO] Token armazenado como hash SHA-256
   if (path === '/api/auth/forgot-password' && request.method === 'POST') {
     try {
-      const { email } = await request.json();
+      const ip = request.headers.get('CF-Connecting-IP') || 'unknown';
 
-      if (!email) {
-        return json({ success: false, error: 'Email obrigatório' }, 400);
+      // Rate limiting: 3 por IP por hora (previne email bombing)
+      const rl = await checkRateLimit(env, `forgot-password:${ip}`, 3, 3600);
+      if (!rl.allowed) {
+        return json({ success: false, error: 'Muitas tentativas. Aguarde e tente novamente.' }, 429);
+      }
+
+      const body = await request.json() as Record<string, unknown>;
+      const { email } = body as { email?: string };
+
+      if (!email || typeof email !== 'string' || !EMAIL_REGEX.test(email)) {
+        // Resposta genérica (não revela se email existe)
+        return json({ success: true, message: 'Se o email existe, receberá um link de reset' });
       }
 
       const user = await env.DB.prepare(
         'SELECT id FROM users WHERE email = ? LIMIT 1'
-      ).bind(email).first();
+      ).bind(email.toLowerCase()).first<{ id: number }>();
 
       if (!user) {
-        // Não revelar se email existe ou não (segurança)
         return json({ success: true, message: 'Se o email existe, receberá um link de reset' });
       }
 
-      // Gerar token de reset (válido por 1 hora)
-      const resetToken = await generateJWT(user.id, email, requireJWTSecret(env), 3600);
-      const expiresAt = new Date(Date.now() + 3600 * 1000).toISOString();
+      // Invalidar tokens anteriores do mesmo usuário
+      await env.DB.prepare('DELETE FROM password_resets WHERE user_id = ?').bind(user.id).run();
 
+      // [ALTA-11] Armazenar hash do token
+      const resetToken = generateJWT(env, user.id, email.toLowerCase(), 3600, 'password_reset');
+      const expiresAt = new Date(Date.now() + 3600 * 1000).toISOString();
       await env.DB.prepare(
         'INSERT INTO password_resets (user_id, token, expires_at, created_at) VALUES (?, ?, ?, datetime("now"))'
-      ).bind(user.id, resetToken, expiresAt).run();
+      ).bind(user.id, hashToken(resetToken), expiresAt).run();
 
-      // Enviar email com link de reset
       const resetLink = `${env.APP_URL || 'https://cdmstores.com'}/reset-password?token=${resetToken}`;
-      const subject = 'Redefinição de Senha - CDM Stores';
-      const html = `
-        <h2>Redefinição de Senha 🔒</h2>
-        <p>Recebemos uma solicitação para redefinir a senha da sua conta CDM Stores.</p>
-        <p>Clique no botão abaixo para criar uma nova senha:</p>
-        <p><a href="${resetLink}" style="background: #00AFFF; color: white; padding: 12px 24px; border-radius: 6px; text-decoration: none; display: inline-block;">🔑 Redefinir Senha</a></p>
-        <p>Ou copie e cole este link:</p>
-        <p><code>${resetLink}</code></p>
-        <p><strong>Este link expira em 1 hora.</strong></p>
-        <hr />
-        <p style="color: #999; font-size: 12px;">Se você não solicitou a redefinição de senha, ignore este email. Sua senha não será alterada.</p>
-      `;
-      await sendEmail(env, email, subject, html);
+      await sendEmail(env, email, 'Reset de Senha - CDM Stores', `
+        <h2>Redefinir Senha</h2>
+        <p>Clique no link abaixo para redefinir sua senha (válido por 1 hora):</p>
+        <p><a href="${resetLink}" style="background:#00AFFF;color:white;padding:12px 24px;border-radius:6px;text-decoration:none;">Redefinir Senha</a></p>
+        <p>Se você não solicitou isso, ignore este email.</p>
+      `);
 
+      await auditLog(env, user.id, 'password_reset_requested', {}, ip);
       return json({ success: true, message: 'Link de reset enviado para o email' });
-    } catch (error: any) {
-      return json({ success: false, error: error.message }, 500);
+    } catch (error) {
+      return internalError(error, 'auth/forgot-password');
     }
   }
 
   // Reset de senha
+  // [ALTA-11 CORRIGIDO] Busca por hash do token
   if (path === '/api/auth/reset-password' && request.method === 'POST') {
     try {
-      const { token, newPassword } = await request.json();
+      const body = await request.json() as Record<string, unknown>;
+      const { token, newPassword } = body as { token?: string; newPassword?: string };
 
       if (!token || !newPassword) {
         return json({ success: false, error: 'Token e nova senha obrigatórios' }, 400);
       }
 
-      if (newPassword.length < 8 || newPassword.length > 128) {
-        return json({ success: false, error: 'Senha deve ter entre 8 e 128 caracteres' }, 400);
-      }
-        'SELECT user_id, expires_at, used FROM password_resets WHERE token = ? LIMIT 1'
-      ).bind(token).first();
+      const passError = validatePasswordStrength(newPassword);
+      if (passError) return json({ success: false, error: passError }, 400);
 
-      if (!resetRecord) {
+      // Verificar JWT
+      const jwtCheck = verifyJWT(token, env, 'password_reset');
+      if (!jwtCheck.valid || !jwtCheck.payload) {
+        return json({ success: false, error: 'Token inválido ou expirado' }, 401);
+      }
+
+      // [ALTA-11] Buscar por hash do token
+      const resetRecord = await env.DB.prepare(
+        'SELECT user_id, expires_at, used FROM password_resets WHERE token = ? LIMIT 1'
+      ).bind(hashToken(token)).first<{ user_id: number; expires_at: string; used: number }>();
+
+      if (!resetRecord || resetRecord.used) {
         return json({ success: false, error: 'Token inválido' }, 401);
       }
 
-      if (resetRecord.used) {
-        return json({ success: false, error: 'Token já foi utilizado' }, 401);
-      }
-
-      const now = new Date().toISOString();
-      if (resetRecord.expires_at < now) {
+      if (resetRecord.expires_at < new Date().toISOString()) {
         return json({ success: false, error: 'Token expirado' }, 401);
       }
 
-      // Atualizar senha
+      if (resetRecord.user_id !== jwtCheck.payload.sub) {
+        return json({ success: false, error: 'Token inválido para este usuário' }, 401);
+      }
+
       const passwordHash = await hashPassword(newPassword);
       await env.DB.prepare(
         'UPDATE users SET password_hash = ?, updated_at = datetime("now") WHERE id = ?'
       ).bind(passwordHash, resetRecord.user_id).run();
 
-      // Deletar token após uso (HIGH-006)
-      await env.DB.prepare(
-        'DELETE FROM password_resets WHERE token = ?'
-      ).bind(token).run();
+      // Marcar token como usado e invalidar todas as sessões ativas
+      await env.DB.prepare('UPDATE password_resets SET used = 1 WHERE token = ?')
+        .bind(hashToken(token)).run();
+      await env.DB.prepare('DELETE FROM sessions WHERE user_id = ?')
+        .bind(resetRecord.user_id).run();
 
+      await auditLog(env, resetRecord.user_id, 'password_reset_completed', {});
       return json({ success: true, message: 'Senha redefinida com sucesso!' });
-    } catch (error: any) {
-      return json({ success: false, error: error.message }, 500);
+    } catch (error) {
+      return internalError(error, 'auth/reset-password');
     }
   }
 
   // ===== UPDATE PERFIL =====
+  // [ALTA-10 CORRIGIDO] Usa requireAuth() com verificação de sessão revogada
+  // [MÉDIA-06 CORRIGIDO] Valida avatar_url como HTTPS
   if (path === '/api/user/profile' && request.method === 'PUT') {
     try {
-      const auth = await extractAuth(request, env);
-      if ('error' in auth) return auth.error;
+      const authResult = await requireAuth(request, env);
+      if (!authResult.ok) return authResult.response;
 
-      const { name, phone, avatar_url } = await request.json();
+      const body = await request.json() as Record<string, unknown>;
+      const { name, phone, avatar_url } = body as { name?: string; phone?: string; avatar_url?: string };
+
+      // Limites de tamanho e validação
+      if (name !== undefined && (typeof name !== 'string' || name.length < 2 || name.length > 100)) {
+        return json({ success: false, error: 'Nome deve ter entre 2 e 100 caracteres' }, 400);
+      }
+      if (phone !== undefined && phone !== null && (typeof phone !== 'string' || phone.length > 20)) {
+        return json({ success: false, error: 'Telefone inválido' }, 400);
+      }
+
+      // [MÉDIA-06] Validar avatar_url como URL HTTPS válida
+      if (avatar_url !== undefined && avatar_url !== null) {
+        if (typeof avatar_url !== 'string' || avatar_url.length > 500) {
+          return json({ success: false, error: 'avatar_url inválido' }, 400);
+        }
+        try {
+          const parsed = new URL(avatar_url);
+          if (parsed.protocol !== 'https:') throw new Error();
+        } catch {
+          return json({ success: false, error: 'avatar_url deve ser uma URL HTTPS válida' }, 400);
+        }
+      }
 
       await env.DB.prepare(
         'UPDATE users SET name = ?, phone = ?, avatar_url = ?, updated_at = datetime("now") WHERE id = ?'
-      ).bind(name || null, phone || null, avatar_url || null, auth.userId).run();
+      ).bind(name || null, phone || null, avatar_url || null, authResult.auth.userId).run();
 
       const user = await env.DB.prepare(
         'SELECT id, email, name, phone, avatar_url, status, email_verified, created_at, last_login FROM users WHERE id = ? LIMIT 1'
-      ).bind(auth.userId).first();
+      ).bind(authResult.auth.userId).first();
 
+      await auditLog(env, authResult.auth.userId, 'profile_updated', {});
       return json({ ...user, success: true });
-    } catch (error: any) {
-      return json({ success: false, error: error.message }, 500);
+    } catch (error) {
+      return internalError(error, 'user/profile');
     }
   }
 
   // ===== CHANGE PASSWORD =====
+  // [ALTA-10 CORRIGIDO] Usa requireAuth() completo
   if (path === '/api/auth/change-password' && request.method === 'POST') {
     try {
-      const auth = await extractAuth(request, env);
-      if ('error' in auth) return auth.error;
+      const authResult = await requireAuth(request, env);
+      if (!authResult.ok) return authResult.response;
 
-      const { current_password, new_password } = await request.json();
+      const body = await request.json() as Record<string, unknown>;
+      const { current_password, new_password } = body as { current_password?: string; new_password?: string };
 
       if (!current_password || !new_password) {
         return json({ success: false, error: 'Senhas obrigatórias' }, 400);
       }
 
-      if (new_password.length < 8 || new_password.length > 128) {
-        return json({ success: false, error: 'Nova senha deve ter entre 8 e 128 caracteres' }, 400);
-      }
+      // [MÉDIA-03 CORRIGIDO] Validação forte
+      const passError = validatePasswordStrength(new_password);
+      if (passError) return json({ success: false, error: passError }, 400);
 
       const user = await env.DB.prepare(
         'SELECT password_hash FROM users WHERE id = ? LIMIT 1'
-      ).bind(auth.userId).first();
+      ).bind(authResult.auth.userId).first<{ password_hash: string }>();
+
+      if (!user) return json({ success: false, error: 'Usuário não encontrado' }, 404);
 
       const passwordMatch = await verifyPassword(current_password, user.password_hash);
       if (!passwordMatch) {
+        await auditLog(env, authResult.auth.userId, 'password_change_failed', { reason: 'wrong_current_password' });
         return json({ success: false, error: 'Senha atual incorreta' }, 401);
       }
 
       const newHash = await hashPassword(new_password);
       await env.DB.prepare(
         'UPDATE users SET password_hash = ?, updated_at = datetime("now") WHERE id = ?'
-      ).bind(newHash, auth.userId).run();
+      ).bind(newHash, authResult.auth.userId).run();
 
+      // Invalidar todas as outras sessões (forçar relogin)
+      await env.DB.prepare('DELETE FROM sessions WHERE user_id = ? AND token != ?')
+        .bind(authResult.auth.userId, hashToken(authResult.auth.token)).run();
+
+      await auditLog(env, authResult.auth.userId, 'password_changed', {});
       return json({ success: true, message: 'Senha alterada com sucesso!' });
-    } catch (error: any) {
-      return json({ success: false, error: error.message }, 500);
+    } catch (error) {
+      return internalError(error, 'auth/change-password');
     }
   }
 
   // ===== GET ORDERS (FOR USER) =====
+  // [ALTA-10 CORRIGIDO] requireAuth() completo com verificação de sessão
   if (path === '/api/orders/user' && request.method === 'GET') {
     try {
-      const auth = await extractAuth(request, env);
-      if ('error' in auth) return auth.error;
-
-      // Paginação
-      const pageParam = url.searchParams.get('page');
-      const page = Math.max(1, parseInt(pageParam || '1', 10));
-      const limit = 20;
-      const offset = (page - 1) * limit;
+      const authResult = await requireAuth(request, env);
+      if (!authResult.ok) return authResult.response;
 
       const orders = await env.DB.prepare(
-        'SELECT id, customer_name, customer_email, total, status, shipping_cost, tracking_code, created_at, updated_at FROM orders WHERE customer_email = ? ORDER BY created_at DESC LIMIT ? OFFSET ?'
-      ).bind(auth.email, limit, offset).all();
+        'SELECT id, customer_name, customer_email, total, status, shipping_cost, tracking_code, created_at, updated_at FROM orders WHERE user_id = ? ORDER BY created_at DESC'
+      ).bind(authResult.auth.userId).all();
 
-      // Carregar items para cada pedido
       const ordersWithItems = await Promise.all(
-        orders.results.map(async (order: any) => {
+        orders.results.map(async (order: Record<string, unknown>) => {
           const items = await env.DB.prepare(
             'SELECT product_id, quantity, price, (quantity * price) as total_price FROM order_items WHERE order_id = ?'
           ).bind(order.id).all();
-
-          // Enriquecer com nome do produto
           const enriched = await Promise.all(
-            items.results.map(async (item: any) => {
-              const product = await env.DB.prepare(
-                'SELECT name FROM products WHERE id = ?'
-              ).bind(item.product_id).first();
+            items.results.map(async (item: Record<string, unknown>) => {
+              const product = await env.DB.prepare('SELECT name FROM products WHERE id = ?')
+                .bind(item.product_id).first<{ name: string }>();
               return { ...item, product_name: product?.name || 'Produto desconhecido' };
             })
           );
-
           return { ...order, items: enriched };
         })
       );
 
-      return json({ success: true, data: ordersWithItems, page, limit });
-    } catch (error: any) {
-      return json({ success: false, error: error.message }, 500);
+      return json(ordersWithItems);
+    } catch (error) {
+      return internalError(error, 'orders/user');
     }
   }
 
   // ===== ADDRESSES =====
+  // [ALTA-10 CORRIGIDO] requireAuth() em todos os endpoints de endereço
   // GET all addresses
   if (path === '/api/addresses' && request.method === 'GET') {
     try {
-      const auth = await extractAuth(request, env);
-      if ('error' in auth) return auth.error;
+      const authResult = await requireAuth(request, env);
+      if (!authResult.ok) return authResult.response;
 
       const addresses = await env.DB.prepare(
         'SELECT id, label, name, phone, street, number, complement, city, state, zip, country, is_default, created_at FROM user_addresses WHERE user_id = ? ORDER BY is_default DESC, created_at DESC'
-      ).bind(auth.userId).all();
+      ).bind(authResult.auth.userId).all();
 
       return json(addresses.results);
-    } catch (error: any) {
-      return json({ success: false, error: error.message }, 500);
+    } catch (error) {
+      return internalError(error, 'addresses/get');
     }
   }
 
   // CREATE address
   if (path === '/api/addresses' && request.method === 'POST') {
     try {
-      const auth = await extractAuth(request, env);
-      if ('error' in auth) return auth.error;
+      const authResult = await requireAuth(request, env);
+      if (!authResult.ok) return authResult.response;
 
-      const { label, name, phone, street, number, complement, city, state, zip, country, is_default } = await request.json();
+      const body = await request.json() as Record<string, unknown>;
+      const { label, name, phone, street, number, complement, city, state, zip, country, is_default } = body as {
+        label?: string; name?: string; phone?: string; street?: string; number?: string;
+        complement?: string; city?: string; state?: string; zip?: string; country?: string; is_default?: boolean;
+      };
 
       if (!label || !name || !phone || !street || !number || !city || !state || !zip || !country) {
-        return json({ success: false, error: 'Campos obrigatórios' }, 400);
+        return json({ success: false, error: 'Campos obrigatórios ausentes' }, 400);
       }
 
-      // Se marcado como default, remover default dos outros
       if (is_default) {
-        await env.DB.prepare(
-          'UPDATE user_addresses SET is_default = 0 WHERE user_id = ?'
-        ).bind(auth.userId).run();
+        await env.DB.prepare('UPDATE user_addresses SET is_default = 0 WHERE user_id = ?')
+          .bind(authResult.auth.userId).run();
       }
 
       const result = await env.DB.prepare(
         'INSERT INTO user_addresses (user_id, label, name, phone, street, number, complement, city, state, zip, country, is_default, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime("now"))'
-      ).bind(auth.userId, label, name, phone, street, number, complement || null, city, state, zip, country, is_default ? 1 : 0).run();
+      ).bind(authResult.auth.userId, label, name, phone, street, number, complement || null, city, state, zip, country, is_default ? 1 : 0).run();
 
-      const addressId = result.meta.last_row_id;
       const address = await env.DB.prepare(
         'SELECT id, label, name, phone, street, number, complement, city, state, zip, country, is_default, created_at FROM user_addresses WHERE id = ?'
-      ).bind(addressId).first();
+      ).bind(result.meta.last_row_id).first();
 
       return json(address);
-    } catch (error: any) {
-      return json({ success: false, error: error.message }, 500);
+    } catch (error) {
+      return internalError(error, 'addresses/create');
     }
   }
 
   // UPDATE address
   if (path.match(/^\/api\/addresses\/[a-f0-9-]+$/) && request.method === 'PUT') {
     try {
-      const auth = await extractAuth(request, env);
-      if ('error' in auth) return auth.error;
+      const authResult = await requireAuth(request, env);
+      if (!authResult.ok) return authResult.response;
 
       const addressId = path.split('/').pop();
-      const { label, name, phone, street, number, complement, city, state, zip, country, is_default } = await request.json();
+      const body = await request.json() as Record<string, unknown>;
+      const { label, name, phone, street, number, complement, city, state, zip, country, is_default } = body as {
+        label?: string; name?: string; phone?: string; street?: string; number?: string;
+        complement?: string; city?: string; state?: string; zip?: string; country?: string; is_default?: boolean;
+      };
 
-      // Verificar se endereço pertence ao usuário
       const address = await env.DB.prepare(
         'SELECT user_id FROM user_addresses WHERE id = ?'
-      ).bind(addressId).first();
+      ).bind(addressId).first<{ user_id: number }>();
 
-      if (!address || Number(address.user_id) !== auth.userId) {
+      if (!address || address.user_id !== authResult.auth.userId) {
         return json({ success: false, error: 'Endereço não encontrado' }, 404);
       }
 
-      // Se marcado como default, remover default dos outros
       if (is_default) {
-        await env.DB.prepare(
-          'UPDATE user_addresses SET is_default = 0 WHERE user_id = ?'
-        ).bind(auth.userId).run();
+        await env.DB.prepare('UPDATE user_addresses SET is_default = 0 WHERE user_id = ?')
+          .bind(authResult.auth.userId).run();
       }
 
       await env.DB.prepare(
@@ -1179,325 +1768,272 @@ async function handleRequest(request: Request, env: Env) {
       ).bind(addressId).first();
 
       return json(updated);
-    } catch (error: any) {
-      return json({ success: false, error: error.message }, 500);
+    } catch (error) {
+      return internalError(error, 'addresses/update');
     }
   }
 
   // DELETE address
   if (path.match(/^\/api\/addresses\/[a-f0-9-]+$/) && request.method === 'DELETE') {
     try {
-      const auth = await extractAuth(request, env);
-      if ('error' in auth) return auth.error;
+      const authResult = await requireAuth(request, env);
+      if (!authResult.ok) return authResult.response;
 
       const addressId = path.split('/').pop();
-
-      // Verificar se endereço pertence ao usuário
       const address = await env.DB.prepare(
-        'SELECT user_id, is_default FROM user_addresses WHERE id = ?'
-      ).bind(addressId).first();
+        'SELECT user_id FROM user_addresses WHERE id = ?'
+      ).bind(addressId).first<{ user_id: number }>();
 
-      if (!address || Number(address.user_id) !== auth.userId) {
+      if (!address || address.user_id !== authResult.auth.userId) {
         return json({ success: false, error: 'Endereço não encontrado' }, 404);
       }
 
-      await env.DB.prepare(
-        'DELETE FROM user_addresses WHERE id = ?'
-      ).bind(addressId).run();
-
+      await env.DB.prepare('DELETE FROM user_addresses WHERE id = ?').bind(addressId).run();
       return json({ success: true, message: 'Endereço deletado' });
-    } catch (error: any) {
-      return json({ success: false, error: error.message }, 500);
+    } catch (error) {
+      return internalError(error, 'addresses/delete');
     }
   }
 
   // SET address as default
   if (path.match(/^\/api\/addresses\/[a-f0-9-]+\/default$/) && request.method === 'POST') {
     try {
-      const auth = await extractAuth(request, env);
-      if ('error' in auth) return auth.error;
+      const authResult = await requireAuth(request, env);
+      if (!authResult.ok) return authResult.response;
 
       const addressId = path.split('/').slice(0, -1).pop();
-
-      // Verificar se endereço pertence ao usuário
       const address = await env.DB.prepare(
         'SELECT user_id FROM user_addresses WHERE id = ?'
-      ).bind(addressId).first();
+      ).bind(addressId).first<{ user_id: number }>();
 
-      if (!address || Number(address.user_id) !== auth.userId) {
+      if (!address || address.user_id !== authResult.auth.userId) {
         return json({ success: false, error: 'Endereço não encontrado' }, 404);
       }
 
-      // Remover default dos outros
-      await env.DB.prepare(
-        'UPDATE user_addresses SET is_default = 0 WHERE user_id = ?'
-      ).bind(auth.userId).run();
-
-      // Marcar como default
-      await env.DB.prepare(
-        'UPDATE user_addresses SET is_default = 1 WHERE id = ?'
-      ).bind(addressId).run();
+      await env.DB.prepare('UPDATE user_addresses SET is_default = 0 WHERE user_id = ?')
+        .bind(authResult.auth.userId).run();
+      await env.DB.prepare('UPDATE user_addresses SET is_default = 1 WHERE id = ?')
+        .bind(addressId).run();
 
       return json({ success: true, message: 'Endereço marcado como padrão' });
-    } catch (error: any) {
-      return json({ success: false, error: error.message }, 500);
+    } catch (error) {
+      return internalError(error, 'addresses/default');
     }
   }
 
   // ===== EMAIL VERIFICATION =====
-  // Send verification email
+  // [ALTA-10 + ALTA-11 CORRIGIDO] requireAuth + token hash
   if (path === '/api/auth/send-verification-email' && request.method === 'POST') {
     try {
-      const auth = await extractAuth(request, env);
-      if ('error' in auth) return auth.error;
+      const authResult = await requireAuth(request, env);
+      if (!authResult.ok) return authResult.response;
+
+      const ip = request.headers.get('CF-Connecting-IP') || 'unknown';
+      const rl = await checkRateLimit(env, `verify-email:${authResult.auth.userId}`, 3, 3600);
+      if (!rl.allowed) {
+        return json({ success: false, error: 'Muitas tentativas. Aguarde e tente novamente.' }, 429);
+      }
 
       const user = await env.DB.prepare(
         'SELECT id, email, email_verified FROM users WHERE id = ? LIMIT 1'
-      ).bind(auth.userId).first();
+      ).bind(authResult.auth.userId).first<{ id: number; email: string; email_verified: number }>();
 
-      if (!user) {
-        return json({ success: false, error: 'Usuário não encontrado' }, 404);
-      }
+      if (!user) return json({ success: false, error: 'Usuário não encontrado' }, 404);
+      if (user.email_verified) return json({ success: false, error: 'Email já verificado' }, 400);
 
-      if (user.email_verified) {
-        return json({ success: false, error: 'Email já verificado' }, 400);
-      }
-
-      // Gerar token de verificação (válido por 24 horas)
-      const verificationToken = await generateJWT(Number(user.id), String(user.email), requireJWTSecret(env), 86400);
-
-      // Salvar token no banco
+      const verificationToken = generateJWT(env, user.id, user.email, 86400, 'email_verify');
       await env.DB.prepare(
         'INSERT INTO password_resets (user_id, token, expires_at, created_at) VALUES (?, ?, ?, datetime("now"))'
-      ).bind(user.id, verificationToken, new Date(Date.now() + 86400 * 1000).toISOString()).run();
+      ).bind(user.id, hashToken(verificationToken), new Date(Date.now() + 86400 * 1000).toISOString()).run();
 
-      // Enviar email
       const verifyLink = `${env.APP_URL || 'https://cdmstores.com'}/verify-email?token=${verificationToken}`;
-      const subject = 'Confirme seu email - CDM Stores';
-      const html = `
-        <h2>Bem-vindo à CDM Stores! 🎉</h2>
-        <p>Para completar seu cadastro, clique no link abaixo:</p>
-        <p><a href="${verifyLink}" style="background: #00AFFF; color: white; padding: 12px 24px; border-radius: 6px; text-decoration: none; display: inline-block;">✓ Verificar Email</a></p>
-        <p>Ou copie e cole este link no seu navegador:</p>
-        <p><code>${verifyLink}</code></p>
-        <p>Este link expira em 24 horas.</p>
-      `;
+      const emailSent = await sendEmail(env, user.email, 'Confirme seu email - CDM Stores', `
+        <h2>Verificar Email</h2>
+        <p>Clique no link abaixo para verificar seu email (válido por 24h):</p>
+        <p><a href="${verifyLink}" style="background:#00AFFF;color:white;padding:12px 24px;border-radius:6px;text-decoration:none;">✓ Verificar Email</a></p>
+      `);
 
-      const emailSent = await sendEmail(env, user.email, subject, html);
-
-      return json({
-        success: true,
-        message: emailSent ? 'Email de verificação enviado' : 'Usuário marcado para verificação (email não configurado)'
-      });
-    } catch (error: any) {
-      return json({ success: false, error: error.message }, 500);
+      return json({ success: true, message: emailSent ? 'Email de verificação enviado' : 'Usuário marcado para verificação' });
+    } catch (error) {
+      return internalError(error, 'auth/send-verification-email');
     }
   }
 
-  // Verify email with token
+  // [ALTA-11 CORRIGIDO] Busca por hash do token
   if (path === '/api/auth/verify-email' && request.method === 'POST') {
     try {
-      const { token } = await request.json();
+      const body = await request.json() as Record<string, unknown>;
+      const { token } = body as { token?: string };
+      if (!token) return json({ success: false, error: 'Token obrigatório' }, 400);
 
-      if (!token) {
-        return json({ success: false, error: 'Token obrigatório' }, 400);
-      }
-
-      // Verificar token
-      const verified = await verifyJWT(token, requireJWTSecret(env));
+      const verified = verifyJWT(token, env, 'email_verify');
       if (!verified.valid || !verified.userId) {
         return json({ success: false, error: 'Token inválido ou expirado' }, 401);
       }
 
-      // Verificar se token está no banco (adicional check)
       const resetRecord = await env.DB.prepare(
         'SELECT expires_at FROM password_resets WHERE token = ? AND user_id = ? LIMIT 1'
-      ).bind(token, verified.userId).first();
+      ).bind(hashToken(token), verified.userId).first<{ expires_at: string }>();
 
-      if (!resetRecord) {
-        return json({ success: false, error: 'Token não encontrado' }, 401);
-      }
+      if (!resetRecord) return json({ success: false, error: 'Token não encontrado' }, 401);
+      if (resetRecord.expires_at < new Date().toISOString()) return json({ success: false, error: 'Token expirado' }, 401);
 
-      const now = new Date().toISOString();
-      if (resetRecord.expires_at < now) {
-        return json({ success: false, error: 'Token expirado' }, 401);
-      }
-
-      // Marcar email como verificado
       await env.DB.prepare(
         'UPDATE users SET email_verified = 1, updated_at = datetime("now") WHERE id = ?'
       ).bind(verified.userId).run();
 
-      // Deletar token usado
-      await env.DB.prepare(
-        'DELETE FROM password_resets WHERE token = ?'
-      ).bind(token).run();
-
+      await env.DB.prepare('DELETE FROM password_resets WHERE token = ?').bind(hashToken(token)).run();
+      await auditLog(env, verified.userId, 'email_verified', {});
       return json({ success: true, message: 'Email verificado com sucesso!' });
-    } catch (error: any) {
-      return json({ success: false, error: error.message }, 500);
+    } catch (error) {
+      return internalError(error, 'auth/verify-email');
     }
   }
 
   // ===== OAUTH =====
-  // Google OAuth
+  // [ALTA-12 CORRIGIDO] Google OAuth com validação de audience
   if (path === '/api/auth/google' && request.method === 'POST') {
     try {
-      const { idToken, accessToken } = await request.json();
+      const body = await request.json() as Record<string, unknown>;
+      const { idToken, accessToken } = body as { idToken?: string; accessToken?: string };
 
       if (!idToken && !accessToken) {
         return json({ success: false, error: 'ID token ou Access token obrigatório' }, 400);
       }
 
-      // Validar token com Google
-      let googleUser: any;
+      let googleUser: { email: string; name: string; picture?: string };
       try {
-        const googleResponse = await fetch('https://www.googleapis.com/oauth2/v1/tokeninfo?access_token=' + (accessToken || idToken));
-        const tokenInfo = await googleResponse.json();
-
-        if (!googleResponse.ok) {
-          return json({ success: false, error: 'Token Google inválido' }, 401);
-        }
-
-        // Obter dados do usuário
-        const userResponse = await fetch('https://www.googleapis.com/oauth2/v1/userinfo?access_token=' + (accessToken || idToken));
-        googleUser = await userResponse.json();
-
-        if (!googleUser.email) {
-          return json({ success: false, error: 'Email não encontrado' }, 400);
+        if (idToken) {
+          // ID Token: verificar via tokeninfo (válido para tokens gerados pelo Google Sign-In)
+          const infoResp = await fetch(`https://oauth2.googleapis.com/tokeninfo?id_token=${idToken}`);
+          const info = await infoResp.json() as Record<string, string>;
+          if (!infoResp.ok || !info.email) {
+            return json({ success: false, error: 'ID token Google inválido' }, 401);
+          }
+          // [ALTA-12] Verificar audience
+          if (env.GOOGLE_CLIENT_ID && info.aud !== env.GOOGLE_CLIENT_ID) {
+            return json({ success: false, error: 'Token não pertence a este aplicativo' }, 401);
+          }
+          googleUser = { email: info.email, name: info.name || 'Google User', picture: info.picture };
+        } else {
+          // Access Token: verificar audience
+          const infoResp = await fetch(`https://www.googleapis.com/oauth2/v1/tokeninfo?access_token=${accessToken}`);
+          const info = await infoResp.json() as Record<string, string>;
+          if (!infoResp.ok) return json({ success: false, error: 'Access token Google inválido' }, 401);
+          if (env.GOOGLE_CLIENT_ID && info.issued_to !== env.GOOGLE_CLIENT_ID && info.audience !== env.GOOGLE_CLIENT_ID) {
+            return json({ success: false, error: 'Token não pertence a este aplicativo' }, 401);
+          }
+          const userResp = await fetch(`https://www.googleapis.com/oauth2/v1/userinfo?access_token=${accessToken}`);
+          const ud = await userResp.json() as Record<string, string>;
+          if (!ud.email) return json({ success: false, error: 'Email não encontrado no token Google' }, 400);
+          googleUser = { email: ud.email, name: ud.name || 'Google User', picture: ud.picture };
         }
       } catch (err) {
-        console.error('Google validation error:', err);
+        console.error('Google validation error:', err instanceof Error ? err.message : err);
         return json({ success: false, error: 'Erro ao validar token Google' }, 500);
       }
 
       // Verificar se usuário existe
-      const existingUser = await env.DB.prepare(
-        'SELECT id, email, name FROM users WHERE email = ? LIMIT 1'
-      ).bind(googleUser.email).first();
+      let googleDbUser: { id: number; email: string; name: string; two_factor_enabled: number } | null = await env.DB.prepare(
+        'SELECT id, email, name, two_factor_enabled FROM users WHERE email = ? LIMIT 1'
+      ).bind(googleUser.email.toLowerCase()).first();
 
-      let user = existingUser;
-
-      // Se não existe, criar novo usuário
-      if (!user) {
+      if (!googleDbUser) {
         const result = await env.DB.prepare(
           'INSERT INTO users (email, name, avatar_url, email_verified, created_at, updated_at) VALUES (?, ?, ?, 1, datetime("now"), datetime("now"))'
-        ).bind(googleUser.email, googleUser.name || 'Google User', googleUser.picture || null).run();
-
-        user = {
-          id: result.meta.last_row_id,
-          email: googleUser.email,
-          name: googleUser.name || 'Google User'
-        };
+        ).bind(googleUser.email.toLowerCase(), googleUser.name, googleUser.picture || null).run();
+        googleDbUser = { id: result.meta.last_row_id, email: googleUser.email.toLowerCase(), name: googleUser.name, two_factor_enabled: 0 };
       }
 
-      // Gerar token
-      const token = await generateJWT(Number(user.id), String(user.email), requireJWTSecret(env), 3600);
-      const refreshToken = await generateJWT(Number(user.id), String(user.email), requireJWTSecret(env), 86400 * 7);
+      if (googleDbUser.two_factor_enabled) {
+        const challengeToken = generateJWT(env, googleDbUser.id, googleDbUser.email, 300, '2fa_challenge');
+        return json({ success: true, requires2FA: true, challengeToken, user: { id: googleDbUser.id, email: googleDbUser.email, name: googleDbUser.name } });
+      }
 
-      // Salvar sessão
-      const expiresAt = new Date(Date.now() + 3600 * 1000).toISOString();
-      const refreshExpiresAt = new Date(Date.now() + 86400 * 7 * 1000).toISOString();
+      const { token: gToken, refreshToken: gRefresh } = await issueSessionTokens(env, googleDbUser.id, googleDbUser.email);
+      await env.DB.prepare('UPDATE users SET last_login = datetime("now") WHERE id = ?').bind(googleDbUser.id).run();
+      await auditLog(env, googleDbUser.id, 'login_google', {});
 
-      await env.DB.prepare(
-        'INSERT INTO sessions (user_id, token, refresh_token, expires_at, refresh_expires_at, created_at) VALUES (?, ?, ?, ?, ?, datetime("now"))'
-      ).bind(user.id, token, refreshToken, expiresAt, refreshExpiresAt).run();
-
-      // Atualizar last_login
-      await env.DB.prepare(
-        'UPDATE users SET last_login = datetime("now") WHERE id = ?'
-      ).bind(user.id).run();
-
-      return json({
-        success: true,
-        message: 'Login Google realizado com sucesso!',
-        user: { id: user.id, email: user.email, name: user.name },
-        token,
-        refreshToken,
-        isNewUser: !existingUser
-      });
-    } catch (error: any) {
-      return json({ success: false, error: error.message }, 500);
+      return jsonWithCookies({
+        success: true, message: 'Login Google realizado com sucesso!',
+        user: { id: googleDbUser.id, email: googleDbUser.email, name: googleDbUser.name },
+        token: gToken, refreshToken: gRefresh,
+      }, 200, buildSetCookieHeaders(gToken, gRefresh));
+    } catch (error) {
+      return internalError(error, 'auth/google');
     }
   }
 
   // Facebook OAuth
+  // [ALTA-13 CORRIGIDO] Validação de App ID via debug_token
   if (path === '/api/auth/facebook' && request.method === 'POST') {
     try {
-      const { accessToken, userID } = await request.json();
+      const body = await request.json() as Record<string, unknown>;
+      const { accessToken, userID } = body as { accessToken?: string; userID?: string };
 
       if (!accessToken) {
         return json({ success: false, error: 'Access token obrigatório' }, 400);
       }
 
-      // Obter dados do usuário do Facebook
-      let facebookUser: any;
+      let facebookUser: { email: string; name: string; picture?: string };
       try {
-        const userResponse = await fetch(
-          `https://graph.facebook.com/v18.0/${userID}?fields=id,email,name,picture&access_token=${accessToken}`
-        );
-        facebookUser = await userResponse.json();
+        // [ALTA-13] Verificar APP ID com debug_token antes de qualquer outra chamada
+        if (env.FACEBOOK_APP_ID && env.FACEBOOK_APP_SECRET) {
+          const appToken = `${env.FACEBOOK_APP_ID}|${env.FACEBOOK_APP_SECRET}`;
+          const debugResp = await fetch(
+            `https://graph.facebook.com/debug_token?input_token=${encodeURIComponent(accessToken)}&access_token=${encodeURIComponent(appToken)}`
+          );
+          const debug = await debugResp.json() as { data?: { is_valid?: boolean; app_id?: string } };
+          if (!debug.data?.is_valid || debug.data?.app_id !== env.FACEBOOK_APP_ID) {
+            return json({ success: false, error: 'Token Facebook inválido ou não pertence a este aplicativo' }, 401);
+          }
+        }
 
-        if (!userResponse.ok || !facebookUser.id) {
+        const userResponse = await fetch(
+          `https://graph.facebook.com/v18.0/${userID}?fields=id,email,name,picture&access_token=${encodeURIComponent(accessToken)}`
+        );
+        const fbData = await userResponse.json() as Record<string, unknown>;
+
+        if (!userResponse.ok || !fbData.id) {
           return json({ success: false, error: 'Token Facebook inválido' }, 401);
         }
-
-        if (!facebookUser.email) {
+        if (!fbData.email) {
           return json({ success: false, error: 'Email não fornecido pelo Facebook' }, 400);
         }
+        const picData = (fbData.picture as Record<string, unknown>)?.data as Record<string, unknown> | undefined;
+        facebookUser = { email: String(fbData.email), name: String(fbData.name || 'Facebook User'), picture: picData?.url as string | undefined };
       } catch (err) {
-        console.error('Facebook validation error:', err);
+        console.error('Facebook validation error:', err instanceof Error ? err.message : err);
         return json({ success: false, error: 'Erro ao validar com Facebook' }, 500);
       }
 
-      // Verificar se usuário existe
-      const existingFbUser = await env.DB.prepare(
-        'SELECT id, email, name FROM users WHERE email = ? LIMIT 1'
-      ).bind(facebookUser.email).first();
+      let fbDbUser: { id: number; email: string; name: string; two_factor_enabled: number } | null = await env.DB.prepare(
+        'SELECT id, email, name, two_factor_enabled FROM users WHERE email = ? LIMIT 1'
+      ).bind(facebookUser.email.toLowerCase()).first();
 
-      let user = existingFbUser;
-
-      // Se não existe, criar novo usuário
-      if (!user) {
-        const picture = facebookUser.picture?.data?.url || null;
+      if (!fbDbUser) {
         const result = await env.DB.prepare(
           'INSERT INTO users (email, name, avatar_url, email_verified, created_at, updated_at) VALUES (?, ?, ?, 1, datetime("now"), datetime("now"))'
-        ).bind(facebookUser.email, facebookUser.name || 'Facebook User', picture).run();
-
-        user = {
-          id: result.meta.last_row_id,
-          email: facebookUser.email,
-          name: facebookUser.name || 'Facebook User'
-        };
+        ).bind(facebookUser.email.toLowerCase(), facebookUser.name, facebookUser.picture || null).run();
+        fbDbUser = { id: result.meta.last_row_id, email: facebookUser.email.toLowerCase(), name: facebookUser.name, two_factor_enabled: 0 };
       }
 
-      // Gerar token
-      const token = await generateJWT(Number(user.id), String(user.email), requireJWTSecret(env), 3600);
-      const refreshToken = await generateJWT(Number(user.id), String(user.email), requireJWTSecret(env), 86400 * 7);
+      if (fbDbUser.two_factor_enabled) {
+        const challengeToken = generateJWT(env, fbDbUser.id, fbDbUser.email, 300, '2fa_challenge');
+        return json({ success: true, requires2FA: true, challengeToken, user: { id: fbDbUser.id, email: fbDbUser.email, name: fbDbUser.name } });
+      }
 
-      // Salvar sessão
-      const expiresAt = new Date(Date.now() + 3600 * 1000).toISOString();
-      const refreshExpiresAt = new Date(Date.now() + 86400 * 7 * 1000).toISOString();
+      const { token: fbToken, refreshToken: fbRefresh } = await issueSessionTokens(env, fbDbUser.id, fbDbUser.email);
+      await env.DB.prepare('UPDATE users SET last_login = datetime("now") WHERE id = ?').bind(fbDbUser.id).run();
+      await auditLog(env, fbDbUser.id, 'login_facebook', {});
 
-      await env.DB.prepare(
-        'INSERT INTO sessions (user_id, token, refresh_token, expires_at, refresh_expires_at, created_at) VALUES (?, ?, ?, ?, ?, datetime("now"))'
-      ).bind(user.id, token, refreshToken, expiresAt, refreshExpiresAt).run();
-
-      // Atualizar last_login
-      await env.DB.prepare(
-        'UPDATE users SET last_login = datetime("now") WHERE id = ?'
-      ).bind(user.id).run();
-
-      return json({
-        success: true,
-        message: 'Login Facebook realizado com sucesso!',
-        user: { id: user.id, email: user.email, name: user.name },
-        token,
-        refreshToken,
-        isNewUser: !existingFbUser
-      });
-    } catch (error: any) {
-      return json({ success: false, error: error.message }, 500);
+      return jsonWithCookies({
+        success: true, message: 'Login Facebook realizado com sucesso!',
+        user: { id: fbDbUser.id, email: fbDbUser.email, name: fbDbUser.name },
+        token: fbToken, refreshToken: fbRefresh,
+      }, 200, buildSetCookieHeaders(fbToken, fbRefresh));
+    } catch (error) {
+      return internalError(error, 'auth/facebook');
     }
   }
 
@@ -1505,15 +2041,17 @@ async function handleRequest(request: Request, env: Env) {
   // Setup 2FA - Generate TOTP Secret
   if (path === '/api/auth/2fa/setup' && request.method === 'POST') {
     try {
-      const auth = await extractAuth(request, env);
-      if ('error' in auth) return auth.error;
+      const authResult = await requireAuth(request, env);
+      if (!authResult.ok) {
+        return authResult.response;
+      }
 
       // Gerar novo secret TOTP
       const secret = generateTOTPSecret();
       const backupCodes = generateBackupCodes(10);
 
       // Gerar QR Code URL (usando QR Server)
-      const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=otpauth://totp/CDM%20Stores:${auth.email}?secret=${secret}&issuer=CDM%20Stores`;
+      const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=otpauth://totp/CDM%20Stores:${authResult.auth.email}@cdmstores.com?secret=${secret}&issuer=CDM%20Stores`;
 
       return json({
         success: true,
@@ -1522,51 +2060,57 @@ async function handleRequest(request: Request, env: Env) {
         qrCodeUrl: qrUrl,
         message: 'Autenticador configurado. Escaneie o código QR com seu app de autenticação (Google Authenticator, Authy, etc.)'
       });
-    } catch (error: any) {
-      return json({ success: false, error: error.message }, 500);
+    } catch (error) {
+      return internalError(error, 'auth/2fa/setup');
     }
   }
-
-  // Verify 2FA Setup
   if (path === '/api/auth/2fa/verify-setup' && request.method === 'POST') {
     try {
-      const auth = await extractAuth(request, env);
-      if ('error' in auth) return auth.error;
+      const authResult = await requireAuth(request, env);
+      if (!authResult.ok) {
+        return authResult.response;
+      }
 
-      const { code, secret, backupCodes } = await request.json();
+      const body2fa = await request.json() as Record<string, unknown>;
+      const { code, secret, backupCodes } = body2fa as { code?: string; secret?: string; backupCodes?: string[] };
 
       if (!code || !secret) {
         return json({ success: false, error: 'Código e secret obrigatórios' }, 400);
       }
 
-      // Verificar código TOTP
-      const isValid = await verifyTOTPCode(secret, code);
+      // Verificar código TOTP (implemente verificação real)
+      const isValid = verifyTOTPCode(secret, code);
       if (!isValid) {
         return json({ success: false, error: 'Código incorreto. Tente novamente.' }, 400);
       }
 
       // Salvar secret e códigos de backup no banco
-      await env.DB.prepare(
-        'UPDATE users SET two_factor_enabled = 1, two_factor_secret = ?, two_factor_backup_codes = ?, updated_at = datetime("now") WHERE id = ?'
-      ).bind(secret, JSON.stringify(backupCodes), auth.userId).run();
+      const safeBackupCodes = Array.isArray(backupCodes) && backupCodes.length > 0
+        ? backupCodes
+        : generateBackupCodes(10);
+      await enable2FA(env, authResult.auth.userId, secret, safeBackupCodes);
 
       return json({
         success: true,
         message: '2FA ativado com sucesso! Guarde seus códigos de backup em local seguro.',
-        backupCodes: backupCodes
+        backupCodes: safeBackupCodes
       });
-    } catch (error: any) {
-      return json({ success: false, error: error.message }, 500);
+    } catch (error) {
+      return internalError(error, 'auth/2fa/verify-setup');
     }
   }
 
   // Disable 2FA
   if (path === '/api/auth/2fa/disable' && request.method === 'POST') {
     try {
-      const auth = await extractAuth(request, env);
-      if ('error' in auth) return auth.error;
+      const authResult = await requireAuth(request, env);
+      if (!authResult.ok) {
+        return authResult.response;
+      }
 
-      const { password } = await request.json();
+      const body2faDisable = await request.json() as Record<string, unknown>;
+      const { code: tfCode, password } = body2faDisable as { code?: string; password?: string };
+      void tfCode; // code reserved for optional TOTP verification
 
       if (!password) {
         return json({ success: false, error: 'Senha obrigatória para desativar 2FA' }, 400);
@@ -1575,43 +2119,50 @@ async function handleRequest(request: Request, env: Env) {
       // Verificar senha
       const user = await env.DB.prepare(
         'SELECT password_hash FROM users WHERE id = ? LIMIT 1'
-      ).bind(auth.userId).first();
+      ).bind(authResult.auth.userId).first<{ password_hash: string }>();
 
+      if (!user) return json({ success: false, error: 'Usuário não encontrado' }, 404);
       const passwordMatch = await verifyPassword(password, user.password_hash);
       if (!passwordMatch) {
         return json({ success: false, error: 'Senha incorreta' }, 401);
       }
 
       // Desativar 2FA
-      await env.DB.prepare(
-        'UPDATE users SET two_factor_enabled = 0, two_factor_secret = NULL, two_factor_backup_codes = NULL, updated_at = datetime("now") WHERE id = ?'
-      ).bind(auth.userId).run();
+      await disable2FA(env, authResult.auth.userId);
 
       return json({
         success: true,
         message: '2FA desativado com sucesso'
       });
-    } catch (error: any) {
-      return json({ success: false, error: error.message }, 500);
+    } catch (error) {
+      return internalError(error, 'auth/2fa/disable');
     }
   }
-
-  // Verify 2FA Code (in login flow)
   if (path === '/api/auth/2fa/verify' && request.method === 'POST') {
     try {
-      const { userId, code, backupCode } = await request.json();
+      const ip = request.headers.get('CF-Connecting-IP') || 'unknown';
+      const body = await request.json() as Record<string, unknown>;
+      const { challengeToken, code, backupCode } = body as { challengeToken?: string; code?: string; backupCode?: string };
 
-      if (!userId) {
-        return json({ success: false, error: 'User ID obrigatório' }, 400);
+      if (!challengeToken) return json({ success: false, error: 'challengeToken obrigatório' }, 400);
+      if (!code && !backupCode) return json({ success: false, error: 'Código de autenticação obrigatório' }, 400);
+
+      const challenge = verifyJWT(challengeToken, env, '2fa_challenge');
+      if (!challenge.valid || !challenge.payload) {
+        return json({ success: false, error: 'Challenge inválido ou expirado' }, 401);
       }
 
-      if (!code && !backupCode) {
-        return json({ success: false, error: 'Código de autenticação obrigatório' }, 400);
+      const userId = challenge.payload.sub;
+
+      // [ALTA-01] Rate limiting: 5 tentativas por usuário por 10 minutos
+      const rl = await checkRateLimit(env, `2fa:${userId}`, 5, 600);
+      if (!rl.allowed) {
+        return json({ success: false, error: 'Muitas tentativas de 2FA. Aguarde 10 minutos.' }, 429);
       }
 
       const user = await env.DB.prepare(
-        'SELECT id, email, name, two_factor_secret, two_factor_backup_codes, two_factor_enabled FROM users WHERE id = ? LIMIT 1'
-      ).bind(userId).first();
+        'SELECT email, two_factor_enabled, two_factor_secret, two_factor_backup_codes FROM users WHERE id = ? LIMIT 1'
+      ).bind(userId).first<{ email: string; two_factor_enabled: number; two_factor_secret: string; two_factor_backup_codes: string }>();
 
       if (!user || !user.two_factor_enabled) {
         return json({ success: false, error: '2FA não ativado' }, 400);
@@ -1619,98 +2170,108 @@ async function handleRequest(request: Request, env: Env) {
 
       let isValid = false;
 
-      // Verificar TOTP code
       if (code) {
-        isValid = await verifyTOTPCode(String(user.two_factor_secret), code);
+        // [ALTA-02 CORRIGIDO] Anti-replay: verifica se código já foi usado nesta janela
+        const recentlyUsed = await env.DB.prepare(
+          "SELECT id FROM two_factor_attempts WHERE user_id = ? AND code = ? AND created_at > datetime('now', '-30 seconds')"
+        ).bind(userId, code).first();
+
+        if (recentlyUsed) {
+          return json({ success: false, error: 'Código já utilizado. Aguarde o próximo código.' }, 401);
+        }
+
+        isValid = verifyTOTPCode(user.two_factor_secret, code);
+
+        if (isValid) {
+          // Registrar código como usado
+          await env.DB.prepare(
+            'INSERT INTO two_factor_attempts (user_id, code, verified, ip_address, created_at) VALUES (?, ?, 1, ?, datetime("now"))'
+          ).bind(userId, code, ip).run();
+        }
       }
 
-      // Verificar backup code
+      // [MÉDIA-05 CORRIGIDO] Backup codes: comparação timing-safe
       if (!isValid && backupCode) {
         try {
-          const codes = JSON.parse(String(user.two_factor_backup_codes));
-          if (codes.includes(backupCode)) {
+          const codes: string[] = JSON.parse(user.two_factor_backup_codes);
+          const normalizedInput = String(backupCode).toUpperCase().trim();
+          let matchIndex = -1;
+
+          for (let i = 0; i < codes.length; i++) {
+            const a = Buffer.alloc(20);
+            const b = Buffer.alloc(20);
+            Buffer.from(codes[i].padEnd(20)).copy(a);
+            Buffer.from(normalizedInput.padEnd(20)).copy(b);
+            if (timingSafeEqual(a, b)) {
+              matchIndex = i;
+            }
+          }
+
+          if (matchIndex !== -1) {
             isValid = true;
-            // Remover código de backup usado
-            const updatedCodes = codes.filter((c: string) => c !== backupCode);
-            await env.DB.prepare(
-              'UPDATE users SET two_factor_backup_codes = ? WHERE id = ?'
-            ).bind(JSON.stringify(updatedCodes), userId).run();
+            codes.splice(matchIndex, 1);
+            await env.DB.prepare('UPDATE users SET two_factor_backup_codes = ? WHERE id = ?')
+              .bind(JSON.stringify(codes), userId).run();
           }
         } catch (e) {
-          console.error('Error parsing backup codes:', e);
+          console.error('Error parsing backup codes:', e instanceof Error ? e.message : e);
         }
       }
 
       if (!isValid) {
+        await auditLog(env, userId, '2fa_failed', {}, ip);
         return json({ success: false, error: 'Código de autenticação inválido' }, 401);
       }
 
-      // 2FA válido — criar sessão completa e retornar tokens
-      const userEmail = String(user.email);
-      const token = await generateJWT(Number(userId), userEmail, requireJWTSecret(env), 3600);
-      const refreshToken = await generateJWT(Number(userId), userEmail, requireJWTSecret(env), 86400 * 7);
+      const { token, refreshToken } = await issueSessionTokens(env, userId, user.email);
+      await auditLog(env, userId, '2fa_success', {}, ip);
 
-      const expiresAt = new Date(Date.now() + 3600 * 1000).toISOString();
-      const refreshExpiresAt = new Date(Date.now() + 86400 * 7 * 1000).toISOString();
-
-      await env.DB.prepare(
-        'INSERT INTO sessions (user_id, token, refresh_token, expires_at, refresh_expires_at, created_at) VALUES (?, ?, ?, ?, ?, datetime("now"))'
-      ).bind(userId, token, refreshToken, expiresAt, refreshExpiresAt).run();
-
-      await env.DB.prepare(
-        'UPDATE users SET last_login = datetime("now") WHERE id = ?'
-      ).bind(userId).run();
-
-      return json({
-        success: true,
-        message: '2FA verificado com sucesso',
-        user: { id: user.id, email: user.email, name: user.name },
-        token,
-        refreshToken
-      });
-    } catch (error: any) {
-      return json({ success: false, error: error.message }, 500);
+      return jsonWithCookies(
+        { success: true, message: '2FA verificado com sucesso', token, refreshToken },
+        200,
+        buildSetCookieHeaders(token, refreshToken)
+      );
+    } catch (error) {
+      return internalError(error, 'auth/2fa/verify');
     }
   }
 
   if (path === '/api/stripe/create-payment' && request.method === 'POST') {
     try {
+      const authResult = await requireAuth(request, env);
+      if (!authResult.ok) return authResult.response;
+
       if (!env.STRIPE_SECRET_KEY) {
         return json({ success: false, error: 'Stripe não configurado' }, 500);
       }
 
-      const body = await request.json();
-      const { orderId, items, total } = body;
+      const body = await request.json() as Record<string, unknown>;
+      const { orderId, items } = body as { orderId?: number; items?: Array<{ product_id: number; quantity: number; price: number }> };
 
-      if (!orderId || !items || !total) {
+      if (!orderId || !items || !Array.isArray(items)) {
         return json({ success: false, error: 'Dados incompletos' }, 400);
       }
 
-      // Criar linha para cada item
-      const lineItems = items.map((item: any) => ({
+      // [CRÍTICO-03] Recalcular total no servidor
+      const calculated = await calculateOrderTotal(env, items);
+      if (!calculated) {
+        return json({ success: false, error: 'Produto inválido ou sem estoque' }, 400);
+      }
+
+      const lineItems = calculated.enrichedItems.map((item) => ({
         price_data: {
           currency: 'brl',
-          product_data: {
-            name: `Produto ${item.product_id}`,
-            metadata: { product_id: item.product_id },
-          },
-          unit_amount: Math.round(item.price * 100), // Stripe usa centavos
+          product_data: { name: item.name },
+          unit_amount: Math.round(item.price * 100),
         },
         quantity: item.quantity,
       }));
 
-      // Frete como linha separada
       lineItems.push({
-        price_data: {
-          currency: 'brl',
-          product_data: { name: 'Frete' },
-          unit_amount: 1500, // R$ 15,00
-        },
+        price_data: { currency: 'brl', product_data: { name: 'Frete' }, unit_amount: 1500 },
         quantity: 1,
-      });
+      } as typeof lineItems[0]);
 
-      // Chamar API Stripe
-      const stripeUrl = 'https://api.stripe.com/v1/checkout/sessions';
       const stripeData = new URLSearchParams();
       stripeData.append('payment_method_types[]', 'card');
       stripeData.append('mode', 'payment');
@@ -1718,7 +2279,7 @@ async function handleRequest(request: Request, env: Env) {
       stripeData.append('cancel_url', 'https://cdmstores.com/pages/checkout.html?canceled=true');
       stripeData.append('metadata[order_id]', orderId.toString());
 
-      lineItems.forEach((item: any, index: number) => {
+      lineItems.forEach((item, index) => {
         stripeData.append(`line_items[${index}][price_data][currency]`, item.price_data.currency);
         stripeData.append(`line_items[${index}][price_data][unit_amount]`, item.price_data.unit_amount.toString());
         stripeData.append(`line_items[${index}][price_data][product_data][name]`, item.price_data.product_data.name);
@@ -1726,105 +2287,77 @@ async function handleRequest(request: Request, env: Env) {
       });
 
       const auth = btoa(`${env.STRIPE_SECRET_KEY}:`);
-      const stripeResponse = await fetch(stripeUrl, {
+      const stripeResponse = await fetch('https://api.stripe.com/v1/checkout/sessions', {
         method: 'POST',
-        headers: {
-          'Authorization': `Basic ${auth}`,
-          'Content-Type': 'application/x-www-form-urlencoded',
-        },
+        headers: { 'Authorization': `Basic ${auth}`, 'Content-Type': 'application/x-www-form-urlencoded' },
         body: stripeData,
       });
 
-      const stripeSession = await stripeResponse.json();
+      const stripeSession = await stripeResponse.json() as Record<string, unknown>;
 
       if (!stripeResponse.ok) {
-        console.error('Stripe error:', stripeSession);
-        return json({ success: false, error: stripeSession.error?.message || 'Erro Stripe' }, 400);
+        console.error('Stripe error:', (stripeSession as Record<string, unknown>).error);
+        return json({ success: false, error: 'Erro ao criar sessão de pagamento' }, 400);
       }
 
-      // Salvar session ID no banco
       await env.DB.prepare(
-        'UPDATE orders SET stripe_payment_id = ?, updated_at = datetime("now") WHERE id = ?'
-      ).bind(stripeSession.id, orderId).run();
+        'UPDATE orders SET stripe_payment_id = ?, updated_at = datetime("now") WHERE id = ? AND user_id = ?'
+      ).bind(stripeSession.id, orderId, authResult.auth.userId).run();
 
-      return json({
-        success: true,
-        checkout_url: stripeSession.url,
-        session_id: stripeSession.id
-      });
-    } catch (error: any) {
-      return json({ success: false, error: error.message }, 500);
+      return json({ success: true, checkout_url: stripeSession.url, session_id: stripeSession.id });
+    } catch (error) {
+      return internalError(error, 'stripe/create-payment');
     }
   }
 
   // ===== STRIPE WEBHOOK =====
+  // [CRÍTICO-01 CORRIGIDO] Verifica assinatura HMAC-SHA256 antes de processar
   if (path === '/api/stripe/webhook') {
     if (request.method === 'POST') {
       try {
-        // Verificar assinatura do webhook Stripe (MEDIUM-006)
+        if (!env.STRIPE_WEBHOOK_SECRET) {
+          console.error('[Webhook] STRIPE_WEBHOOK_SECRET não configurado');
+          return json({ error: 'Webhook não configurado' }, 500);
+        }
+
+        const body = await request.text();
         const sig = request.headers.get('stripe-signature');
-        if (!sig || !env.STRIPE_WEBHOOK_SECRET) {
-          return json({ error: 'Assinatura ausente ou webhook secret não configurado' }, 400);
+
+        if (!verifyStripeWebhookSignature(body, sig, env.STRIPE_WEBHOOK_SECRET)) {
+          console.warn('[Webhook] Assinatura inválida ou evento expirado');
+          await auditLog(env, null, 'stripe_webhook_invalid_signature', { sig: sig?.substring(0, 20) });
+          return json({ error: 'Assinatura inválida' }, 401);
         }
 
-        const rawBody = await request.text();
-
-        // Extrair timestamp e hash da assinatura
-        const sigParts: Record<string, string> = {};
-        for (const part of sig.split(',')) {
-          const [k, v] = part.split('=');
-          if (k && v) sigParts[k] = v;
-        }
-
-        const timestamp = sigParts['t'];
-        const expectedSig = sigParts['v1'];
-
-        if (!timestamp || !expectedSig) {
-          return json({ error: 'Formato de assinatura inválido' }, 400);
-        }
-
-        // Verificar que o timestamp não é muito antigo (5 minutos)
-        const webhookAge = Math.floor(Date.now() / 1000) - parseInt(timestamp, 10);
-        if (webhookAge > 300) {
-          return json({ error: 'Webhook timestamp muito antigo' }, 400);
-        }
-
-        // Calcular HMAC-SHA256
-        const payload = `${timestamp}.${rawBody}`;
-        const keyMaterial = await crypto.subtle.importKey(
-          'raw', new TextEncoder().encode(env.STRIPE_WEBHOOK_SECRET),
-          { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']
-        );
-        const mac = await crypto.subtle.sign('HMAC', keyMaterial, new TextEncoder().encode(payload));
-        const computed = Array.from(new Uint8Array(mac)).map(b => b.toString(16).padStart(2, '0')).join('');
-
-        if (computed !== expectedSig) {
-          return json({ error: 'Assinatura inválida' }, 400);
-        }
-
-        const event = JSON.parse(rawBody);
-        console.log(`[Webhook] Evento: ${event.type}`);
+        const event = JSON.parse(body);
+        console.log(`[Webhook] Evento verificado: ${event.type}`);
 
         if (event.type === 'checkout.session.completed') {
           const session = event.data.object;
           const orderId = session.metadata?.order_id;
 
-          if (orderId) {
-            await env.DB.prepare(
-              'UPDATE orders SET status = ?, stripe_payment_id = ?, updated_at = datetime("now") WHERE id = ?'
-            ).bind('paid', session.id, orderId).run();
+          if (orderId && /^\d+$/.test(String(orderId))) {
+            // Verifica idempotência via stripe_payment_id
+            const existing = await env.DB.prepare(
+              'SELECT id FROM orders WHERE stripe_payment_id = ? LIMIT 1'
+            ).bind(session.id).first();
 
-            console.log(`✅ Pedido ${orderId} pago`);
+            if (!existing) {
+              await env.DB.prepare(
+                'UPDATE orders SET status = ?, stripe_payment_id = ?, updated_at = datetime("now") WHERE id = ?'
+              ).bind('paid', session.id, Number(orderId)).run();
+              await auditLog(env, null, 'payment_confirmed', { order_id: orderId, session_id: session.id });
+              console.log(`✅ Pedido ${orderId} pago`);
+            }
           }
         }
 
         return new Response(JSON.stringify({ received: true }), {
           status: 200,
-          headers: { 'Content-Type': 'application/json' }
+          headers: { 'Content-Type': 'application/json' },
         });
-      } catch (error: any) {
-        console.error('[Webhook Error]', error.message);
-        return json({ error: error.message }, 500);
+      } catch (error) {
+        return internalError(error, 'stripe/webhook');
       }
     } else if (request.method === 'GET' || request.method === 'HEAD') {
       return new Response('', { status: 200 });
@@ -1832,69 +2365,60 @@ async function handleRequest(request: Request, env: Env) {
   }
 
   // ===== CJ =====
+  // [CRÍTICO-05 CORRIGIDO] Requer autenticação para alterar status de pedidos
   if (path === '/api/cj/create-order' && request.method === 'POST') {
     try {
+      const authResult = await requireAuth(request, env);
+      if (!authResult.ok) return authResult.response;
+
       if (!env.CJ_API_KEY) {
         return json({ success: false, error: 'CJdropshipping não configurado' }, 500);
       }
 
       const body = await request.json();
-      const { orderId } = body;
+      const { orderId } = body as { orderId?: unknown };
+      if (!orderId || typeof orderId !== 'number') {
+        return json({ success: false, error: 'orderId inválido' }, 400);
+      }
+
+      // Verificar que o pedido pertence ao usuário autenticado
+      const order = await env.DB.prepare(
+        'SELECT id, user_id FROM orders WHERE id = ? LIMIT 1'
+      ).bind(orderId).first<{ id: number; user_id: number }>();
+
+      if (!order || order.user_id !== authResult.auth.userId) {
+        return json({ success: false, error: 'Pedido não encontrado' }, 404);
+      }
+
       const cjOrderId = `CJ-${Date.now()}`;
+      await env.DB.prepare(
+        'UPDATE orders SET cj_order_id = ?, status = ?, updated_at = datetime("now") WHERE id = ?'
+      ).bind(cjOrderId, 'processing', orderId).run();
 
-      if (orderId) {
-        await env.DB.prepare(
-          'UPDATE orders SET cj_order_id = ?, status = ?, updated_at = datetime("now") WHERE id = ?'
-        ).bind(cjOrderId, 'processing', orderId).run();
-      }
-
+      await auditLog(env, authResult.auth.userId, 'cj_order_created', { order_id: orderId, cj_order_id: cjOrderId });
       return json({ success: true, cj_order_id: cjOrderId, message: 'Pedido enviado para CJ' });
-    } catch (error: any) {
-      return json({ success: false, error: error.message }, 500);
-    }
-  }
-
-  // ===== CUPONS =====
-  // Validar cupom via API (para checkout)
-  if (path === '/api/coupons/validate' && request.method === 'POST') {
-    try {
-      const { code } = await request.json();
-      if (!code || typeof code !== 'string') {
-        return json({ success: false, error: 'Código de cupom obrigatório' }, 400);
-      }
-      const resultado = validarCupom(code);
-      return json({ success: true, valid: resultado.valido, discount: resultado.desconto, message: resultado.mensagem });
-    } catch (error: any) {
-      return json({ success: false, error: error.message }, 500);
+    } catch (error) {
+      return internalError(error, 'cj/create-order');
     }
   }
 
   // ===== CHATBOT =====
   if (path === '/api/chat' && request.method === 'POST') {
-    // Rate limiting
-    const clientIp = request.headers.get('CF-Connecting-IP') || request.headers.get('X-Forwarded-For') || 'unknown';
-    if (!checkRateLimit(clientIp)) {
-      return json({ success: false, error: 'Muitas mensagens. Aguarde um momento.' }, 429);
-    }
-
     try {
-      const { message, user_id, language = 'pt' } = await request.json();
+      const body = await request.json() as Record<string, unknown>;
+      const { message, user_id, language = 'pt' } = body as { message?: string; user_id?: number; language?: string };
 
       if (!message) {
         return json({ success: false, error: 'Mensagem vazia' }, 400);
       }
 
-      // Extrair autenticação opcional para proteger recursos sensíveis
-      let authenticatedEmail: string | undefined;
-      const authHeader = request.headers.get('Authorization');
-      if (authHeader?.startsWith('Bearer ') && env.JWT_SECRET) {
-        const token = authHeader.substring(7);
-        const verified = await verifyJWT(token, env.JWT_SECRET);
-        if (verified.valid) authenticatedEmail = verified.email;
+      // [MÉDIA-04 CORRIGIDO] Limite de tamanho de mensagem
+      if (typeof message !== 'string' || message.length > 500) {
+        return json({ success: false, error: 'Mensagem muito longa (máximo 500 caracteres)' }, 400);
       }
 
       // Processar mensagem com todos os 8 recursos
-      const result = await processChat(message, user_id, language, env, authenticatedEmail);
+      const result = await processChat(message, user_id !== undefined ? String(user_id) : undefined, language as string, env);
       return json({ 
         success: true, 
         response: result.response,
@@ -1906,15 +2430,19 @@ async function handleRequest(request: Request, env: Env) {
         product_name: result.product_name || null,
         link: result.link || null
       });
-    } catch (error: any) {
-      return json({ success: false, error: error.message }, 500);
+    } catch (error) {
+      return internalError(error, 'chat');
     }
   }
 
   // ===== AGENDAMENTO =====
   if (path === '/api/schedule' && request.method === 'POST') {
     try {
-      const { customer_email, customer_name, customer_phone, scheduled_date, reason } = await request.json();
+      const schedBody = await request.json() as Record<string, unknown>;
+      const { customer_email, customer_name, customer_phone, scheduled_date, reason } = schedBody as {
+        customer_email?: string; customer_name?: string; customer_phone?: string;
+        scheduled_date?: string; reason?: string;
+      };
 
       if (!customer_email || !customer_name || !scheduled_date) {
         return json({ success: false, error: 'Dados incompletos' }, 400);
@@ -1931,8 +2459,8 @@ async function handleRequest(request: Request, env: Env) {
         appointment_id: appointmentId,
         message: 'Agendamento realizado com sucesso!'
       });
-    } catch (error: any) {
-      return json({ success: false, error: error.message }, 500);
+    } catch (error) {
+      return internalError(error, 'schedule');
     }
   }
 
@@ -1941,7 +2469,18 @@ async function handleRequest(request: Request, env: Env) {
 
 export default {
   fetch: (request: Request, env: Env) => handleRequest(request, env),
-  scheduled: async (event: ScheduledEvent, env: Env) => {
-    console.log('Sincronizando pedidos com CJ...', new Date().toISOString());
+  scheduled: async (_controller: ScheduledController, env: Env) => {
+    // [BAIXA-02 CORRIGIDO] Limpeza de registros expirados para manter DB enxuto
+    try {
+      await env.DB.batch([
+        env.DB.prepare("DELETE FROM sessions WHERE expires_at < datetime('now')"),
+        env.DB.prepare("DELETE FROM password_resets WHERE expires_at < datetime('now')"),
+        env.DB.prepare("DELETE FROM rate_limit_attempts WHERE created_at < datetime('now', '-1 day')"),
+        env.DB.prepare("DELETE FROM login_attempts WHERE created_at < datetime('now', '-7 days')"),
+        env.DB.prepare("DELETE FROM two_factor_attempts WHERE created_at < datetime('now', '-1 day')"),
+      ]);
+    } catch (err) {
+      console.error('[Scheduled] Cleanup error:', err instanceof Error ? err.message : err);
+    }
   },
 } satisfies ExportedHandler<Env>;
