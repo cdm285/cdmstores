@@ -710,10 +710,9 @@ function initGoogleOAuth() {
 
     if (googleLoginBtn) {
       googleLoginBtn.addEventListener('click', () => {
-        // Usar Google Sign-In button
         if (window.google) {
           window.google.accounts.id.initialize({
-            client_id: 'YOUR_GOOGLE_CLIENT_ID', // Substituir com seu ID
+            client_id: 'YOUR_GOOGLE_CLIENT_ID',
             callback: (response) => {
               if (window.authSystem) {
                 window.authSystem.loginWithGoogle(response);
@@ -725,8 +724,7 @@ function initGoogleOAuth() {
             { theme: 'outline', size: 'large' }
           );
         }
-        // Para demonstração, usar prompt
-        alert('Configure seu GOOGLE_CLIENT_ID para ativar Google Sign-In');
+        // Google OAuth não configurado - silenciar
       });
     }
   };
@@ -765,9 +763,8 @@ function initFacebookOAuth() {
               }
             }
           }, {scope: 'public_profile,email'});
-        } else {
-          alert('Configure seu FACEBOOK_APP_ID para ativar Facebook Login');
         }
+        // Facebook OAuth não configurado - silenciar
       });
     }
   }, 1000);
@@ -784,4 +781,3 @@ document.addEventListener('DOMContentLoaded', () => {
 
 // Exportar para uso externo
 window.currentUser = currentUser;
-window.currentToken = currentToken;
