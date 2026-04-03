@@ -40,6 +40,9 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: TypeScript check
+        run: npx tsc --noEmit
+
       - name: Deploy Worker
         run: npx wrangler deploy --env production
         env:
@@ -52,8 +55,6 @@ jobs:
   deploy-pages:
     name: Pages (Frontend)
     runs-on: ubuntu-latest
-    # Só faz deploy real no push para main; PRs não sobrescrevem produção
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
 
     steps:
       - name: Checkout
@@ -64,4 +65,5 @@ jobs:
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          command: pages deploy . --project-name cdmstores --branch main --commit-dirty=true
+          # push para main → deploy em produção; PRs → deploy de preview automático
+          command: pages deploy . --project-name cdmstores --branch ${{ github.head_ref || github.ref_name }}

@@ -1,0 +1,40 @@
+# ─── Dependências ────────────────────────────────────────────────
+node_modules/
+
+# ─── Build / Wrangler ────────────────────────────────────────────
+.wrangler/
+dist/
+.dev.vars
+
+# ─── Variáveis de ambiente (NUNCA commitar segredos) ─────────────
+.env
+.env.*
+!.env.example
+
+# ─── VS Code ─────────────────────────────────────────────────────
+.vscode/
+*.code-workspace
+
+# ─── Sistema Operacional ─────────────────────────────────────────
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ─── Instaladores ────────────────────────────────────────────────
+*.msi
+*.exe
+*.dmg
+
+# ─── Python ──────────────────────────────────────────────────────
+__pycache__/
+*.pyc
+*.pyo
+
+# ─── Pastas temporárias ──────────────────────────────────────────
+New folder/
+tmp/
+temp/
+
+# ─── Logs ────────────────────────────────────────────────────────
+*.log
+npm-debug.log*
