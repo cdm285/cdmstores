@@ -77,7 +77,7 @@ export class IntentAgent extends BaseAgent {
     },
     {
       category: 'tracking',
-      patterns: [/\b(rastr[ae]|track|onde está|onde ta|cadê|status do pedido|entrega|delivered)\b/i],
+      patterns: [/\b(rastr\w*|track\w*|onde está|onde ta|cadê|status do pedido|entrega|delivered)\b/i],
       route: 'fast', confidence: 88,
     },
     {
@@ -97,7 +97,7 @@ export class IntentAgent extends BaseAgent {
     },
     {
       category: 'product_query',
-      patterns: [/\b(produto|products|quanto custa|preço|price|precio|fone|carregador|cabo|caixa)\b/i],
+      patterns: [/\b(produtos?|products?|quanto custa|preço|price|precio|fone|carregador|cabo|caixa)\b/i],
       route: 'fast', confidence: 85,
     },
     {
