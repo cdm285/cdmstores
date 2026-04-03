@@ -3,7 +3,8 @@
 // Security hardening: OWASP ASVS L2/L3, NIST SP 800-63B, PCI-DSS
 
 import { createHash, createHmac, randomBytes, scryptSync, timingSafeEqual } from 'node:crypto';
-import { orchestrator } from './agents/orchestrator.js';
+import { orchestrator }        from './agents/orchestrator.js';
+import { handleChatRequest }   from './routes/chat.js';
 
 // ─── SECURITY HEADERS (OWASP ASVS 14.4, PCI-DSS 6.2.4) ──────────────────────
 const SECURITY_HEADERS: Record<string, string> = {
@@ -2420,45 +2421,9 @@ async function handleRequest(request: Request, env: Env) {
     }
   }
 
-  // ===== CHATBOT =====
+  // ===== CHATBOT (via routes/chat.ts → agents/00-orchestrator.ts) =====
   if (path === '/api/chat' && request.method === 'POST') {
-    try {
-      const body = await request.json() as Record<string, unknown>;
-      const { message, user_id, language = 'pt', session_id } = body as { message?: string; user_id?: number; language?: string; session_id?: string };
-
-      if (!message) {
-        return json({ success: false, error: 'Mensagem vazia' }, 400);
-      }
-
-      // [MÉDIA-04 CORRIGIDO] Limite de tamanho de mensagem
-      if (typeof message !== 'string' || message.length > 500) {
-        return json({ success: false, error: 'Mensagem muito longa (máximo 500 caracteres)' }, 400);
-      }
-
-      // Processar mensagem com o sistema de 90 agentes
-      const result = await orchestrator.process({
-        message,
-        sessionId: typeof session_id === 'string' && session_id.length > 0 ? session_id : `anon-${Date.now()}`,
-        userId: user_id !== undefined ? String(user_id) : undefined,
-        language: (language as 'pt' | 'en' | 'es') ?? 'pt',
-        isMobile: (request.headers.get('user-agent') ?? '').toLowerCase().includes('mobile'),
-      }, env);
-
-      return json({
-        success: true,
-        response: result.response,
-        action: result.action || null,
-        data: result.data || null,
-        coupon_valid: result.coupon_valid || null,
-        discount: result.discount || null,
-        product_id: result.product_id || null,
-        product_name: result.product_name || null,
-        product_price: result.product_price || null,
-        link: result.link || null,
-      });
-    } catch (error) {
-      return internalError(error, 'chat');
-    }
+    return handleChatRequest(request, env);
   }
 
   // ===== AGENDAMENTO =====
