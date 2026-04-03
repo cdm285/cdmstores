@@ -5,25 +5,32 @@
 
 const API_BASE = 'https://cdmstores.com/api';
 let currentUser = null;
-let currentToken = null;
+// [ALTA-14 CORRIGIDO] Tokens não são mais armazenados em localStorage.
+// A sessão é gerenciada pelo backend via cookies HttpOnly (credentials: 'include').
 
 class AuthSystem {
   constructor() {
-    this.loadUser();
-    this.initAuthUI();
+    this.loadUser().then(() => this.initAuthUI());
   }
 
   /**
-   * Carregar usuário do localStorage
+   * Carregar sessão via cookie seguro (não localStorage)
    */
-  loadUser() {
-    const token = localStorage.getItem('auth_token');
-    const user = localStorage.getItem('auth_user');
-
-    if (token && user) {
-      currentToken = token;
-      currentUser = JSON.parse(user);
-      this.updateUIForLoggedIn();
+  async loadUser() {
+    try {
+      const res = await fetch(`${API_BASE}/auth/me`, {
+        method: 'GET',
+        credentials: 'include',
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success && data.user) {
+          currentUser = data.user;
+          this.updateUIForLoggedIn();
+        }
+      }
+    } catch (_) {
+      // Not authenticated — normal on first load
     }
   }
 
@@ -502,6 +509,7 @@ class AuthSystem {
       const response = await fetch(`${API_BASE}/auth/register`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify({ name, email, password })
       });
 
@@ -512,10 +520,7 @@ class AuthSystem {
         return;
       }
 
-      // Salvar token e usuário
-      localStorage.setItem('auth_token', data.token);
-      localStorage.setItem('auth_user', JSON.stringify(data.user));
-      currentToken = data.token;
+      // [ALTA-14] Não armazenar token em localStorage. Cookie HttpOnly já foi definido pelo servidor.
       currentUser = data.user;
 
       document.getElementById('register-error').innerHTML = `<div class="auth-success">Conta criada com sucesso!</div>`;
@@ -536,6 +541,7 @@ class AuthSystem {
       const response = await fetch(`${API_BASE}/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify({ email, password })
       });
 
@@ -546,11 +552,7 @@ class AuthSystem {
         return;
       }
 
-      // Salvar tokens e usuário
-      localStorage.setItem('auth_token', data.token);
-      localStorage.setItem('auth_refresh_token', data.refreshToken);
-      localStorage.setItem('auth_user', JSON.stringify(data.user));
-      currentToken = data.token;
+      // [ALTA-14] Não armazenar tokens em localStorage. Cookies HttpOnly já definidos pelo servidor.
       currentUser = data.user;
 
       document.getElementById('login-error').innerHTML = `<div class="auth-success">Login realizado!</div>`;
@@ -570,16 +572,14 @@ class AuthSystem {
     try {
       await fetch(`${API_BASE}/auth/logout`, {
         method: 'POST',
-        headers: { 'Authorization': `Bearer ${currentToken}` }
+        credentials: 'include',
       });
     } catch (error) {
       console.error('Erro ao fazer logout:', error);
     }
 
-    localStorage.removeItem('auth_token');
-    localStorage.removeItem('auth_refresh_token');
-    localStorage.removeItem('auth_user');
-    currentToken = null;
+    // [ALTA-14] Não há tokens em localStorage para remover.
+    // O servidor já limpou os cookies HttpOnly.
     currentUser = null;
 
     document.getElementById('user-panel').classList.remove('active');
@@ -612,11 +612,11 @@ class AuthSystem {
   }
 
   /**
-   * Obter headers com token
+   * Obter headers para requisições autenticadas (credenciais via cookie, não token)
    */
   getAuthHeaders() {
-    if (!currentToken) return {};
-    return { 'Authorization': `Bearer ${currentToken}` };
+    // Retornar apenas Content-Type; cookies são enviados automaticamente com credentials: 'include'
+    return {};
   }
 
   /**
@@ -627,6 +627,7 @@ class AuthSystem {
       const res = await fetch(`${API_BASE}/auth/google`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify({ 
           idToken: response.credential || response.id_token,
           accessToken: response.accessToken 
@@ -640,10 +641,7 @@ class AuthSystem {
         return;
       }
 
-      // Salvar token e usuário
-      localStorage.setItem('auth_token', data.token);
-      localStorage.setItem('auth_user', JSON.stringify(data.user));
-      currentToken = data.token;
+      // [ALTA-14] Cookie HttpOnly já foi definido pelo servidor.
       currentUser = data.user;
 
       // Fechar modal e atualizar UI
@@ -654,7 +652,7 @@ class AuthSystem {
       // Redirecionar após login
       setTimeout(() => window.location.href = '/profile.html', 1000);
     } catch (error) {
-      alert('Erro ao fazer login com Google: ' + error.message);
+      alert('Erro ao fazer login com Google');
     }
   }
 
@@ -666,6 +664,7 @@ class AuthSystem {
       const res = await fetch(`${API_BASE}/auth/facebook`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify({ 
           accessToken: response.accessToken || response.authResponse?.accessToken,
           userID: response.userID || response.authResponse?.userID
@@ -679,10 +678,7 @@ class AuthSystem {
         return;
       }
 
-      // Salvar token e usuário
-      localStorage.setItem('auth_token', data.token);
-      localStorage.setItem('auth_user', JSON.stringify(data.user));
-      currentToken = data.token;
+      // [ALTA-14] Cookie HttpOnly já foi definido pelo servidor.
       currentUser = data.user;
 
       // Fechar modal e atualizar UI
@@ -693,7 +689,7 @@ class AuthSystem {
       // Redirecionar após login
       setTimeout(() => window.location.href = '/profile.html', 1000);
     } catch (error) {
-      alert('Erro ao fazer login com Facebook: ' + error.message);
+      alert('Erro ao fazer login com Facebook');
     }
   }
 }

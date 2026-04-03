@@ -1,38 +1,77 @@
 name = "cdmstores-backend"
 main = "src/index.ts"
-compatibility_date = "2024-12-01"
+compatibility_date = "2025-03-01"
 compatibility_flags = ["nodejs_compat"]
 
-# Banco de dados D1
+# ─── AMBIENTE PADRÃO (wrangler dev / workers.dev) ────────────────
+# Usado quando nenhum --env é passado (testes locais)
+
+[vars]
+ENVIRONMENT = "development"
+
 [[d1_databases]]
 binding = "DB"
 database_name = "cdmstores"
 database_id = "a22156d2-037a-400d-9408-d064020b4ca8"
 
-# Variáveis de ambiente
+# ─── PRODUÇÃO ────────────────────────────────────────────────────
+# Deploy: wrangler deploy --env production
+
 [env.production]
+name = "cdmstores-backend"
 vars = { ENVIRONMENT = "production" }
 
 [[env.production.d1_databases]]
 binding = "DB"
-database_name = "cdmstores"
+database_name = "cdmstores"          # banco de PRODUÇÃO
 database_id = "a22156d2-037a-400d-9408-d064020b4ca8"
 
-[env.development]
-vars = { ENVIRONMENT = "development" }
-
-[[env.development.d1_databases]]
-binding = "DB"
-database_name = "cdmstores"
-database_id = "a22156d2-037a-400d-9408-d064020b4ca8"
-
-# Variáveis secretas (use wrangler secret put)
-# wrangler secret put STRIPE_SECRET_KEY
-# wrangler secret put STRIPE_WEBHOOK_SECRET
-# wrangler secret put CJ_API_KEY
-# wrangler secret put CJ_API_SECRET
-
-# CORS para seu domínio
-[[routes]]
+# Rotas de produção (precisam de zona ativa no Cloudflare)
+[[env.production.routes]]
 pattern = "cdmstores.com/api/*"
 zone_name = "cdmstores.com"
+
+[[env.production.routes]]
+pattern = "www.cdmstores.com/api/*"
+zone_name = "cdmstores.com"
+
+# ─── STAGING / PREVIEW ───────────────────────────────────────────
+# Deploy: wrangler deploy --env staging
+# Preview: wrangler dev --env staging
+#
+# ATENÇÃO SEGURANÇA [CRÍTICO-04]:
+# Staging DEVE usar banco separado do de produção.
+# Para criar o banco de staging:
+#   wrangler d1 create cdmstores-staging
+# Substitua o database_id abaixo com o ID retornado.
+
+[env.staging]
+vars = { ENVIRONMENT = "staging" }
+
+[[env.staging.d1_databases]]
+binding = "DB"
+database_name = "cdmstores-staging"
+# SUBSTITUIR pelo ID real do banco de staging criado com wrangler d1 create:
+database_id = "REPLACE_WITH_STAGING_DB_ID"
+
+# ─── SEGREDOS — NÃO colocar aqui, usar os comandos abaixo ────────
+# Produção:
+# wrangler secret put STRIPE_SECRET_KEY        --env production
+# wrangler secret put STRIPE_WEBHOOK_SECRET    --env production
+# wrangler secret put CJ_API_KEY               --env production
+# wrangler secret put JWT_SECRET               --env production  (mín. 64 chars aleatórios)
+# wrangler secret put RESEND_API_KEY           --env production
+# wrangler secret put APP_URL                  --env production
+# wrangler secret put GOOGLE_CLIENT_ID         --env production
+# wrangler secret put GOOGLE_CLIENT_SECRET     --env production
+# wrangler secret put FACEBOOK_APP_ID          --env production
+# wrangler secret put FACEBOOK_APP_SECRET      --env production
+# wrangler secret put TURNSTILE_SECRET_KEY     --env production
+#
+# Staging (mesmos segredos com credenciais de teste):
+# wrangler secret put STRIPE_SECRET_KEY        --env staging
+# wrangler secret put TURNSTILE_SECRET_KEY     --env staging
+# wrangler secret put JWT_SECRET               --env staging
+#
+# Gerar JWT_SECRET seguro (PowerShell):
+#   [Convert]::ToBase64String((1..64 | ForEach-Object { Get-Random -Max 256 }))

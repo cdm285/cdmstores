@@ -144,18 +144,43 @@ body {
 .header-logo a {
     display: flex;
     align-items: center;
-    gap: 10px;
     text-decoration: none;
     line-height: 1;
 }
-.logo { height: 40px; width: auto; max-width: 180px; }
-.logo-text {
-    font-size: 1.1rem;
-    font-weight: 900;
-    letter-spacing: -0.03em;
-    color: var(--dark);
-    font-family: "Inter", sans-serif;
-    text-transform: uppercase;
+
+/* Premium logo image — desktop */
+.premium-logo-img {
+    height: 44px;
+    width: auto;
+    max-width: 240px;
+    object-fit: contain;
+    filter:
+        drop-shadow(0 0 10px rgba(0,162,255,0.4))
+        contrast(1.1)
+        brightness(1.05);
+    transition: transform 0.2s ease, filter 0.3s ease;
+    display: block;
+}
+.premium-logo-img:hover {
+    transform: scale(1.03);
+    filter:
+        drop-shadow(0 0 16px rgba(0,162,255,0.75))
+        contrast(1.15)
+        brightness(1.1);
+}
+
+@media (max-width: 768px) {
+    .premium-logo-img {
+        height: 30px;
+        filter:
+            drop-shadow(0 0 8px rgba(0,162,255,0.5))
+            contrast(1.1)
+            brightness(1.05);
+    }
+    .header-logo {
+        flex: 1;
+        justify-content: flex-start;
+    }
 }
 
 /* NAV — center column */
@@ -443,6 +468,14 @@ body {
 }
 
 /* Language switcher — text only */
+.mobile-nav-lang-label {
+    font-size: 0.7rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    margin-bottom: 2px;
+}
 .mobile-lang {
     display: flex;
     align-items: center;
@@ -1068,7 +1101,13 @@ body.nav-open {
     max-width: 260px;
     color: #64748b;
 }
-.footer-logo { height: 34px; width: auto; filter: brightness(0) invert(1); opacity: 0.9; }
+.footer-logo {
+    height: 34px;
+    width: auto;
+    object-fit: contain;
+    filter: drop-shadow(0 0 8px rgba(0,162,255,0.35)) brightness(1.05);
+    opacity: 1;
+}
 .footer-logo-text {
     font-size: 1.1rem;
     font-weight: 900;
@@ -1321,3 +1360,4 @@ body.nav-open {
 ::-webkit-scrollbar-track        { background: transparent; }
 ::-webkit-scrollbar-thumb        { background: #d1d5db; border-radius: 3px; }
 ::-webkit-scrollbar-thumb:hover  { background: #9ca3af; }
+

@@ -12,35 +12,75 @@
 
 <body>
 
-    <!-- HEADER INVISÍVEL -->
-    <header class="header">
+    <!-- HEADER -->
+    <header class="header" id="site-header">
 
-        <!-- MENU ESQUERDA -->
-        <div class="left-area">
-            <nav class="menu">
-                <a href="index.html" data-i18n="nav.home">Início</a>
-                <a href="#produtos" data-i18n="nav.products">Produtos</a>
-                <a href="atendimento.html" data-i18n="nav.support">Atendimento</a>
-                <a href="pages/rastreio.html" data-i18n="nav.track">Rastreio</a>
-                <button id="menu-cart-btn" class="menu-cart-btn" title="Carrinho">🛒 <span id="menu-cart-count">0</span></button>
+        <!-- LOGO -->
+        <div class="header-logo">
+            <a href="index.html" aria-label="CDM STORES">
+                <img src="./assets/logo-premium.png" class="premium-logo-img" alt="CDM STORES" fetchpriority="high">
+            </a>
+        </div>
+
+        <!-- NAV DESKTOP -->
+        <div class="header-nav-container">
+            <nav class="header-nav" aria-label="Navegação principal">
+                <a href="index.html" class="nav-link" data-i18n="nav.home">Início</a>
+                <a href="#produtos" class="nav-link" data-i18n="nav.products">Produtos</a>
+                <a href="pages/rastreio.html" class="nav-link" data-i18n="nav.track">Rastreio</a>
             </nav>
-        </div>
-
-        <!-- LOGO CENTRAL -->
-        <div class="logo-area">
-            <img src="./assets/logo.png" class="logo" alt="CDM STORES">
-        </div>
-
-        <!-- BANDEIRAS DIREITA -->
-        <div class="right-area">
-            <div class="lang-selector">
-                <img src="./assets/br.png" alt="BR" data-lang="pt" title="Português">
-                <img src="./assets/us.png" alt="EN" data-lang="en" title="English">
-                <img src="./assets/es.png" alt="ES" data-lang="es" title="Español">
+            <div class="desktop-lang" role="group" aria-label="Idioma">
+                <button class="desktop-lang-btn active" data-lang="pt" aria-pressed="true">PT</button>
+                <span class="desktop-lang-sep">|</span>
+                <button class="desktop-lang-btn" data-lang="en" aria-pressed="false">EN</button>
+                <span class="desktop-lang-sep">|</span>
+                <button class="desktop-lang-btn" data-lang="es" aria-pressed="false">ES</button>
             </div>
         </div>
 
+        <!-- ACTIONS DESKTOP -->
+        <div class="header-actions">
+            <button id="menu-cart-btn" class="header-cart-btn" aria-label="Abrir carrinho">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg>
+                <span id="menu-cart-count" class="cart-badge-nav">0</span>
+            </button>
+            <a href="#produtos" class="header-cta" data-i18n="nav.products">Produtos</a>
+        </div>
+
+        <!-- HAMBURGER (mobile only) -->
+        <button class="hamburger" id="hamburger-btn" aria-label="Abrir menu" aria-expanded="false" aria-controls="mobile-nav">
+            <span class="hamburger-line"></span>
+            <span class="hamburger-line"></span>
+            <span class="hamburger-line"></span>
+        </button>
+
     </header>
+
+    <!-- MOBILE OFF-CANVAS NAV -->
+    <div class="mobile-nav" id="mobile-nav" aria-hidden="true" role="dialog" aria-modal="true" aria-label="Menu de navegação">
+        <div class="mobile-nav-header">
+            <a href="index.html" class="mobile-nav-logo">CDM STORES</a>
+            <button class="mobile-nav-close" id="mobile-nav-close" aria-label="Fechar menu">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+            </button>
+        </div>
+        <nav class="mobile-nav-links" aria-label="Menu mobile">
+            <a href="index.html" class="mobile-nav-link" data-i18n="nav.home">Início</a>
+            <a href="#produtos" class="mobile-nav-link" data-i18n="nav.products">Produtos</a>
+            <a href="pages/rastreio.html" class="mobile-nav-link" data-i18n="nav.track">Rastreio</a>
+        </nav>
+        <div class="mobile-nav-footer">
+            <div class="mobile-nav-lang-label">Idioma</div>
+            <div class="mobile-lang" role="group" aria-label="Idioma">
+                <button class="mobile-lang-btn active" data-lang="pt" aria-pressed="true">PT</button>
+                <span class="mobile-lang-sep">|</span>
+                <button class="mobile-lang-btn" data-lang="en" aria-pressed="false">EN</button>
+                <span class="mobile-lang-sep">|</span>
+                <button class="mobile-lang-btn" data-lang="es" aria-pressed="false">ES</button>
+            </div>
+        </div>
+    </div>
+    <div class="mobile-nav-overlay" id="mobile-nav-overlay" aria-hidden="true"></div>
 
     <!-- MODAL DO CARRINHO -->
     <div id="cart-modal" class="cart-modal">
