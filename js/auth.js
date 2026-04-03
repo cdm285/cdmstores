@@ -46,12 +46,6 @@ class AuthSystem {
 
     // Criar modais
     this.createAuthModal();
-
-    // Inicializar OAuth após modal ser criada
-    setTimeout(() => {
-      initGoogleOAuth();
-      initFacebookOAuth();
-    }, 100);
   }
 
   /**
@@ -694,90 +688,11 @@ class AuthSystem {
   }
 }
 
-// Inicializar Google OAuth
-function initGoogleOAuth() {
-  // Carregar Google Sign-In library
-  const script = document.createElement('script');
-  script.src = 'https://accounts.google.com/gsi/client';
-  script.async = true;
-  script.defer = true;
-  document.head.appendChild(script);
-
-  script.onload = () => {
-    // Configurar botões do Google
-    const googleLoginBtn = document.getElementById('google-login-btn');
-    const googleRegisterBtn = document.getElementById('google-register-btn');
-
-    if (googleLoginBtn) {
-      googleLoginBtn.addEventListener('click', () => {
-        if (window.google) {
-          window.google.accounts.id.initialize({
-            client_id: 'YOUR_GOOGLE_CLIENT_ID',
-            callback: (response) => {
-              if (window.authSystem) {
-                window.authSystem.loginWithGoogle(response);
-              }
-            }
-          });
-          window.google.accounts.id.renderButton(
-            document.createElement('div'),
-            { theme: 'outline', size: 'large' }
-          );
-        }
-        // Google OAuth não configurado - silenciar
-      });
-    }
-  };
-}
-
-// Inicializar Facebook OAuth
-function initFacebookOAuth() {
-  // Carregar Facebook SDK
-  window.fbAsyncInit = function() {
-    FB.init({
-      appId: 'YOUR_FACEBOOK_APP_ID', // Substituir com seu ID
-      cookie: true,
-      xfbml: true,
-      version: 'v18.0'
-    });
-  };
-
-  const script = document.createElement('script');
-  script.src = 'https://connect.facebook.net/pt_BR/sdk.js';
-  script.async = true;
-  script.defer = true;
-  document.head.appendChild(script);
-
-  // Configurar botões do Facebook após carregamento
-  setTimeout(() => {
-    const facebookLoginBtn = document.getElementById('facebook-login-btn');
-    const facebookRegisterBtn = document.getElementById('facebook-register-btn');
-
-    if (facebookLoginBtn) {
-      facebookLoginBtn.addEventListener('click', () => {
-        if (window.FB) {
-          FB.login(function(response) {
-            if (response.authResponse) {
-              if (window.authSystem) {
-                window.authSystem.loginWithFacebook(response.authResponse);
-              }
-            }
-          }, {scope: 'public_profile,email'});
-        }
-        // Facebook OAuth não configurado - silenciar
-      });
-    }
-  }, 1000);
-}
-
 // Inicializar quando DOM está pronto
 document.addEventListener('DOMContentLoaded', () => {
   window.authSystem = new AuthSystem();
-  
-  // Inicializar OAuth (comentado até configurar credenciais)
-  // initGoogleOAuth();
-  // initFacebookOAuth();
 });
 
 // Exportar para uso externo
 window.currentUser = currentUser;
+

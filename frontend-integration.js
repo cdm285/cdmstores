@@ -1,31 +1,41 @@
 /**
  * CDM STORES - Frontend Integration Script
- * Integra botões de compra com backend Cloudflare Workers
+ * Carrinho 100% local (localStorage) — não depende do backend para funcionar.
  */
 
 const API_BASE = 'https://cdmstores.com/api';
 
-// Simula carrinho em localStorage
+// ─── Carrinho local ───────────────────────────────────────────────────────────
 class Cart {
   constructor() {
+    this.items = [];
     this.load();
   }
 
   load() {
-    this.items = JSON.parse(localStorage.getItem('cdm_cart') || '[]');
+    try {
+      this.items = JSON.parse(localStorage.getItem('cdm_cart') || '[]');
+    } catch (_) {
+      this.items = [];
+    }
   }
 
   save() {
     localStorage.setItem('cdm_cart', JSON.stringify(this.items));
   }
 
-  add(productId, quantity = 1) {
+  add(productId, productName, productPrice, quantity = 1) {
     const existing = this.items.find(i => i.product_id === productId);
     if (existing) {
       existing.quantity += quantity;
     } else {
-      this.items.push({ product_id: productId, quantity });
+      this.items.push({ product_id: productId, name: productName, price: productPrice, quantity });
     }
+    this.save();
+  }
+
+  remove(productId) {
+    this.items = this.items.filter(i => i.product_id !== productId);
     this.save();
   }
 
@@ -34,368 +44,164 @@ class Cart {
     this.save();
   }
 
-  getTotal() {
-    return this.items.length;
+  getCount() {
+    return this.items.reduce((sum, i) => sum + i.quantity, 0);
   }
+
+  getSubtotal() {
+    return this.items.reduce((sum, i) => sum + (i.price * i.quantity), 0);
+  }
+
+  // Retrocompatibilidade
+  getTotal() { return this.getCount(); }
 }
 
 const cart = new Cart();
 
-/**
- * Adiciona produto ao carrinho
- */
-async function adicionarCarrinho(productId, productName, productPrice) {
-  try {
-    // Valida no backend
-    const response = await fetch(`${API_BASE}/cart/add`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        product_id: productId,
-        quantity: 1
-      })
-    });
+// ─── Adicionar ao carrinho (local-first, API em background) ──────────────────
+function adicionarCarrinho(productId, productName, productPrice) {
+  cart.add(productId, productName, productPrice, 1);
+  atualizarCarrinhoUI();
+  mostrarNotificacao(`${productName} adicionado ao carrinho!`, 'success');
 
-    const data = await response.json();
-
-    if (data.success) {
-      cart.add(productId, 1);
-      atualizarCarrinhoUI();
-      mostrarNotificacao(`${productName} adicionado ao carrinho!`, 'success');
-    } else {
-      mostrarNotificacao(data.error || 'Erro ao adicionar ao carrinho', 'error');
-    }
-  } catch (error) {
-    mostrarNotificacao('Erro de conexão ao carrinho', 'error');
-    console.error(error);
-  }
+  // Sincronização com backend em background (falha silenciosa)
+  fetch(`${API_BASE}/cart/add`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ product_id: productId, quantity: 1 })
+  }).catch(() => {});
 }
 
-/**
- * Inicia checkout - Faz pedido e vai para Stripe
- */
-async function comprar(email, phone = '') {
-  if (cart.items.length === 0) {
-    mostrarNotificacao('Carrinho vazio!', 'warning');
-    return;
-  }
-
-  try {
-    mostrarNotificacao('Processando pedido...', 'info');
-    
-    // Busca dados dos produtos para calcular total
-    const productsResponse = await fetch(`${API_BASE}/products`);
-    const { data: products } = await productsResponse.json();
-
-    let total = 0;
-    const orderItems = [];
-
-    for (const cartItem of cart.items) {
-      const product = products.find(p => p.id === cartItem.product_id);
-      if (product) {
-        const itemTotal = product.price * cartItem.quantity;
-        total += itemTotal;
-        orderItems.push({
-          product_id: product.id,
-          quantity: cartItem.quantity,
-          price: product.price
-        });
-      }
-    }
-
-    const shippingCost = 15.00;
-    const orderTotal = total + shippingCost;
-
-    // Cria pedido
-    const orderResponse = await fetch(`${API_BASE}/orders`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        customer_name: email.split('@')[0],
-        customer_email: email,
-        items: orderItems,
-        total: orderTotal,
-        shipping_cost: shippingCost
-      })
-    });
-
-    const orderData = await orderResponse.json();
-
-    if (!orderData.success) {
-      mostrarNotificacao('Erro ao criar pedido', 'error');
-      return;
-    }
-
-    const orderId = orderData.order_id;
-    mostrarNotificacao(`Pedido #${orderId} criado! Redirecionando para Stripe...`, 'info');
-
-    // Criar Stripe Checkout Session
-    const checkoutResponse = await fetch(`${API_BASE}/stripe/create-payment`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        orderId: orderId,
-        items: orderItems,
-        total: orderTotal
-      })
-    });
-
-    const checkoutData = await checkoutResponse.json();
-
-    if (!checkoutData.success || !checkoutData.checkout_url) {
-      mostrarNotificacao('Erro ao criar sessão de pagamento: ' + (checkoutData.error || 'Desconhecido'), 'error');
-      return;
-    }
-
-    // Limpar carrinho e redirecionar
-    cart.clear();
-    atualizarCarrinhoUI();
-
-    // Redirecionar para Stripe
-    window.location.href = checkoutData.checkout_url;
-
-  } catch (error) {
-    mostrarNotificacao('Erro ao processar checkout: ' + error.message, 'error');
-    console.error(error);
-  }
+// ─── Remover item ─────────────────────────────────────────────────────────────
+function removerItemCarrinho(productId) {
+  cart.remove(productId);
+  atualizarCarrinhoUI();
+  atualizarCarrinhoVisualizacao();
+  mostrarNotificacao('Produto removido do carrinho', 'info');
 }
 
-/**
- * Rastreia pedido
- */
-async function rastrear(trackingCode) {
-  try {
-    const response = await fetch(`${API_BASE}/tracking/${trackingCode}`);
-    const data = await response.json();
-
-    if (data.success) {
-      const order = data.data;
-      alert(`
-Rastreamento:
-Pedido: #${order.id}
-Cliente: ${order.customer_name}
-Status: ${order.status}
-Código: ${order.tracking_code || 'Aguardando...'}
-      `);
-    } else {
-      mostrarNotificacao('Pedido não encontrado', 'error');
-    }
-  } catch (error) {
-    mostrarNotificacao('Erro ao rastrear', 'error');
-    console.error(error);
-  }
-}
-
-/**
- * Atualiza UI do carrinho
- */
+// ─── Atualizar contadores ─────────────────────────────────────────────────────
 function atualizarCarrinhoUI() {
-  const cartCount = document.getElementById('cart-count');
-  if (cartCount) {
-    cartCount.textContent = cart.getTotal();
-  }
-  // Retrocompatibilidade
-  const carrinhoCount = document.getElementById('carrinho-count');
-  if (carrinhoCount) {
-    carrinhoCount.textContent = cart.getTotal();
-  }
-  // Novo: Contar no menu
-  const menuCartCount = document.getElementById('menu-cart-count');
-  if (menuCartCount) {
-    menuCartCount.textContent = cart.getTotal();
-  }
+  const count = cart.getCount();
+  ['cart-count', 'carrinho-count', 'menu-cart-count'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.textContent = count;
+  });
 }
 
-/**
- * Alterna modal do carrinho
- */
+// ─── Abrir/fechar modal ───────────────────────────────────────────────────────
 function toggleCartModal() {
   const modal = document.getElementById('cart-modal');
   const overlay = document.getElementById('cart-overlay');
-  modal?.classList.toggle('active');
-  overlay?.classList.toggle('active');
-  if (modal?.classList.contains('active')) {
-    atualizarCarrinhoVisualizacao();
-  }
+  if (!modal) return;
+  const isOpen = modal.classList.toggle('active');
+  overlay?.classList.toggle('active', isOpen);
+  if (isOpen) atualizarCarrinhoVisualizacao();
 }
 
-/**
- * Atualiza visualização dos itens no modal
- */
+// ─── Renderizar itens no modal ────────────────────────────────────────────────
 function atualizarCarrinhoVisualizacao() {
   const itemsList = document.getElementById('cart-items-list');
   if (!itemsList) return;
 
   if (cart.items.length === 0) {
     itemsList.innerHTML = '<p class="cart-empty">Carrinho vazio</p>';
+    calcularTotalLocal();
     return;
   }
 
   itemsList.innerHTML = cart.items.map(item => `
-    <div class="cart-item">
-      <div class="cart-item-info">
-        <div class="cart-item-name">Produto ID: ${item.product_id}</div>
-        <div class="cart-item-price">Quantidade: ${item.quantity}</div>
+    <div class="cart-item" style="display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid #eee;">
+      <div>
+        <div style="font-weight:600;font-size:14px;">${escapeHtml(item.name || 'Produto')}</div>
+        <div style="color:#666;font-size:13px;">R$ ${Number(item.price).toFixed(2)} × ${item.quantity}</div>
       </div>
-      <button class="cart-item-remove" onclick="removerItemCarrinho(${item.product_id})">Remover</button>
+      <button onclick="removerItemCarrinho(${Number(item.product_id)})"
+        style="background:none;border:none;color:#e74c3c;cursor:pointer;font-size:18px;padding:4px 8px;">✕</button>
     </div>
   `).join('');
 
-  calcularTotal();
+  calcularTotalLocal();
 }
 
-/**
- * Remove item do carrinho
- */
-function removerItemCarrinho(productId) {
-  cart.items = cart.items.filter(i => i.product_id !== productId);
-  cart.save();
-  atualizarCarrinhoUI();
-  atualizarCarrinhoVisualizacao();
-  mostrarNotificacao('Produto removido do carrinho', 'info');
+// ─── Calcular total (local, sem API) ─────────────────────────────────────────
+function calcularTotalLocal() {
+  const subtotal = cart.getSubtotal();
+  const frete = 15.00;
+  const desconto = parseFloat(localStorage.getItem('cdm_discount') || '0') || 0;
+  const total = Math.max(0, subtotal - desconto + frete);
+
+  const el = (id) => document.getElementById(id);
+  if (el('cart-subtotal')) el('cart-subtotal').textContent = subtotal.toFixed(2);
+  if (el('discount-info')) el('discount-info').style.display = desconto > 0 ? 'flex' : 'none';
+  if (el('cart-discount')) el('cart-discount').textContent = desconto.toFixed(2);
+  if (el('cart-total-amount')) el('cart-total-amount').textContent = total.toFixed(2);
 }
 
-/**
- * Calcula total do carrinho
- */
-async function calcularTotal() {
-  try {
-    const response = await fetch(`${API_BASE}/products`);
-    const { data: products } = await response.json();
+// Alias para compatibilidade com código antigo
+function calcularTotal() { calcularTotalLocal(); }
 
-    let subtotal = 0;
-    for (const item of cart.items) {
-      const product = products.find(p => p.id === item.product_id);
-      if (product) {
-        subtotal += product.price * item.quantity;
-      }
-    }
-
-    const frete = 15.00;
-    const desconto = parseFloat(localStorage.getItem('cdm_discount') || 0);
-    const total = subtotal - desconto + frete;
-
-    document.getElementById('cart-subtotal').textContent = subtotal.toFixed(2);
-    
-    if (desconto > 0) {
-      document.getElementById('discount-info').style.display = 'block';
-      document.getElementById('cart-discount').textContent = desconto.toFixed(2);
-    }
-    
-    document.getElementById('cart-total-amount').textContent = total.toFixed(2);
-  } catch (error) {
-    console.error('Erro ao calcular total:', error);
-  }
-}
-
-/**
- * Aplica cupom de desconto
- */
+// ─── Cupom ───────────────────────────────────────────────────────────────────
 function aplicarCupom() {
   const couponInput = document.getElementById('coupon-input');
   const cupom = couponInput?.value.trim().toUpperCase();
 
-  if (!cupom) {
-    mostrarNotificacao('Digite um código de cupom', 'warning');
-    return;
-  }
+  if (!cupom) { mostrarNotificacao('Digite um código de cupom', 'warning'); return; }
 
-  // Cupons de teste (você pode adicionar mais)
-  const cuponsValidos = {
-    'NEWYEAR': 10.00,
-    'PROMO': 5.00,
-    'DESCONTO10': 10.00,
-    'SAVE20': 20.00
-  };
+  const cuponsValidos = { 'NEWYEAR': 10, 'PROMO': 5, 'DESCONTO10': 10, 'SAVE20': 20, 'CDM10': 10 };
 
   if (cuponsValidos[cupom]) {
     const desconto = cuponsValidos[cupom];
-    localStorage.setItem('cdm_discount', desconto);
+    localStorage.setItem('cdm_discount', String(desconto));
     localStorage.setItem('cdm_coupon', cupom);
-    calcularTotal();
-    couponInput.value = '';
+    calcularTotalLocal();
+    if (couponInput) couponInput.value = '';
     mostrarNotificacao(`Cupom ${cupom} aplicado! Desconto: R$ ${desconto.toFixed(2)}`, 'success');
   } else {
     mostrarNotificacao('Cupom inválido!', 'error');
   }
 }
 
-/**
- * Finaliza compra pelo modal
- */
-async function finalizarCompraModal() {
-  const email = document.getElementById('modal-customer-email')?.value;
-  if (!email) {
-    mostrarNotificacao('Digite seu email', 'warning');
-    return;
-  }
-  
-  // Vai para checkout.html com os dados
-  localStorage.setItem('checkout_email', email);
-  window.location.href = 'pages/checkout.html';
-}
-
-/**
- * Mostra notificação temporária
- */
- */
+// ─── Notificação toast ────────────────────────────────────────────────────────
 function mostrarNotificacao(message, type = 'info') {
+  if (!document.getElementById('cdm-notif-style')) {
+    const s = document.createElement('style');
+    s.id = 'cdm-notif-style';
+    s.textContent = '@keyframes cdmSlideIn{from{opacity:0;transform:translateY(-10px)}to{opacity:1;transform:translateY(0)}}';
+    document.head.appendChild(s);
+  }
+  const colors = { success: '#27ae60', error: '#e74c3c', warning: '#f39c12', info: '#2980b9' };
   const notif = document.createElement('div');
   notif.textContent = message;
-  notif.style.cssText = `
-    position: fixed;
-    top: 20px;
-    right: 20px;
-    background: ${type === 'success' ? '#4CAF50' : type === 'error' ? '#f44336' : '#2196F3'};
-    color: white;
-    padding: 15px 20px;
-    border-radius: 4px;
-    z-index: 10000;
-    animation: slideIn 0.3s ease;
-  `;
+  notif.style.cssText = `position:fixed;top:20px;right:20px;z-index:99999;
+    background:${colors[type]||colors.info};color:#fff;padding:14px 20px;
+    border-radius:8px;font-size:14px;font-weight:500;
+    box-shadow:0 4px 16px rgba(0,0,0,.25);animation:cdmSlideIn .3s ease;max-width:320px;`;
   document.body.appendChild(notif);
-  setTimeout(() => notif.remove(), 3000);
+  setTimeout(() => notif.remove(), 3500);
 }
 
-/**
- * Carrega produtos para dropdown/select
- */
+// ─── Escape XSS ──────────────────────────────────────────────────────────────
+function escapeHtml(str) {
+  return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// ─── Carregarmos produtos (compatibilidade) ───────────────────────────────────
 async function carregarProdutos() {
   try {
-    const response = await fetch(`${API_BASE}/products`);
-    const { data: products } = await response.json();
-
-    return products.map(p => ({
-      id: p.id,
-      name: p.name,
-      price: p.price,
-      stock: p.stock
-    }));
-  } catch (error) {
-    console.error('Erro ao carregar produtos:', error);
-    return [];
-  }
+    const r = await fetch(`${API_BASE}/products`);
+    const { data } = await r.json();
+    return data || [];
+  } catch (_) { return []; }
 }
 
-/**
- * Inicializa ao carregar página
- */
+// ─── Init ─────────────────────────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', () => {
   atualizarCarrinhoUI();
-  
-  // Click listener para botão do carrinho no menu
   const menuCartBtn = document.getElementById('menu-cart-btn');
-  if (menuCartBtn) {
-    menuCartBtn.addEventListener('click', toggleCartModal);
-  }
+  if (menuCartBtn) menuCartBtn.addEventListener('click', toggleCartModal);
 });
 
-// Exporta funções globalmente
-window.cdmStore = {
-  cart,
-  adicionarCarrinho,
-  comprar,
-  rastrear,
-  carregarProdutos,
-  mostrarNotificacao
-};
+// ─── Exportar globalmente ────────────────────────────────────────────────────
+window.cdmStore = { cart, adicionarCarrinho, removerItemCarrinho, toggleCartModal, aplicarCupom, mostrarNotificacao, carregarProdutos };
+
