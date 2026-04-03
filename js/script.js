@@ -753,5 +753,5 @@ document.addEventListener("DOMContentLoaded", () => {
     initProductButtons();
     initCheckout();
     initTracking();
-    initChat();
+    // initChat() desabilitado — chatbot.js tem widget superior com integração AI
 });

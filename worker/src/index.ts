@@ -829,6 +829,7 @@ function validarCupom(cupom: string): { valido: boolean; desconto: number; mensa
     'PROMO': 5,
     'DESCONTO10': 10,
     'SAVE20': 20,
+    'CDM10': 10,
   };
 
   const cupomUpper = cupom.toUpperCase().trim();

@@ -9,7 +9,8 @@ class ChatBot {
   constructor() {
     this.isOpen = false;
     this.messages = [];
-    this.language = localStorage.getItem('cdm_language') || 'pt';
+    // Usa a mesma chave que script.js para sincronizar idioma
+    this.language = localStorage.getItem('cdm_lang') || 'pt';
     this.createChatWidget();
     this.attachEventListeners();
   }
@@ -288,12 +289,23 @@ class ChatBot {
         langBtns.forEach(b => b.classList.remove('active'));
         e.target.classList.add('active');
         this.language = e.target.dataset.lang;
-        localStorage.setItem('cdm_language', this.language);
+        // Sincroniza com a mesma chave de script.js
+        localStorage.setItem('cdm_lang', this.language);
       });
 
       // Mark active language
       if (btn.dataset.lang === this.language) {
         btn.classList.add('active');
+      }
+    });
+
+    // Sincroniza idioma quando script.js muda (via storage event)
+    window.addEventListener('storage', (e) => {
+      if (e.key === 'cdm_lang' && e.newValue && e.newValue !== this.language) {
+        this.language = e.newValue;
+        langBtns.forEach(b => {
+          b.classList.toggle('active', b.dataset.lang === this.language);
+        });
       }
     });
   }
@@ -318,6 +330,10 @@ class ChatBot {
     this.addMessage(message, 'user');
     input.value = '';
 
+    // Mostrar indicador de digitação
+    const typingId = 'typing-' + Date.now();
+    this.addTypingIndicator(typingId);
+
     try {
       // Enviar para backend
       const response = await fetch(`${API_BASE}/chat`, {
@@ -330,6 +346,7 @@ class ChatBot {
         })
       });
 
+      this.removeTypingIndicator(typingId);
       const data = await response.json();
 
       if (data.success) {
@@ -346,6 +363,7 @@ class ChatBot {
         this.addMessage('Desculpe, ocorreu um erro. Tente novamente.', 'bot');
       }
     } catch (error) {
+      this.removeTypingIndicator(typingId);
       console.error('Erro ao enviar mensagem:', error);
       this.addMessage('Erro de conexão. Tente mais tarde.', 'bot');
     }
@@ -358,9 +376,12 @@ class ChatBot {
     switch (data.action) {
       // 1. Integração com Carrinho
       case 'add_to_cart':
-        if (typeof cart !== 'undefined' && data.product_id) {
-          cart.adicionarCarrinho(data.product_id);
-          this.addMessage(`✅ ${data.product_name} foi adicionado ao seu carrinho!`, 'bot');
+        if (data.product_id) {
+          // Usa a função global que adiciona localmente (não depende de API)
+          if (typeof adicionarCarrinho === 'function') {
+            adicionarCarrinho(data.product_id, data.product_name || 'Produto', Number(data.product_price) || 0);
+          }
+          // Não exibe mensagem extra: data.response já contém a confirmação
         }
         break;
 
@@ -397,13 +418,12 @@ class ChatBot {
 
       // 4. Aplicar Cupom
       case 'coupon_applied':
-        if (data.coupon_valid && typeof cart !== 'undefined' && data.discount) {
-          cart.cupomDesconto = data.discount;
-          this.addMessage(
-            `✅ Cupom aplicado com sucesso!\n` +
-            `Desconto: R$ ${data.discount}`,
-            'bot'
-          );
+        if (data.coupon_valid && data.discount) {
+          // Persiste no localStorage (mesmo mecanismo de frontend-integration.js)
+          localStorage.setItem('cdm_discount', String(data.discount));
+          localStorage.setItem('cdm_coupon', 'chatbot');
+          if (typeof calcularTotalLocal === 'function') calcularTotalLocal();
+          // Não exibe mensagem extra: data.response já contém a confirmação
         }
         break;
 
@@ -542,6 +562,21 @@ class ChatBot {
       console.error('Erro ao agendar:', error);
       this.addMessage('Erro de conexão ao agendar.', 'bot');
     }
+  }
+
+  addTypingIndicator(id) {
+    const body = document.getElementById('chatbot-body');
+    const div = document.createElement('div');
+    div.className = 'chatbot-message bot';
+    div.id = id;
+    div.innerHTML = `<p style="color:#999;font-style:italic;">✦ digitando...</p>`;
+    body.appendChild(div);
+    body.scrollTop = body.scrollHeight;
+  }
+
+  removeTypingIndicator(id) {
+    const el = document.getElementById(id);
+    if (el) el.remove();
   }
 
   addMessage(text, sender) {
