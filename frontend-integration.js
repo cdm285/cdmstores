@@ -80,6 +80,21 @@ function removerItemCarrinho(productId) {
   mostrarNotificacao('Produto removido do carrinho', 'info');
 }
 
+// ─── Atualizar quantidade ────────────────────────────────────────────────────
+function atualizarQuantidade(productId, delta) {
+  const item = cart.items.find(i => i.product_id === productId);
+  if (!item) return;
+  const novaQtd = item.quantity + delta;
+  if (novaQtd <= 0) {
+    removerItemCarrinho(productId);
+  } else {
+    item.quantity = novaQtd;
+    cart.save();
+    atualizarCarrinhoUI();
+    atualizarCarrinhoVisualizacao();
+  }
+}
+
 // ─── Atualizar contadores ─────────────────────────────────────────────────────
 function atualizarCarrinhoUI() {
   const count = cart.getCount();
@@ -111,13 +126,20 @@ function atualizarCarrinhoVisualizacao() {
   }
 
   itemsList.innerHTML = cart.items.map(item => `
-    <div class="cart-item" style="display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid #eee;">
-      <div>
-        <div style="font-weight:600;font-size:14px;">${escapeHtml(item.name || 'Produto')}</div>
-        <div style="color:#666;font-size:13px;">R$ ${Number(item.price).toFixed(2)} × ${item.quantity}</div>
+    <div class="cart-item" style="display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid #eee;gap:10px;">
+      <div style="flex:1;min-width:0;">
+        <div style="font-weight:600;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(item.name || 'Produto')}</div>
+        <div style="color:#666;font-size:12px;margin-top:2px;">R$ ${Number(item.price).toFixed(2)} cada</div>
       </div>
-      <button onclick="removerItemCarrinho(${Number(item.product_id)})"
-        style="background:none;border:none;color:#e74c3c;cursor:pointer;font-size:18px;padding:4px 8px;">✕</button>
+      <div style="display:flex;align-items:center;gap:6px;flex-shrink:0;">
+        <button onclick="atualizarQuantidade(${Number(item.product_id)}, -1)"
+          style="width:28px;height:28px;border:1px solid #ddd;border-radius:6px;background:#f5f5f5;cursor:pointer;font-size:16px;display:flex;align-items:center;justify-content:center;line-height:1;">−</button>
+        <span style="min-width:20px;text-align:center;font-weight:600;font-size:14px;">${item.quantity}</span>
+        <button onclick="atualizarQuantidade(${Number(item.product_id)}, 1)"
+          style="width:28px;height:28px;border:1px solid #ddd;border-radius:6px;background:#f5f5f5;cursor:pointer;font-size:16px;display:flex;align-items:center;justify-content:center;line-height:1;">+</button>
+        <button onclick="removerItemCarrinho(${Number(item.product_id)})"
+          style="background:none;border:none;color:#e74c3c;cursor:pointer;font-size:16px;padding:4px;margin-left:2px;">✕</button>
+      </div>
     </div>
   `).join('');
 
@@ -203,5 +225,6 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 // ─── Exportar globalmente ────────────────────────────────────────────────────
-window.cdmStore = { cart, adicionarCarrinho, removerItemCarrinho, toggleCartModal, aplicarCupom, mostrarNotificacao, carregarProdutos };
+window.cdmStore = { cart, adicionarCarrinho, removerItemCarrinho, atualizarQuantidade, toggleCartModal, aplicarCupom, mostrarNotificacao, carregarProdutos };
+window.atualizarQuantidade = atualizarQuantidade;
 

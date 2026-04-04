@@ -1114,6 +1114,7 @@ body.nav-open {
     object-fit: contain;
     filter: drop-shadow(0 0 8px rgba(0,162,255,0.35)) brightness(1.05);
     opacity: 1;
+    mix-blend-mode: screen;
 }
 .footer-logo-text {
     font-size: 1.1rem;

@@ -45,10 +45,10 @@
         <!-- NAV DESKTOP -->
         <div class="header-nav-container">
             <nav class="header-nav" aria-label="Navegação principal">
-                <a href="index.html" class="nav-link">Página Inicial</a>
-                <a href="#produtos" class="nav-link">Produtos</a>
-                <a href="#sobre" class="nav-link">Sobre</a>
-                <a href="#contato" class="nav-link">Contato</a>
+                <a href="index.html" class="nav-link" data-i18n="nav.home">Início</a>
+                <a href="#produtos" class="nav-link" data-i18n="nav.products">Produtos</a>
+                <a href="#sobre" class="nav-link" data-i18n="nav.sobre">Sobre</a>
+                <a href="#contato" class="nav-link" data-i18n="nav.contato">Contato</a>
             </nav>
             <div class="desktop-lang" role="group" aria-label="Idioma">
                 <button class="desktop-lang-btn active" data-lang="pt" aria-pressed="true">PT</button>
@@ -89,10 +89,10 @@
         </div>
 
         <nav class="mobile-nav-links" aria-label="Menu mobile">
-            <a href="index.html" class="mobile-nav-link">Página Inicial</a>
-            <a href="#produtos" class="mobile-nav-link">Produtos</a>
-            <a href="#sobre" class="mobile-nav-link">Sobre</a>
-            <a href="#contato" class="mobile-nav-link">Contato</a>
+            <a href="index.html" class="mobile-nav-link" data-i18n="nav.home">Início</a>
+            <a href="#produtos" class="mobile-nav-link" data-i18n="nav.products">Produtos</a>
+            <a href="#sobre" class="mobile-nav-link" data-i18n="nav.sobre">Sobre</a>
+            <a href="#contato" class="mobile-nav-link" data-i18n="nav.contato">Contato</a>
         </nav>
 
         <div class="mobile-nav-footer">
@@ -166,10 +166,10 @@
                     <span>4.9/5 AVALIAÇÃO DOS CLIENTES</span>
                 </div>
                 <h1>ELETRÔNICOS PREMIUM,<br><em>ENTREGA GARANTIDA.</em></h1>
-                <p>Crafted for performance. Built for reliability.</p>
+                <p data-i18n="hero.subtitle">Crafted for performance. Built for reliability.</p>
                 <div class="hero-actions">
-                    <a href="#produtos" class="btn-hero">SHOP NOW</a>
-                    <a href="pages/rastreio.html" class="btn-hero-text">Rastrear Pedido &rarr;</a>
+                    <a href="#produtos" class="btn-hero" data-i18n="hero.cta">Comprar Agora</a>
+                    <a href="pages/rastreio.html" class="btn-hero-text" data-i18n="hero.track">Rastrear Pedido →</a>
                 </div>
                 <div class="hero-trust">
                     <span>✓ Entrega em 3–7 dias</span>
@@ -222,8 +222,8 @@
     <section id="produtos" class="produtos" aria-label="Catálogo de produtos">
 
         <div class="section-header">
-            <h2>Eletrônicos Exclusivos</h2>
-            <p class="section-subtitle">Qualidade garantida, preços justos e envio rápido.</p>
+            <h2 data-i18n="products.title">Eletrônicos Exclusivos</h2>
+            <p class="section-subtitle" data-i18n="products.subtitle">Qualidade garantida, preços justos e envio rápido.</p>
         </div>
 
         <div class="grid-produtos">
@@ -333,7 +333,7 @@
                 </div>
                 <div class="card-body">
                     <span class="card-type">Speaker · Bluetooth 5.3</span>
-                    <h3>Caixa de Som Portátil</h3>
+                    <h3 data-i18n="products.p4.title">Caixa de Som Portátil</h3>
                     <div class="card-rating" aria-label="Avaliação: 4.7 de 5 estrelas">
                         <span class="stars" aria-hidden="true">★★★★★</span>
                         <span class="rating-count">( 203 reviews )</span>
@@ -435,6 +435,10 @@
             <p data-i18n="footer">© 2026 CDM STORES · Todos os direitos reservados.</p>
         </div>
     </footer>
+
+    <!-- Google Identity Services (defina GOOGLE_CLIENT_ID para ativar login Google) -->
+    <script>window.GOOGLE_CLIENT_ID = '';</script>
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
 
     <script src="js/script.js" defer></script>
     <script src="./frontend-integration.js" defer></script>

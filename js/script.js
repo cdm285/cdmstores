@@ -4,16 +4,22 @@ const translations = {
         "nav.products": "Produtos",
         "nav.support": "Atendimento",
         "nav.track": "Rastreio",
+        "nav.sobre": "Sobre",
+        "nav.contato": "Contato",
         "hero.title": "Eletrônicos Premium, Entrega Garantida.",
         "hero.subtitle": "Produtos de alta qualidade com entrega rápida, pagamento seguro e rastreio profissional.",
-        "hero.cta": "Usar Cupom",
-        "products.title": "Nossos Produtos",
+        "hero.cta": "Comprar Agora",
+        "hero.track": "Rastrear Pedido →",
+        "products.title": "Eletrônicos Exclusivos",
+        "products.subtitle": "Qualidade garantida, preços justos e envio rápido.",
         "products.p1.title": "Fone Bluetooth",
         "products.p1.desc": "Fone wireless de alta qualidade",
         "products.p2.title": "Carregador USB-C",
         "products.p2.desc": "Carregador rápido 65W",
         "products.p3.title": "Cabo Lightning",
         "products.p3.desc": "Cabo original certificado",
+        "products.p4.title": "Caixa de Som Portátil",
+        "products.p4.desc": "Caixa bluetooth com graves potentes",
         "products.buy": "Adicionar ao Carrinho",
         "cart.my": "🛒 Meu Carrinho",
         "cart.empty": "Carrinho vazio",
@@ -66,16 +72,22 @@ const translations = {
         "nav.products": "Products",
         "nav.support": "Support",
         "nav.track": "Tracking",
+        "nav.sobre": "About",
+        "nav.contato": "Contact",
         "hero.title": "Premium Electronics, Guaranteed Delivery.",
-        "hero.subtitle": "High-quality products with fast shipping, secure payment and professional tracking.",
-        "hero.cta": "Use Coupon",
-        "products.title": "Our Products",
+        "hero.subtitle": "Crafted for performance. Built for reliability.",
+        "hero.cta": "Shop Now",
+        "hero.track": "Track Order →",
+        "products.title": "Exclusive Electronics",
+        "products.subtitle": "Guaranteed quality, fair prices and fast shipping.",
         "products.p1.title": "Bluetooth Headphones",
         "products.p1.desc": "High-quality wireless headphones",
         "products.p2.title": "USB-C Charger",
         "products.p2.desc": "Fast 65W Charger",
         "products.p3.title": "Lightning Cable",
         "products.p3.desc": "Original certified cable",
+        "products.p4.title": "Portable Speaker",
+        "products.p4.desc": "Portable Bluetooth speaker",
         "products.buy": "Add to Cart",
         "cart.my": "🛒 My Cart",
         "cart.empty": "Empty cart",
@@ -128,16 +140,22 @@ const translations = {
         "nav.products": "Productos",
         "nav.support": "Atención",
         "nav.track": "Seguimiento",
+        "nav.sobre": "Sobre nosotros",
+        "nav.contato": "Contacto",
         "hero.title": "Electrónicos Premium, Entrega Garantizada.",
-        "hero.subtitle": "Productos de alta calidad con envío rápido, pago seguro y rastreo profesional.",
-        "hero.cta": "Usar cupón",
-        "products.title": "Nuestros productos",
+        "hero.subtitle": "Articulado para el rendimiento. Creado para la confiabilidad.",
+        "hero.cta": "Comprar Ahora",
+        "hero.track": "Rastrear pedido →",
+        "products.title": "Electrónicos Exclusivos",
+        "products.subtitle": "Calidad garantizada, precios justos y envío rápido.",
         "products.p1.title": "Auriculares Bluetooth",
         "products.p1.desc": "Auriculares inalámbricos de alta calidad",
         "products.p2.title": "Cargador USB-C",
         "products.p2.desc": "Cargador rápido 65W",
         "products.p3.title": "Cable Lightning",
         "products.p3.desc": "Cable original certificado",
+        "products.p4.title": "Bocina Portátil",
+        "products.p4.desc": "Bocina bluetooth portátil",
         "products.buy": "Agregar al carrito",
         "cart.my": "🛒 Mi carrito",
         "cart.empty": "Carrito vacío",
@@ -238,6 +256,17 @@ function applyTranslations(lang) {
         const text = translations[lang]?.[key];
         if (text) el.textContent = text;
     });
+
+    // Hero h1: usa innerHTML para preservar <br> e <em>
+    const heroH1 = document.querySelector(".hero-inner h1");
+    if (heroH1) {
+        const h1Map = {
+            pt: "ELETR\u00d4NICOS PREMIUM,<br><em>ENTREGA GARANTIDA.</em>",
+            en: "PREMIUM ELECTRONICS,<br><em>GUARANTEED DELIVERY.</em>",
+            es: "ELECTR\u00d3NICOS PREMIUM,<br><em>ENTREGA GARANTIZADA.</em>"
+        };
+        heroH1.innerHTML = h1Map[lang] || h1Map.pt;
+    }
 
     // Traduzir placeholders
     document.querySelectorAll("[data-i18n-placeholder]").forEach((el) => {

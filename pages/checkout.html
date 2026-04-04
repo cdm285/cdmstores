@@ -159,13 +159,13 @@
         async function checkoutStripe() {
             const email = document.getElementById('checkout-email').value;
             if (!email || !email.includes('@')) {
-                cdmStore.mostrarNotificacao('Digite um email válido', 'warning');
+                mostrarNotificacao('Digite um email válido', 'warning');
                 return;
             }
 
-            const cart = JSON.parse(localStorage.getItem('cdm_cart') || '[]');
-            if (!cart.length) {
-                cdmStore.mostrarNotificacao('Carrinho vazio', 'warning');
+            const cartItems = JSON.parse(localStorage.getItem('cdm_cart') || '[]');
+            if (!cartItems.length) {
+                mostrarNotificacao('Carrinho vazio', 'warning');
                 return;
             }
 
@@ -173,36 +173,71 @@
             btn.disabled = true;
             btn.textContent = 'Processando...';
 
+            // Dados completos de produto para Stripe
+            const productData = {
+                1: { name: 'Fone Bluetooth Premium', price: 89.90, stripeLink: 'https://buy.stripe.com/test_6oE5mTgBi1mP2owbII' },
+                2: { name: 'Carregador USB-C 65W',   price: 49.90, stripeLink: 'https://buy.stripe.com/test_cN28zJaBO9tz36E3cc' },
+                3: { name: 'Cabo Lightning 2m',       price: 29.90, stripeLink: 'https://buy.stripe.com/test_cN22a95amfUr1MAfZ0' },
+                4: { name: 'Caixa de Som Portátil',   price: 149.90, stripeLink: 'https://buy.stripe.com/test_6oE5mTgBi1mP2owbII' }
+            };
+
+            const enrichedItems = cartItems.map(i => {
+                const pid = i.product_id || i.id;
+                const info = productData[pid] || { name: i.name || 'Produto', price: Number(i.price) || 0 };
+                return { product_id: pid, name: info.name, price: info.price, quantity: i.quantity };
+            });
+
             try {
-                // Primeiro criar o pedido
+                // Criar pedido no backend
                 const orderRes = await fetch('https://cdmstores.com/api/orders', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     credentials: 'include',
                     body: JSON.stringify({
                         customer_email: email,
-                        items: cart.map(i => ({ product_id: i.product_id || i.id, quantity: i.quantity }))
+                        items: enrichedItems.map(i => ({ product_id: i.product_id, quantity: i.quantity }))
                     })
                 });
                 const orderData = await orderRes.json();
                 if (!orderData.success) throw new Error(orderData.error || 'Erro ao criar pedido');
 
-                // Criar sessão Stripe
+                // Criar sessão Stripe (backend aceita payment_url no response)
                 const payRes = await fetch('https://cdmstores.com/api/stripe/create-payment', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     credentials: 'include',
-                    body: JSON.stringify({ orderId: orderData.order_id, items: cart })
+                    body: JSON.stringify({
+                        orderId: orderData.order_id,
+                        customerEmail: email,
+                        items: enrichedItems.map(i => ({ name: i.name, price: i.price, quantity: i.quantity })),
+                        total: enrichedItems.reduce((s, i) => s + i.price * i.quantity, 0)
+                    })
                 });
                 const payData = await payRes.json();
-                if (!payData.success || !payData.checkout_url) throw new Error(payData.error || 'Erro ao iniciar pagamento');
+                // Backend retorna payment_url (campo correto após fix)
+                const url = payData.payment_url || payData.checkout_url;
+                if (!payData.success || !url) throw new Error(payData.error || 'Erro ao iniciar pagamento');
 
-                window.location.href = payData.checkout_url;
+                window.location.href = url;
             } catch (err) {
-                cdmStore.mostrarNotificacao(err.message || 'Erro ao processar pagamento', 'error');
+                console.warn('Backend indisponível, usando link Stripe direto:', err.message);
+                // Fallback: abrir link Stripe direto do primeiro item
+                const firstItem = enrichedItems[0];
+                const pid = firstItem ? firstItem.product_id : 1;
+                const fallbackLink = (productData[pid] || productData[1]).stripeLink;
+                window.open(fallbackLink, '_blank', 'noopener');
                 btn.disabled = false;
                 btn.textContent = '🔒 Pagar com Stripe';
             }
+        }
+
+        function mostrarNotificacao(msg, type) {
+            const colors = { success: '#27ae60', error: '#e74c3c', warning: '#f39c12', info: '#2980b9' };
+            const n = document.createElement('div');
+            n.textContent = msg;
+            n.style.cssText = `position:fixed;top:20px;right:20px;z-index:99999;background:${colors[type]||colors.info};color:#fff;padding:14px 20px;border-radius:8px;font-size:14px;font-weight:500;box-shadow:0 4px 16px rgba(0,0,0,.25);max-width:320px;`;
+            document.body.appendChild(n);
+            setTimeout(() => n.remove(), 3500);
         }
 
         document.addEventListener('DOMContentLoaded', updateCartDisplay);
