@@ -1,0 +1,63 @@
+CDM STORES — Audit Report
+Timestamp: 2026-04-05 22:16:43
+────────────────────────────────────────────────────────────
+
+╔═══════════════════════════════════════════════════╗
+║    CDM STORES — Pre-Deploy Audit Report           ║
+╚═══════════════════════════════════════════════════╝
+  Timestamp : 2026-04-05 22:16:43
+
+  [1] Navigation
+    [  OK  ] EN default lang (index.html)
+    [  OK  ] #sobre section exists
+    [  OK  ] #contato section exists
+    [  OK  ] Main navigation aria-label
+  [2] Currency/USD
+    [  OK  ] No R$ in index.html
+    [  OK  ] USD promo bar ($199)
+    [  OK  ] No R$ in checkout.html
+    [  OK  ] No R$ in frontend-integration
+  [3] Authentication
+    [  OK  ] Sign In button (auth.js)
+    [  OK  ] Create Account (auth.js)
+    [  OK  ] Continue with Google (auth.js)
+    [  OK  ] Country default: United States
+    [  OK  ] No CEP/BR validation in auth.js
+  [4] Chatbot/Payment
+    [  OK  ] No PIX in chatbot.js
+    [  OK  ] No PIX in script.js
+    [  OK  ] No Boleto in index.html
+  [5] Stripe
+    [  OK  ] Pay with Stripe button
+    [  OK  ] Stripe.js loaded
+    [  OK  ] No PayPal in checkout
+  [6] Shipping Logic
+    [  OK  ] Free shipping at subtotal >= 199
+    [  OK  ] Shipping fallback $9.99
+    [  OK  ] No hardcoded R$ 15
+  [7] Responsiveness
+    [  OK  ] mobile.css linked
+    [  OK  ] Viewport meta tag
+  [8] i18n
+    [  OK  ] detectLang() returns 'en'
+    [  OK  ] EN lang button active (index)
+    [  OK  ] EN lang active (checkout)
+  [9] Security
+    [  OK  ] No inline Stripe secret (index)
+    [  OK  ] No inline secret (auth.js)
+    [  OK  ] HTTPS API base URL
+    [  OK  ] Fetch uses credentials:include
+  [+] Deep page checks
+    [  OK  ] checkout.html: no Portuguese h1
+    [  OK  ] checkout.html: no Portuguese nav links
+    [  OK  ] checkout.html: productData closing };
+    [  OK  ] checkout.html: EN mobile lang default
+    [  OK  ] rastreio.html: no Portuguese fallback
+    [  OK  ] rastreio.html: EN mobile lang default
+    [  OK  ] stripe.ts: currency USD
+    [  OK  ] stripe.ts: no BRL currency
+    [  OK  ] stripe.ts: English error messages
+
+  SCORE: 40 / 40 checks passed
+  All checks passed. Ready for deployment.
+

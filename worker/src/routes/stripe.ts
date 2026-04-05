@@ -11,14 +11,14 @@ router.post('/create-payment', async (req, env: { STRIPE_SECRET_KEY: string; STR
     const { orderId, items, total, customerEmail } = await req.json() as { orderId: string; items: Array<{ name: string; price: number; quantity: number }>; total: number; customerEmail: string };
     
     if (!orderId || !total) {
-      return json({ success: false, error: 'Dados incompletos' }, { status: 400 });
+      return json({ success: false, error: 'Incomplete request data' }, { status: 400 });
     }
     
     const session = await stripe.checkout.sessions.create({
       payment_method_types: ['card'],
       line_items: items.map(item => ({
         price_data: {
-          currency: 'brl',
+          currency: 'usd',
           product_data: {
             name: item.name,
           },
@@ -53,7 +53,7 @@ router.post('/webhook', async (req, env: { STRIPE_SECRET_KEY: string; STRIPE_WEB
     const sig = req.headers.get('stripe-signature');
 
     if (!sig) {
-      return json({ success: false, error: 'Assinatura ausente' }, { status: 400 });
+      return json({ success: false, error: 'Missing Stripe signature' }, { status: 400 });
     }
     
     let event;
@@ -64,7 +64,7 @@ router.post('/webhook', async (req, env: { STRIPE_SECRET_KEY: string; STRIPE_WEB
         env.STRIPE_WEBHOOK_SECRET
       );
     } catch (err) {
-      return json({ success: false, error: 'Assinatura inválida' }, { status: 400 });
+      return json({ success: false, error: 'Invalid Stripe signature' }, { status: 400 });
     }
     
     // Processar eventos
@@ -78,7 +78,7 @@ router.post('/webhook', async (req, env: { STRIPE_SECRET_KEY: string; STRIPE_WEB
       ).bind('paid', session.id, orderId).run();
       
       // Aqui você criaria o pedido no CJdropshipping
-      console.log(`Pedido ${orderId} pago com sucesso!`);
+      console.log(`Order ${orderId} paid successfully.`);
     }
     
     return json({ success: true, received: true });

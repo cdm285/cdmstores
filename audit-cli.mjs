@@ -79,7 +79,16 @@ chk('No inline Stripe secret (index)', 'index.html',              /sk_live|sk_te
 chk('No inline secret (auth.js)',      'js/auth.js',              /sk_live|sk_test/, false);
 chk('HTTPS API base URL',              'js/auth.js',              /https:\/\/cdmstores\.com\/api/);
 chk('Fetch uses credentials:include',  'js/auth.js',              /credentials['":\s]+include/);
-
+// ── [+] Additional deep checks ────────────────────────────────────────────
+chk('checkout.html: no Portuguese h1',        'pages/checkout.html',     /Finalizar Pagamento/, false);
+chk('checkout.html: no Portuguese nav links', 'pages/checkout.html',     /In\u00edcio|Produtos|Rastreio|Fechar menu|Abrir menu|Idioma/, false);
+chk('checkout.html: productData closing };',  'pages/checkout.html',     /stripeLink.*\}\s*\}\s*;/);
+chk('checkout.html: EN mobile lang default',  'pages/checkout.html',     /mobile-lang-btn active.*data-lang="en"/);
+chk('rastreio.html: no Portuguese fallback',  'pages/rastreio.html',     /Rastrear Pedido|Rastrear"/, false);
+chk('rastreio.html: EN mobile lang default',  'pages/rastreio.html',     /mobile-lang-btn active.*data-lang="en"/);
+chk('stripe.ts: currency USD',                'worker/src/routes/stripe.ts', /currency.*usd/);
+chk('stripe.ts: no BRL currency',             'worker/src/routes/stripe.ts', /currency.*brl/, false);
+chk('stripe.ts: English error messages',      'worker/src/routes/stripe.ts', /Dados incompletos|Assinatura/, false);
 // ── Report ────────────────────────────────────────────────────────────────
 const ok   = results.filter(r => r.status === 'OK').length;
 const fail = results.filter(r => r.status === 'FAIL').length;
@@ -92,15 +101,16 @@ console.log(`  Timestamp : ${ts}`);
 console.log('');
 
 const cats = [
-  { name: '[1] Navigation',       from: 0,  count: 4 },
-  { name: '[2] Currency/USD',     from: 4,  count: 4 },
-  { name: '[3] Authentication',   from: 8,  count: 5 },
-  { name: '[4] Chatbot/Payment',  from: 13, count: 3 },
-  { name: '[5] Stripe',           from: 16, count: 3 },
-  { name: '[6] Shipping Logic',   from: 19, count: 3 },
-  { name: '[7] Responsiveness',   from: 22, count: 2 },
-  { name: '[8] i18n',             from: 24, count: 3 },
-  { name: '[9] Security',         from: 27, count: 4 },
+  { name: '[1] Navigation',          from: 0,  count: 4 },
+  { name: '[2] Currency/USD',        from: 4,  count: 4 },
+  { name: '[3] Authentication',      from: 8,  count: 5 },
+  { name: '[4] Chatbot/Payment',     from: 13, count: 3 },
+  { name: '[5] Stripe',              from: 16, count: 3 },
+  { name: '[6] Shipping Logic',      from: 19, count: 3 },
+  { name: '[7] Responsiveness',      from: 22, count: 2 },
+  { name: '[8] i18n',                from: 24, count: 3 },
+  { name: '[9] Security',            from: 27, count: 4 },
+  { name: '[+] Deep page checks',    from: 31, count: 9 },
 ];
 
 for (const cat of cats) {

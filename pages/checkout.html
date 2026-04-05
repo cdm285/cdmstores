@@ -28,12 +28,12 @@
 
         <!-- NAV DESKTOP -->
         <div class="header-nav-container">
-            <nav class="header-nav" aria-label="Navegação principal">
-                <a href="../index.html" class="nav-link" data-i18n="nav.home">Início</a>
-                <a href="../index.html#produtos" class="nav-link" data-i18n="nav.products">Produtos</a>
-                <a href="rastreio.html" class="nav-link" data-i18n="nav.track">Rastreio</a>
+            <nav class="header-nav" aria-label="Main navigation">
+                <a href="../index.html" class="nav-link" data-i18n="nav.home">Home</a>
+                <a href="../index.html#produtos" class="nav-link" data-i18n="nav.products">Products</a>
+                <a href="rastreio.html" class="nav-link" data-i18n="nav.track">Track Order</a>
             </nav>
-            <div class="desktop-lang" role="group" aria-label="Idioma">
+            <div class="desktop-lang" role="group" aria-label="Language">
                 <button class="desktop-lang-btn" data-lang="pt" aria-pressed="false">PT</button>
                 <span class="desktop-lang-sep">|</span>
                 <button class="desktop-lang-btn active" data-lang="en" aria-pressed="true">EN</button>
@@ -44,11 +44,11 @@
 
         <!-- ACTIONS DESKTOP -->
         <div class="header-actions">
-            <a href="../index.html" class="header-cta" data-i18n="nav.home">Voltar</a>
+            <a href="../index.html" class="header-cta" data-i18n="nav.home">Back</a>
         </div>
 
         <!-- HAMBURGER (mobile only) -->
-        <button class="hamburger" id="hamburger-btn" aria-label="Abrir menu" aria-expanded="false" aria-controls="mobile-nav">
+        <button class="hamburger" id="hamburger-btn" aria-label="Open navigation menu" aria-expanded="false" aria-controls="mobile-nav">
             <span class="hamburger-line"></span>
             <span class="hamburger-line"></span>
             <span class="hamburger-line"></span>
@@ -57,25 +57,25 @@
     </header>
 
     <!-- MOBILE OFF-CANVAS NAV -->
-    <div class="mobile-nav" id="mobile-nav" aria-hidden="true" role="dialog" aria-modal="true" aria-label="Menu de navegação">
+    <div class="mobile-nav" id="mobile-nav" aria-hidden="true" role="dialog" aria-modal="true" aria-label="Navigation menu">
         <div class="mobile-nav-header">
             <a href="../index.html" class="mobile-nav-logo">CDM STORES</a>
-            <button class="mobile-nav-close" id="mobile-nav-close" aria-label="Fechar menu">
+            <button class="mobile-nav-close" id="mobile-nav-close" aria-label="Close menu">
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
             </button>
         </div>
-        <nav class="mobile-nav-links" aria-label="Menu mobile">
-            <a href="../index.html" class="mobile-nav-link" data-i18n="nav.home">Início</a>
-            <a href="../index.html#produtos" class="mobile-nav-link" data-i18n="nav.products">Produtos</a>
-            <a href="rastreio.html" class="mobile-nav-link" data-i18n="nav.track">Rastreio</a>
+        <nav class="mobile-nav-links" aria-label="Mobile navigation">
+            <a href="../index.html" class="mobile-nav-link" data-i18n="nav.home">Home</a>
+            <a href="../index.html#produtos" class="mobile-nav-link" data-i18n="nav.products">Products</a>
+            <a href="rastreio.html" class="mobile-nav-link" data-i18n="nav.track">Track Order</a>
             <a href="checkout.html" class="mobile-nav-link">Checkout</a>
         </nav>
         <div class="mobile-nav-footer">
-            <div class="mobile-nav-lang-label">Idioma</div>
-            <div class="mobile-lang" role="group" aria-label="Idioma">
-                <button class="mobile-lang-btn active" data-lang="pt" aria-pressed="true">PT</button>
+            <div class="mobile-nav-lang-label">Language</div>
+            <div class="mobile-lang" role="group" aria-label="Language">
+                <button class="mobile-lang-btn" data-lang="pt" aria-pressed="false">PT</button>
                 <span class="mobile-lang-sep">|</span>
-                <button class="mobile-lang-btn" data-lang="en" aria-pressed="false">EN</button>
+                <button class="mobile-lang-btn active" data-lang="en" aria-pressed="true">EN</button>
                 <span class="mobile-lang-sep">|</span>
                 <button class="mobile-lang-btn" data-lang="es" aria-pressed="false">ES</button>
             </div>
@@ -85,17 +85,17 @@
 
     <section class="checkout">
         <div class="checkout-card">
-            <h1 data-i18n="checkout.title">Finalizar Pagamento</h1>
-            <p style="color: var(--text-secondary); font-size:0.9rem; margin-bottom:20px;" data-i18n="checkout.subtitle">Conclua seu pagamento com segurança.</p>
+            <h1 data-i18n="checkout.title">Checkout</h1>
+            <p style="color: var(--text-secondary); font-size:0.9rem; margin-bottom:20px;" data-i18n="checkout.subtitle">Complete your purchase securely.</p>
 
             <div class="checkout-info">
-                <p><strong data-i18n="checkout.statusLabel">Status:</strong> <span data-i18n="checkout.statusValue">Selecione a forma de pagamento e conclua.</span></p>
-                <p id="checkout-selected" data-i18n="checkout.selection" style="margin-top:6px;">Produto selecionado: n/d</p>
+                <p><strong data-i18n="checkout.statusLabel">Status:</strong> <span data-i18n="checkout.statusValue">Select payment method to complete.</span></p>
+                <p id="checkout-selected" data-i18n="checkout.selection" style="margin-top:6px;">Selected product: n/a</p>
             </div>
 
             <div id="cart-items" style="margin: 20px 0; padding: 16px; background: var(--bg-subtle); border: 1px solid var(--border); border-radius: var(--radius-md);">
-                <h4 style="margin-bottom:8px; font-size:0.9rem; color:var(--text-secondary);">Itens no carrinho</h4>
-                <p id="cart-summary" style="font-size:0.9rem;">Carregando...</p>
+                <h4 style="margin-bottom:8px; font-size:0.9rem; color:var(--text-secondary);">Cart items</h4>
+                <p id="cart-summary" style="font-size:0.9rem;">Loading...</p>
             </div>
 
             <label for="checkout-email" style="display:block; font-size:0.85rem; font-weight:600; margin-bottom:6px; color:var(--text-secondary);">Email for receipt</label>
@@ -113,7 +113,7 @@
 
     <footer class="footer" role="contentinfo">
         <div class="footer-bottom">
-            <p data-i18n="footer">© 2026 CDM STORES · Todos os direitos reservados.</p>
+            <p data-i18n="footer">© 2026 CDM STORES · All rights reserved.</p>
         </div>
     </footer>
 
@@ -133,7 +133,7 @@
             let total = 0;
             items.forEach(item => {
                 const price = prices[item.product_id] || 0;
-                const name  = names[item.product_id] || `Produto #${item.product_id}`;
+                const name  = names[item.product_id] || `Product #${item.product_id}`;
                 const sub   = price * item.quantity;
                 total += sub;
                 html += `<li style="padding:6px 0;border-bottom:1px solid var(--border);font-size:0.9rem;display:flex;justify-content:space-between;">
@@ -179,6 +179,7 @@
                 2: { name: 'USB-C Charger 65W',   price: 49.90, stripeLink: 'https://buy.stripe.com/test_cN28zJaBO9tz36E3cc' },
                 3: { name: 'Lightning Cable 2m',       price: 29.90, stripeLink: 'https://buy.stripe.com/test_cN22a95amfUr1MAfZ0' },
                 4: { name: 'Portable Speaker',   price: 149.90, stripeLink: 'https://buy.stripe.com/test_6oE5mTgBi1mP2owbII' }
+            };
 
             const enrichedItems = cartItems.map(i => {
                 const pid = i.product_id || i.id;
@@ -198,7 +199,7 @@
                     })
                 });
                 const orderData = await orderRes.json();
-                if (!orderData.success) throw new Error(orderData.error || 'Erro ao criar pedido');
+                if (!orderData.success) throw new Error(orderData.error || 'Error creating order');
 
                 // Criar sessão Stripe (backend aceita payment_url no response)
                 const payRes = await fetch('https://cdmstores.com/api/stripe/create-payment', {
@@ -215,7 +216,7 @@
                 const payData = await payRes.json();
                 // Backend retorna payment_url (campo correto após fix)
                 const url = payData.payment_url || payData.checkout_url;
-                if (!payData.success || !url) throw new Error(payData.error || 'Erro ao iniciar pagamento');
+                if (!payData.success || !url) throw new Error(payData.error || 'Error initiating payment');
 
                 window.location.href = url;
             } catch (err) {

@@ -107,12 +107,12 @@
 
         <!-- NAV DESKTOP -->
         <div class="header-nav-container">
-            <nav class="header-nav" aria-label="Navegação principal">
-                <a href="../index.html" class="nav-link" data-i18n="nav.home">Início</a>
-                <a href="../index.html#produtos" class="nav-link" data-i18n="nav.products">Produtos</a>
-                <a href="rastreio.html" class="nav-link" aria-current="page" data-i18n="nav.track">Rastreio</a>
+            <nav class="header-nav" aria-label="Main navigation">
+                <a href="../index.html" class="nav-link" data-i18n="nav.home">Home</a>
+                <a href="../index.html#produtos" class="nav-link" data-i18n="nav.products">Products</a>
+                <a href="rastreio.html" class="nav-link" aria-current="page" data-i18n="nav.track">Track Order</a>
             </nav>
-            <div class="desktop-lang" role="group" aria-label="Idioma">
+            <div class="desktop-lang" role="group" aria-label="Language">
                 <button class="desktop-lang-btn" data-lang="pt" aria-pressed="false">PT</button>
                 <span class="desktop-lang-sep">|</span>
                 <button class="desktop-lang-btn active" data-lang="en" aria-pressed="true">EN</button>
@@ -123,11 +123,11 @@
 
         <!-- ACTIONS DESKTOP -->
         <div class="header-actions">
-            <a href="../index.html#produtos" class="header-cta" data-i18n="nav.products">Produtos</a>
+            <a href="../index.html#produtos" class="header-cta" data-i18n="nav.products">Products</a>
         </div>
 
         <!-- HAMBURGER (mobile only) -->
-        <button class="hamburger" id="hamburger-btn" aria-label="Abrir menu" aria-expanded="false" aria-controls="mobile-nav">
+        <button class="hamburger" id="hamburger-btn" aria-label="Open navigation menu" aria-expanded="false" aria-controls="mobile-nav">
             <span class="hamburger-line"></span>
             <span class="hamburger-line"></span>
             <span class="hamburger-line"></span>
@@ -136,24 +136,24 @@
     </header>
 
     <!-- MOBILE OFF-CANVAS NAV -->
-    <div class="mobile-nav" id="mobile-nav" aria-hidden="true" role="dialog" aria-modal="true" aria-label="Menu de navegação">
+    <div class="mobile-nav" id="mobile-nav" aria-hidden="true" role="dialog" aria-modal="true" aria-label="Navigation menu">
         <div class="mobile-nav-header">
             <a href="../index.html" class="mobile-nav-logo">CDM STORES</a>
-            <button class="mobile-nav-close" id="mobile-nav-close" aria-label="Fechar menu">
+            <button class="mobile-nav-close" id="mobile-nav-close" aria-label="Close menu">
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
             </button>
         </div>
-        <nav class="mobile-nav-links" aria-label="Menu mobile">
-            <a href="../index.html" class="mobile-nav-link" data-i18n="nav.home">Início</a>
-            <a href="../index.html#produtos" class="mobile-nav-link" data-i18n="nav.products">Produtos</a>
-            <a href="rastreio.html" class="mobile-nav-link" aria-current="page" data-i18n="nav.track">Rastreio</a>
+        <nav class="mobile-nav-links" aria-label="Mobile navigation">
+            <a href="../index.html" class="mobile-nav-link" data-i18n="nav.home">Home</a>
+            <a href="../index.html#produtos" class="mobile-nav-link" data-i18n="nav.products">Products</a>
+            <a href="rastreio.html" class="mobile-nav-link" aria-current="page" data-i18n="nav.track">Track Order</a>
         </nav>
         <div class="mobile-nav-footer">
-            <div class="mobile-nav-lang-label">Idioma</div>
-            <div class="mobile-lang" role="group" aria-label="Idioma">
-                <button class="mobile-lang-btn active" data-lang="pt" aria-pressed="true">PT</button>
+            <div class="mobile-nav-lang-label">Language</div>
+            <div class="mobile-lang" role="group" aria-label="Language">
+                <button class="mobile-lang-btn" data-lang="pt" aria-pressed="false">PT</button>
                 <span class="mobile-lang-sep">|</span>
-                <button class="mobile-lang-btn" data-lang="en" aria-pressed="false">EN</button>
+                <button class="mobile-lang-btn active" data-lang="en" aria-pressed="true">EN</button>
                 <span class="mobile-lang-sep">|</span>
                 <button class="mobile-lang-btn" data-lang="es" aria-pressed="false">ES</button>
             </div>
@@ -162,16 +162,16 @@
     <div class="mobile-nav-overlay" id="mobile-nav-overlay" aria-hidden="true"></div>
 
     <main class="rastreio-wrap">
-        <h2 data-i18n="tracking.title">Rastrear Pedido</h2>
-        <p data-i18n="tracking.subtitle">Digite o código de rastreio enviado para seu email.</p>
+        <h2 data-i18n="tracking.title">Track Order</h2>
+        <p data-i18n="tracking.subtitle">Enter the tracking code sent to your email.</p>
 
         <div class="rastreio-form">
             <input type="text" id="codigo-rastreio" class="rastreio-input"
                    placeholder="Ex: CDM123456BR"
                    data-i18n-placeholder="tracking.placeholder"
-                   aria-label="Código de rastreio"
+                   aria-label="Tracking code"
                    maxlength="30">
-            <button class="btn-rastrear" id="btn-rastrear" data-i18n="tracking.button">Rastrear</button>
+            <button class="btn-rastrear" id="btn-rastrear" data-i18n="tracking.button">Track</button>
         </div>
 
         <div id="resultado-rastreio" class="rastreio-resultado" role="status" aria-live="polite"></div>
@@ -179,7 +179,7 @@
 
     <footer class="footer" role="contentinfo">
         <div class="footer-bottom">
-            <p data-i18n="footer">© 2026 CDM STORES · Todos os direitos reservados.</p>
+            <p data-i18n="footer">© 2026 CDM STORES · All rights reserved.</p>
         </div>
     </footer>
 
