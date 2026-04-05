@@ -372,27 +372,27 @@ class ChatBot {
     const r = {
       pt: {
         rastreio: '📦 Use a aba Rastreio e cole seu código (ex: CDM123456BR). Acompanhe em tempo real!',
-        pagamento: '💳 Aceitamos Stripe, cartão crédito/débito e PIX. Totalmente seguro (PCI-DSS).',
-        frete: '🚚 Entregamos em todo Brasil. Prazo: 2–7 dias úteis. Frete: R$ 15,00.',
-        produto: '🛍️ Temos Fone Bluetooth (R$ 89,90), Carregador USB-C (R$ 49,90) e mais!',
+        pagamento: '💳 Aceitamos Stripe, cartão crédito/débito. Totalmente seguro (PCI-DSS).',
+        frete: '🚚 Entregamos internacionalmente. Frete grátis acima de $199. Prazo: 5–10 dias úteis.',
+        produto: '🛍️ Temos Fone Bluetooth ($89.90), Carregador USB-C ($49.90) e mais!',
         carrinho: '🛒 Clique no ícone 🛒 para ver seu carrinho e finalizar a compra.',
         suporte: '📞 Estamos disponíveis 24/7. Use o chat ou entre em contato!',
         padrao: '😊 Pode me contar mais? Posso ajudar com produtos, rastreio, pagamento e suporte!'
       },
       en: {
         rastreio: '📦 Use the Tracking tab with your code (ex: CDM123456BR). Real-time tracking!',
-        pagamento: '💳 We accept Stripe, credit/debit card and PIX. Fully secure (PCI-DSS).',
-        frete: '🚚 We deliver across Brazil. Time: 2–7 business days. Shipping: R$ 15.00.',
-        produto: '🛍️ We have Bluetooth Headphones (R$ 89.90), USB-C Charger (R$ 49.90) and more!',
+        pagamento: '💳 We accept Stripe with credit/debit cards. Fully secure (PCI-DSS).',
+        frete: '🚚 We ship internationally. Free shipping on orders over $199. Estimated 5–10 business days.',
+        produto: '🛍️ We have Bluetooth Headphones ($89.90), USB-C Charger ($49.90) and more!',
         carrinho: '🛒 Click the 🛒 icon to view your cart and checkout.',
         suporte: '📞 We\'re available 24/7. Use chat or contact us!',
         padrao: '😊 Tell me more? I can help with products, tracking, payment and support!'
       },
       es: {
         rastreio: '📦 Usa la pestaña Rastreo con tu código (ej: CDM123456BR). ¡Seguimiento en tiempo real!',
-        pagamento: '💳 Aceptamos Stripe, tarjeta crédito/débito y PIX. Totalmente seguro (PCI-DSS).',
-        frete: '🚚 Entregamos en todo Brasil. Plazo: 2–7 días hábiles. Envío: R$ 15,00.',
-        produto: '🛍️ Tenemos Auriculares Bluetooth (R$ 89,90), Cargador USB-C (R$ 49,90) ¡y más!',
+        pagamento: '💳 Aceptamos Stripe con tarjeta crédito/débito. Totalmente seguro (PCI-DSS).',
+        frete: '🚚 Enviamos internacionalmente. Envío gratis en pedidos sobre $199. Plazo: 5–10 días hábiles.',
+        produto: '🛍️ Tenemos Auriculares Bluetooth ($89.90), Cargador USB-C ($49.90) ¡y más!',
         carrinho: '🛒 Haz clic en el icono 🛒 para ver tu carrito y finalizar la compra.',
         suporte: '📞 Estamos disponibles 24/7. ¡Usa el chat o contáctanos!',
         padrao: '😊 ¿Puedes contarme más? ¡Puedo ayudarte con productos, rastreo, pago y soporte!'

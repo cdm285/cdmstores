@@ -239,10 +239,10 @@ const state = {
 
 function detectLang() {
     const nav = navigator.language || navigator.userLanguage;
-    if (!nav) return "pt";
+    if (!nav) return "en";
     if (nav.toLowerCase().startsWith("es")) return "es";
-    if (nav.toLowerCase().startsWith("en")) return "en";
-    return "pt";
+    if (nav.toLowerCase().startsWith("pt")) return "pt";
+    return "en";
 }
 
 function applyTranslations(lang) {
@@ -291,11 +291,11 @@ function applyTranslations(lang) {
     // Traduzir labels do carrinho
     const cartLabels = document.querySelectorAll(".cart-total p");
     if (cartLabels.length >= 3) {
-        cartLabels[0].innerHTML = `${translations[lang]?.["cart.subtotal"] || "Subtotal"}: <strong>R$ <span id="cart-subtotal">0.00</span></strong>`;
-        cartLabels[2].textContent = `${translations[lang]?.["cart.shipping"] || "Frete"}: R$ 15.00`;
+        cartLabels[0].innerHTML = `${translations[lang]?.["cart.subtotal"] || "Subtotal"}: <strong>$ <span id="cart-subtotal">0.00</span></strong>`;
+        cartLabels[2].textContent = `${translations[lang]?.["cart.shipping"] || "Shipping"}: Calculated at checkout`;
     }
     const cartTotalH3 = document.querySelector(".cart-total h3");
-    if (cartTotalH3) cartTotalH3.textContent = `${translations[lang]?.["cart.total"] || "Total"}: R$ ${document.getElementById("cart-total-amount")?.textContent || "15.00"}`;
+    if (cartTotalH3) cartTotalH3.textContent = `${translations[lang]?.["cart.total"] || "Total"}: $ ${document.getElementById("cart-total-amount")?.textContent || "0.00"}`;
 
     // Traduzir produtos (se existirem na página)
     document.querySelectorAll(".card h3").forEach((el, idx) => {
@@ -309,8 +309,8 @@ function applyTranslations(lang) {
         const prodNum = Math.floor(idx / 2) + 1; // 2 p tags per card
         const descKey = `products.p${prodNum}.desc`;
         const text = translations[lang]?.[descKey];
-        if (text && el.textContent.includes("R$")) {
-            const price = el.textContent.match(/R\$ [\d,]+/)?.[0] || "";
+        if (text && el.textContent.includes("$")) {
+            const price = el.textContent.match(/\$[\d.]+/)?.[0] || "";
             el.innerHTML = `${price} - ${text}`;
         }
     });
@@ -509,7 +509,7 @@ function updateCheckoutSelection() {
     const nameKey = `products.${id}.title`;
     const name = translations[state.lang]?.[nameKey] || translations[state.lang]?.["products.p1.title"];
     const selectionLabel = translations[state.lang]?.["checkout.selection"] || "Produto";
-    const price = product.price?.toLocaleString(state.lang, { style: "currency", currency: state.lang === "en" ? "USD" : "BRL" }) || "";
+    const price = product.price?.toLocaleString('en-US', { style: "currency", currency: "USD" }) || "";
     selectionEl.textContent = `${selectionLabel} ${name} ${price ? `(${price})` : ""}`;
 }
 
@@ -652,9 +652,9 @@ function initChat() {
         // Detecção de Pagamento & Stripe
         if (lower.match(/pagamento|payment|pagar|pay|cartão|card|pix|stripe|valor|preço|price/)) {
             const responses = {
-                pt: "💳 Aceitamos Stripe com cartão crédito/débito e PIX. Totalmente seguro (PCI-DSS). Problemas? Fale com suporte!",
-                en: "💳 We accept Stripe with credit/debit cards and PIX. Fully secure (PCI-DSS). Issues? Contact support!",
-                es: "💳 Aceptamos Stripe con tarjeta crédito/débito y PIX. Totalmente seguro (PCI-DSS). ¿Problemas? ¡Contacta soporte!"
+                pt: "💳 Aceitamos Stripe com cartão crédito/débito. Totalmente seguro (PCI-DSS). Problemas? Fale com suporte!",
+                en: "💳 We accept Stripe with credit/debit cards. Fully secure (PCI-DSS). Issues? Contact support!",
+                es: "💳 Aceptamos Stripe con tarjeta crédito/débito. Totalmente seguro (PCI-DSS). ¿Problemas? ¡Contacta soporte!"
             };
             appendMsg(responses[lang] || responses.pt, "bot");
             return;
@@ -663,9 +663,9 @@ function initChat() {
         // Detecção de Frete & Envio
         if (lower.match(/frete|envio|shipping|entrega|quando|quando chega|quando llega|prazo/)) {
             const responses = {
-                pt: "🚚 Entregamos em todo Brasil com rastreio. Prazo médio: 2-7 dias úteis. Frete: R$ 15,00 (primeira compra grátis!)",
-                en: "🚚 We deliver all over Brazil with tracking. Average time: 2-7 business days. Shipping: R$ 15.00",
-                es: "🚚 Entregamos en todo Brasil con rastreo. Tiempo promedio: 2-7 días hábiles. Envío: R$ 15,00"
+                pt: "🚚 Entregamos mundialmente com rastreio. Prazo médio: 3-7 dias úteis. Frete grátis em pedidos acima de $199!",
+                en: "🚚 We deliver worldwide with tracking. Average time: 3-7 business days. Free shipping on orders over $199!",
+                es: "🚚 Entregamos a todo el mundo con rastreo. Tiempo promedio: 3-7 días hábiles. ¡Envío gratis en pedidos acima de $199!"
             };
             appendMsg(responses[lang] || responses.pt, "bot");
             return;

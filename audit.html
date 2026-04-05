@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CDM STORES — Technical Audit</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: 'Inter', system-ui, sans-serif; background: #0f172a; color: #e2e8f0; padding: 24px; }
+    h1 { color: #38bdf8; font-size: 1.6rem; margin-bottom: 4px; }
+    .subtitle { color: #64748b; font-size: 0.85rem; margin-bottom: 24px; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 16px; margin-bottom: 24px; }
+    .card { background: #1e293b; border-radius: 12px; padding: 20px; border: 1px solid #334155; }
+    .card h2 { font-size: 0.95rem; font-weight: 700; margin-bottom: 16px; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.05em; }
+    .check { display: flex; align-items: flex-start; gap: 10px; padding: 8px 0; border-bottom: 1px solid #1e3a5f22; font-size: 0.875rem; }
+    .check:last-child { border-bottom: none; }
+    .check .icon { width: 20px; height: 20px; border-radius: 4px; display: flex; align-items: center; justify-content: center; font-size: 12px; flex-shrink: 0; margin-top: 1px; }
+    .ok    { background: #052e16; border: 1px solid #166534; color: #4ade80; }
+    .fail  { background: #450a0a; border: 1px solid #991b1b; color: #f87171; }
+    .warn  { background: #422006; border: 1px solid #92400e; color: #fbbf24; }
+    .skip  { background: #1e293b; border: 1px solid #475569; color: #64748b; }
+    .check-label { flex: 1; line-height: 1.4; }
+    .check-detail { font-size: 0.76rem; color: #64748b; margin-top: 2px; }
+    .status-ok   { color: #4ade80; }
+    .status-fail { color: #f87171; }
+    .status-warn { color: #fbbf24; }
+    .btn { padding: 12px 24px; background: linear-gradient(135deg, #0ea5e9, #6366f1); color: #fff; border: none; border-radius: 8px; cursor: pointer; font-size: 0.9rem; font-weight: 600; margin-right: 12px; margin-bottom: 12px; }
+    .btn:hover { opacity: 0.9; }
+    .btn-secondary { background: #334155; }
+    .summary { background: #1e293b; border: 1px solid #334155; border-radius: 12px; padding: 20px; margin-bottom: 24px; display: flex; gap: 32px; flex-wrap: wrap; }
+    .summary-stat { text-align: center; }
+    .summary-stat .num { font-size: 2rem; font-weight: 700; display: block; }
+    .summary-stat .lbl { font-size: 0.75rem; color: #64748b; text-transform: uppercase; }
+    #log { background: #020617; border: 1px solid #1e293b; border-radius: 8px; padding: 16px; font-family: 'Courier New', monospace; font-size: 0.8rem; max-height: 300px; overflow-y: auto; white-space: pre-wrap; color: #94a3b8; }
+    .progress { height: 6px; background: #1e293b; border-radius: 3px; margin: 16px 0; overflow: hidden; }
+    .progress-bar { height: 100%; background: linear-gradient(90deg, #0ea5e9, #6366f1); border-radius: 3px; transition: width 0.4s ease; width: 0%; }
+    .running { animation: pulse 1s infinite; }
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.5} }
+  </style>
+</head>
+<body>
+
+<h1>🔍 CDM STORES — Technical Audit</h1>
+<p class="subtitle">Automated validation of all critical modules · Run Date: <span id="run-date"></span></p>
+
+<div class="progress"><div class="progress-bar" id="progress-bar"></div></div>
+
+<div class="summary">
+  <div class="summary-stat"><span class="num status-ok" id="total-ok">0</span> <span class="lbl">✅ OK</span></div>
+  <div class="summary-stat"><span class="num status-fail" id="total-fail">0</span> <span class="lbl">❌ Failed</span></div>
+  <div class="summary-stat"><span class="num status-warn" id="total-warn">0</span> <span class="lbl">⚠️ Warning</span></div>
+  <div class="summary-stat"><span class="num" id="total-all" style="color:#64748b">0</span> <span class="lbl">Total Checks</span></div>
+</div>
+
+<div style="margin-bottom: 20px;">
+  <button class="btn" onclick="runAudit()">▶ Run Full Audit</button>
+  <button class="btn btn-secondary" onclick="clearLog()">🗑 Clear</button>
+  <button class="btn btn-secondary" onclick="copyReport()">📋 Copy Report</button>
+</div>
+
+<div class="grid" id="audit-grid"></div>
+
+<h3 style="color:#64748b; margin-bottom: 12px; font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.05em;">Console Log</h3>
+<div id="log">Audit not started. Click "Run Full Audit" to begin.</div>
+
+<script>
+document.getElementById('run-date').textContent = new Date().toLocaleString('en-US');
+
+const BASE = window.location.origin + window.location.pathname.replace('audit.html', '');
+
+const CHECKS = [
+  {
+    category: '🌐 Navigation & Menu',
+    items: [
+      { id: 'nav-index', label: 'index.html loads', type: 'url', url: 'index.html' },
+      { id: 'nav-checkout', label: 'Checkout page loads', type: 'url', url: 'pages/checkout.html' },
+      { id: 'nav-tracking', label: 'Track Order page loads', type: 'url', url: 'pages/rastreio.html' },
+      { id: 'nav-hamburger', label: 'Hamburger menu exists in DOM', type: 'dom', page: 'index.html', selector: '#hamburger-btn' },
+      { id: 'nav-mobile', label: 'Mobile nav exists', type: 'dom', page: 'index.html', selector: '#mobile-nav' },
+      { id: 'nav-lang-en', label: 'Language selector has EN button', type: 'dom', page: 'index.html', selector: '[data-lang="en"]' },
+      { id: 'nav-lang-es', label: 'Language selector has ES button', type: 'dom', page: 'index.html', selector: '[data-lang="es"]' },
+    ]
+  },
+  {
+    category: '💵 Currency & USD',
+    items: [
+      { id: 'usd-promo', label: 'Promo bar shows $199 (not R$)', type: 'content', page: 'index.html', contains: '$199', notContains: 'R$&nbsp;199' },
+      { id: 'usd-products', label: 'Product cards show $ prices', type: 'content', page: 'index.html', contains: '$89.90' },
+      { id: 'usd-no-pix', label: 'No PIX payment icon in footer', type: 'content', page: 'index.html', notContains: 'title="Pix">PIX' },
+      { id: 'usd-no-bol', label: 'No Boleto payment icon in footer', type: 'content', page: 'index.html', notContains: 'title="Boleto">BOL' },
+      { id: 'usd-cart', label: 'Cart modal uses $ (not R$)', type: 'content', page: 'index.html', contains: 'id="cart-subtotal"', notContains: 'R$ <span id="cart-subtotal"' },
+      { id: 'usd-checkout', label: 'Checkout uses USD currency', type: 'content', page: 'pages/checkout.html', notContains: 'R$ 15,00' },
+    ]
+  },
+  {
+    category: '🔐 Authentication',
+    items: [
+      { id: 'auth-login-form', label: 'Login form exists', type: 'script', page: 'index.html', scriptCheck: 'AuthSystem' },
+      { id: 'auth-google', label: 'Google OAuth button configured', type: 'content', page: 'index.html', contains: 'google.com/gsi/client' },
+      { id: 'auth-modal', label: 'Auth modal injected by JS', type: 'script', check: 'auth-modal-class' },
+      { id: 'auth-register', label: 'Registration form (full fields)', type: 'content', page: 'js/auth.js', contains: 'reg-firstname' },
+      { id: 'auth-password-strength', label: 'Password strength validation', type: 'content', page: 'js/auth.js', contains: 'strength-strong' },
+      { id: 'auth-secure-cookie', label: 'Auth uses secure cookies (no localStorage token)', type: 'content', page: 'js/auth.js', contains: "credentials: 'include'", notContains: "localStorage.setItem('cdm_token'" },
+    ]
+  },
+  {
+    category: '💬 Chatbot',
+    items: [
+      { id: 'chat-fab', label: 'Chatbot FAB button JS exists', type: 'content', page: 'js/chatbot.js', contains: 'chatbot-fab' },
+      { id: 'chat-modal', label: 'Chat modal created', type: 'content', page: 'js/chatbot.js', contains: 'chatbot-modal' },
+      { id: 'chat-ai', label: 'AI backend integration (POST /api/chat)', type: 'content', page: 'js/chatbot.js', contains: '/api/chat' },
+      { id: 'chat-fallback', label: 'Local fallback replies', type: 'content', page: 'js/chatbot.js', contains: '_localReply' },
+      { id: 'chat-tracking', label: 'Chatbot handles order tracking', type: 'content', page: 'js/script.js', contains: 'Track Order' },
+    ]
+  },
+  {
+    category: '💳 Stripe Payments',
+    items: [
+      { id: 'stripe-only', label: 'Only Stripe (no PayPal/Pix/Boleto)', type: 'content', page: 'pages/checkout.html', contains: 'stripe.com', notContains: 'paypal' },
+      { id: 'stripe-btn', label: 'Pay with Stripe button exists', type: 'content', page: 'pages/checkout.html', contains: 'Pay with Stripe' },
+      { id: 'stripe-webhook', label: 'Stripe webhook route exists', type: 'content', page: 'worker/src/routes/stripe.ts', contains: 'webhook' },
+      { id: 'stripe-order', label: 'Order creation before payment', type: 'content', page: 'pages/checkout.html', contains: '/api/orders' },
+      { id: 'stripe-fallback', label: 'Direct Stripe link fallback', type: 'content', page: 'pages/checkout.html', contains: 'buy.stripe.com' },
+    ]
+  },
+  {
+    category: '🚢 Shipping & Free Shipping',
+    items: [
+      { id: 'ship-199', label: 'Free shipping on $199+ orders', type: 'content', page: 'frontend-integration.js', contains: '199' },
+      { id: 'ship-dynamic', label: 'Dynamic shipping calc in cart', type: 'content', page: 'frontend-integration.js', contains: 'subtotal >= 199' },
+      { id: 'ship-display', label: 'Shipping display element exists', type: 'content', page: 'index.html', contains: 'cart-shipping-display' },
+    ]
+  },
+  {
+    category: '📱 Responsiveness',
+    items: [
+      { id: 'resp-viewport', label: 'Viewport meta tag set', type: 'content', page: 'index.html', contains: 'width=device-width' },
+      { id: 'resp-mobile-css', label: 'mobile.css loaded', type: 'content', page: 'index.html', contains: 'mobile.css' },
+      { id: 'resp-hamburger-css', label: 'Hamburger CSS (display:none on desktop)', type: 'content', page: 'css/mobile.css', contains: 'hamburger' },
+      { id: 'resp-grid', label: 'Responsive product grid', type: 'content', page: 'css/mobile.css', contains: 'grid-template-columns: 1fr' },
+    ]
+  },
+  {
+    category: '🌍 Internationalization',
+    items: [
+      { id: 'i18n-en', label: 'English translations defined', type: 'content', page: 'js/script.js', contains: '"nav.home": "Home"' },
+      { id: 'i18n-es', label: 'Spanish translations defined', type: 'content', page: 'js/script.js', contains: '"nav.home": "Inicio"' },
+      { id: 'i18n-pt', label: 'Portuguese translations defined', type: 'content', page: 'js/script.js', contains: '"nav.home": "In\u00edcio"' },
+      { id: 'i18n-default-en', label: 'Default language is EN', type: 'content', page: 'js/script.js', contains: 'return "en"' },
+      { id: 'i18n-data-attr', label: 'data-i18n attributes in HTML', type: 'content', page: 'index.html', contains: 'data-i18n=' },
+    ]
+  },
+  {
+    category: '🔒 Security',
+    items: [
+      { id: 'sec-xss', label: 'XSS escape function exists', type: 'content', page: 'frontend-integration.js', contains: 'escapeHtml' },
+      { id: 'sec-https', label: 'API uses HTTPS', type: 'content', page: 'js/auth.js', contains: 'https://cdmstores.com/api' },
+      { id: 'sec-no-token-ls', label: 'No token in localStorage (auth)', type: 'content', page: 'js/auth.js', notContains: "localStorage.setItem('token'" },
+      { id: 'sec-httponly', label: 'HttpOnly cookies comment', type: 'content', page: 'js/auth.js', contains: 'HttpOnly' },
+      { id: 'sec-lang', label: 'HTML lang attribute set', type: 'content', page: 'index.html', contains: '<html lang="en"' },
+    ]
+  }
+];
+
+let results = {};
+let log = '';
+
+function addLog(msg, type = 'info') {
+  const colors = { info: '#94a3b8', ok: '#4ade80', fail: '#f87171', warn: '#fbbf24' };
+  const color = colors[type] || colors.info;
+  log += `<span style="color:${color}">${new Date().toLocaleTimeString()} [${type.toUpperCase()}] ${msg}</span>\n`;
+  document.getElementById('log').innerHTML = log;
+  document.getElementById('log').scrollTop = 9999;
+}
+
+function updateSummary() {
+  const vals = Object.values(results);
+  const ok   = vals.filter(r => r === 'ok').length;
+  const fail = vals.filter(r => r === 'fail').length;
+  const warn = vals.filter(r => r === 'warn').length;
+  document.getElementById('total-ok').textContent   = ok;
+  document.getElementById('total-fail').textContent  = fail;
+  document.getElementById('total-warn').textContent  = warn;
+  document.getElementById('total-all').textContent   = vals.length;
+}
+
+async function fetchText(path) {
+  try {
+    const r = await fetch(BASE + path, { cache: 'no-cache' });
+    if (!r.ok) return null;
+    return await r.text();
+  } catch (_) { return null; }
+}
+
+async function runCheck(item) {
+  const el = document.getElementById('check-' + item.id);
+
+  if (item.type === 'url') {
+    const t = await fetchText(item.url);
+    return t !== null ? 'ok' : 'fail';
+  }
+
+  if (item.type === 'content') {
+    const t = await fetchText(item.page);
+    if (t === null) return 'warn'; // can't fetch (CORS in some servers)
+    let status = 'ok';
+    if (item.contains && !t.includes(item.contains)) status = 'fail';
+    if (item.notContains && t.includes(item.notContains)) status = 'fail';
+    return status;
+  }
+
+  if (item.type === 'dom') {
+    const t = await fetchText(item.page);
+    if (t === null) return 'warn';
+    return t.includes(item.selector.replace('#', 'id="').replace('.', 'class="')) ? 'ok' : 'fail';
+  }
+
+  if (item.type === 'script') {
+    if (item.check === 'auth-modal-class') {
+      const t = await fetchText('js/auth.js');
+      return t && t.includes('auth-modal') ? 'ok' : 'fail';
+    }
+    if (item.scriptCheck === 'AuthSystem') {
+      const t = await fetchText('js/auth.js');
+      return t && t.includes('class AuthSystem') ? 'ok' : 'fail';
+    }
+    return 'warn';
+  }
+
+  return 'warn';
+}
+
+function setCheckStatus(id, status) {
+  const el = document.getElementById('icon-' + id);
+  const detailEl = document.getElementById('detail-' + id);
+  if (!el) return;
+  results[id] = status;
+  if (status === 'ok') {
+    el.className = 'icon ok'; el.textContent = '✓';
+    if (detailEl) { detailEl.textContent = 'PASSED'; detailEl.className = 'check-detail status-ok'; }
+  } else if (status === 'fail') {
+    el.className = 'icon fail'; el.textContent = '✗';
+    if (detailEl) { detailEl.textContent = 'FAILED'; detailEl.className = 'check-detail status-fail'; }
+  } else {
+    el.className = 'icon warn'; el.textContent = '⚠';
+    if (detailEl) { detailEl.textContent = 'WARNING'; detailEl.className = 'check-detail status-warn'; }
+  }
+  updateSummary();
+}
+
+function buildGrid() {
+  const grid = document.getElementById('audit-grid');
+  grid.innerHTML = '';
+  CHECKS.forEach(section => {
+    const card = document.createElement('div');
+    card.className = 'card';
+    card.innerHTML = `<h2>${section.category}</h2>` +
+      section.items.map(item => `
+        <div class="check" id="check-${item.id}">
+          <div class="icon skip" id="icon-${item.id}">–</div>
+          <div class="check-label">
+            ${item.label}
+            <div class="check-detail" id="detail-${item.id}">Pending</div>
+          </div>
+        </div>
+      `).join('');
+    grid.appendChild(card);
+  });
+}
+
+async function runAudit() {
+  log = '';
+  results = {};
+  buildGrid();
+  addLog('Starting CDM STORES Technical Audit...', 'info');
+  addLog(`Base URL: ${BASE}`, 'info');
+
+  const allItems = CHECKS.flatMap(s => s.items);
+  let done = 0;
+
+  for (const item of allItems) {
+    addLog(`Checking: ${item.label}`, 'info');
+    const status = await runCheck(item);
+    setCheckStatus(item.id, status);
+    done++;
+    document.getElementById('progress-bar').style.width = `${(done / allItems.length) * 100}%`;
+
+    const msg = `${item.label}: ${status.toUpperCase()}`;
+    addLog(msg, status);
+    await new Promise(r => setTimeout(r, 50));
+  }
+
+  const ok   = Object.values(results).filter(r => r === 'ok').length;
+  const fail = Object.values(results).filter(r => r === 'fail').length;
+  const warn = Object.values(results).filter(r => r === 'warn').length;
+
+  addLog('', 'info');
+  addLog('═══════════════════════════════════════════', 'info');
+  addLog(`AUDIT COMPLETE`, 'info');
+  addLog(`✅ OK: ${ok} | ❌ Failed: ${fail} | ⚠️ Warning: ${warn}`, fail > 0 ? 'fail' : 'ok');
+  addLog(`Score: ${Math.round((ok / allItems.length) * 100)}%`, ok > allItems.length * 0.8 ? 'ok' : 'warn');
+  addLog('═══════════════════════════════════════════', 'info');
+}
+
+function clearLog() {
+  log = '';
+  document.getElementById('log').textContent = 'Log cleared.';
+  document.getElementById('progress-bar').style.width = '0%';
+}
+
+function copyReport() {
+  const vals = Object.entries(results);
+  const lines = ['CDM STORES Audit Report — ' + new Date().toLocaleString('en-US'), ''];
+  CHECKS.forEach(section => {
+    lines.push(section.category);
+    section.items.forEach(item => {
+      const s = results[item.id] || 'pending';
+      const icon = s === 'ok' ? '✅' : s === 'fail' ? '❌' : '⚠️';
+      lines.push(`  ${icon} ${item.label}: ${s.toUpperCase()}`);
+    });
+    lines.push('');
+  });
+  navigator.clipboard?.writeText(lines.join('\n')) || alert(lines.join('\n'));
+}
+
+buildGrid();
+</script>
+</body>
+</html>

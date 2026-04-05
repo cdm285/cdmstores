@@ -1,19 +1,20 @@
 <!DOCTYPE html>
-<html lang="pt-BR">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="description" content="Finalizar pagamento com segurança — CDM STORES">
-    <title>Finalizar Pagamento · CDM STORES</title>
+    <meta name="description" content="Secure checkout — CDM STORES">
+    <title>Checkout · CDM STORES</title>
 
     <link rel="stylesheet" href="../css/global.css">
     <link rel="stylesheet" href="../css/mobile.css">
+    <script src="https://js.stripe.com/v3/" defer></script>
 </head>
 
 <body>
 
     <div class="promo-bar">
-        <p>🔒 Pagamento 100% Seguro · SSL 256-bit · PCI-DSS</p>
+        <p>🔒 100% Secure Payment · SSL 256-bit · PCI-DSS</p>
     </div>
 
     <header class="header" id="site-header">
@@ -33,9 +34,9 @@
                 <a href="rastreio.html" class="nav-link" data-i18n="nav.track">Rastreio</a>
             </nav>
             <div class="desktop-lang" role="group" aria-label="Idioma">
-                <button class="desktop-lang-btn active" data-lang="pt" aria-pressed="true">PT</button>
+                <button class="desktop-lang-btn" data-lang="pt" aria-pressed="false">PT</button>
                 <span class="desktop-lang-sep">|</span>
-                <button class="desktop-lang-btn" data-lang="en" aria-pressed="false">EN</button>
+                <button class="desktop-lang-btn active" data-lang="en" aria-pressed="true">EN</button>
                 <span class="desktop-lang-sep">|</span>
                 <button class="desktop-lang-btn" data-lang="es" aria-pressed="false">ES</button>
             </div>
@@ -97,16 +98,16 @@
                 <p id="cart-summary" style="font-size:0.9rem;">Carregando...</p>
             </div>
 
-            <label for="checkout-email" style="display:block; font-size:0.85rem; font-weight:600; margin-bottom:6px; color:var(--text-secondary);">Email para recibo</label>
-            <input type="email" id="checkout-email" placeholder="seu@email.com"
+            <label for="checkout-email" style="display:block; font-size:0.85rem; font-weight:600; margin-bottom:6px; color:var(--text-secondary);">Email for receipt</label>
+            <input type="email" id="checkout-email" placeholder="your@email.com"
                    style="width:100%; padding:11px 14px; margin-bottom:16px; border:1px solid var(--border); border-radius:var(--radius-sm); font-size:0.9rem; font-family:inherit; transition:border-color 0.2s;"
-                   aria-label="Email para recibo do pedido">
+                   aria-label="Email for order receipt">
 
             <button class="btn-hero" id="btn-stripe" onclick="checkoutStripe()" style="width:100%; justify-content:center;">
-                🔒 Pagar com Stripe
+                🔒 Pay with Stripe
             </button>
 
-            <a href="../index.html" class="link-voltar">← Voltar para a loja</a>
+            <a href="../index.html" class="link-voltar">← Back to store</a>
         </div>
     </section>
 
@@ -123,11 +124,11 @@
             const items = cdmStore.cart.items;
             const summary = document.getElementById('cart-summary');
             if (items.length === 0) {
-                summary.innerHTML = '<p>Carrinho vazio — <a href="../index.html">voltar à loja</a></p>';
+                summary.innerHTML = '<p>Cart is empty — <a href="../index.html">back to store</a></p>';
                 return;
             }
-            const prices = {1: 89.90, 2: 49.90, 3: 29.90};
-            const names  = {1: 'Fone Bluetooth', 2: 'Carregador USB-C', 3: 'Cabo Lightning'};
+            const prices = {1: 89.90, 2: 49.90, 3: 29.90, 4: 149.90};
+            const names  = {1: 'Bluetooth Headphones', 2: 'USB-C Charger 65W', 3: 'Lightning Cable 2m', 4: 'Portable Speaker'};
             let html = '<ul style="list-style:none;padding:0;margin:0;">';
             let total = 0;
             items.forEach(item => {
@@ -137,19 +138,19 @@
                 total += sub;
                 html += `<li style="padding:6px 0;border-bottom:1px solid var(--border);font-size:0.9rem;display:flex;justify-content:space-between;">
                     <span>${name} × ${item.quantity}</span>
-                    <strong>R$ ${sub.toFixed(2)}</strong>
+                    <strong>$${sub.toFixed(2)}</strong>
                 </li>`;
             });
             html += `</ul>
             <div style="margin-top:12px;font-size:0.9rem;">
                 <div style="display:flex;justify-content:space-between;padding:6px 0;color:var(--text-secondary);">
-                    <span>Subtotal</span><span>R$ ${total.toFixed(2)}</span>
+                    <span>Subtotal</span><span>$${total.toFixed(2)}</span>
                 </div>
                 <div style="display:flex;justify-content:space-between;padding:6px 0;color:var(--text-secondary);">
-                    <span>Frete</span><span>R$ 15,00</span>
+                    <span>Shipping</span><span>${total >= 199 ? 'Free 🎉' : '$9.99'}</span>
                 </div>
                 <div style="display:flex;justify-content:space-between;padding:8px 0;font-weight:700;font-size:1.05rem;border-top:2px solid var(--border);margin-top:4px;">
-                    <span>Total</span><span>R$ ${(total + 15).toFixed(2)}</span>
+                    <span>Total</span><span>$${(total >= 199 ? total : total + 9.99).toFixed(2)}</span>
                 </div>
             </div>`;
             summary.innerHTML = html;
@@ -159,27 +160,25 @@
         async function checkoutStripe() {
             const email = document.getElementById('checkout-email').value;
             if (!email || !email.includes('@')) {
-                mostrarNotificacao('Digite um email válido', 'warning');
+                mostrarNotificacao('Please enter a valid email', 'warning');
                 return;
             }
 
             const cartItems = JSON.parse(localStorage.getItem('cdm_cart') || '[]');
             if (!cartItems.length) {
-                mostrarNotificacao('Carrinho vazio', 'warning');
-                return;
+                mostrarNotificacao('Cart is empty', 'warning');
             }
 
             const btn = document.getElementById('btn-stripe');
             btn.disabled = true;
-            btn.textContent = 'Processando...';
+            btn.textContent = 'Processing...';
 
             // Dados completos de produto para Stripe
             const productData = {
-                1: { name: 'Fone Bluetooth Premium', price: 89.90, stripeLink: 'https://buy.stripe.com/test_6oE5mTgBi1mP2owbII' },
-                2: { name: 'Carregador USB-C 65W',   price: 49.90, stripeLink: 'https://buy.stripe.com/test_cN28zJaBO9tz36E3cc' },
-                3: { name: 'Cabo Lightning 2m',       price: 29.90, stripeLink: 'https://buy.stripe.com/test_cN22a95amfUr1MAfZ0' },
-                4: { name: 'Caixa de Som Portátil',   price: 149.90, stripeLink: 'https://buy.stripe.com/test_6oE5mTgBi1mP2owbII' }
-            };
+                1: { name: 'Bluetooth Premium Headphones', price: 89.90, stripeLink: 'https://buy.stripe.com/test_6oE5mTgBi1mP2owbII' },
+                2: { name: 'USB-C Charger 65W',   price: 49.90, stripeLink: 'https://buy.stripe.com/test_cN28zJaBO9tz36E3cc' },
+                3: { name: 'Lightning Cable 2m',       price: 29.90, stripeLink: 'https://buy.stripe.com/test_cN22a95amfUr1MAfZ0' },
+                4: { name: 'Portable Speaker',   price: 149.90, stripeLink: 'https://buy.stripe.com/test_6oE5mTgBi1mP2owbII' }
 
             const enrichedItems = cartItems.map(i => {
                 const pid = i.product_id || i.id;
@@ -227,7 +226,7 @@
                 const fallbackLink = (productData[pid] || productData[1]).stripeLink;
                 window.open(fallbackLink, '_blank', 'noopener');
                 btn.disabled = false;
-                btn.textContent = '🔒 Pagar com Stripe';
+                btn.textContent = '🔒 Pay with Stripe';
             }
         }
 

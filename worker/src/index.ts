@@ -5,6 +5,7 @@
 import { createHash, createHmac, randomBytes, scryptSync, timingSafeEqual } from 'node:crypto';
 import { orchestrator }        from './agents/orchestrator.js';
 import { handleChatRequest }   from './routes/chat.js';
+import { handleOrganicRequest } from './routes/organic.js';
 
 // ─── SECURITY HEADERS (OWASP ASVS 14.4, PCI-DSS 6.2.4) ──────────────────────
 const SECURITY_HEADERS: Record<string, string> = {
@@ -2424,6 +2425,11 @@ async function handleRequest(request: Request, env: Env) {
   // ===== CHATBOT (via routes/chat.ts → agents/00-orchestrator.ts) =====
   if (path === '/api/chat' && request.method === 'POST') {
     return handleChatRequest(request, env);
+  }
+
+  // ===== ORGANIC TRAFFIC ORCHESTRATOR =====
+  if (path.startsWith('/api/organic')) {
+    return handleOrganicRequest(request, env as unknown as import('./core/types.js').AgentEnv);
   }
 
   // ===== AGENDAMENTO =====

@@ -1,0 +1,36 @@
+# ─── .dev.vars — Variáveis locais para wrangler dev ──────────────────────────
+# Copie este arquivo para .dev.vars e preencha os valores de TESTE.
+# NUNCA commite .dev.vars (está no .gitignore).
+# Estes valores SÓ são lidos pelo "wrangler dev" local — nunca vão ao Cloudflare.
+
+# Stripe (use chaves de TEST sk_test_...)
+STRIPE_SECRET_KEY=sk_test_REPLACE_ME
+STRIPE_WEBHOOK_SECRET=whsec_REPLACE_ME
+STRIPE_PUBLISHABLE_KEY=pk_test_REPLACE_ME
+
+# CJdropshipping
+CJ_API_KEY=REPLACE_ME
+
+# Auth / JWT  (mín. 64 chars — gerar com o comando abaixo)
+# PowerShell: [Convert]::ToBase64String((1..64|%{Get-Random -Max 256}))
+JWT_SECRET=REPLACE_WITH_64_CHAR_RANDOM_STRING
+
+# E-mail transacional (Resend)
+RESEND_API_KEY=re_REPLACE_ME
+
+# App URL (local)
+APP_URL=http://localhost:8787
+
+# Cloudflare Turnstile (use a chave de teste: 1x0000000000000000000000000000000AA)
+TURNSTILE_SECRET_KEY=1x0000000000000000000000000000000AA
+
+# Google OAuth
+GOOGLE_CLIENT_ID=REPLACE_ME.apps.googleusercontent.com
+GOOGLE_CLIENT_SECRET=REPLACE_ME
+
+# Facebook OAuth
+FACEBOOK_APP_ID=REPLACE_ME
+FACEBOOK_APP_SECRET=REPLACE_ME
+
+# Organic Traffic Orchestrator — chave de acesso admin
+ORGANIC_ADMIN_KEY=REPLACE_WITH_STRONG_RANDOM_STRING

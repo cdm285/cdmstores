@@ -334,12 +334,12 @@ class AuthSystem {
     const gSvg = `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/><path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/><path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/><path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/></svg>`;
     const fSvg = `<svg width="20" height="20" viewBox="0 0 24 24" fill="white" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/></svg>`;
     return `
-      <div class="auth-or-divider">OU</div>
+      <div class="auth-or-divider">OR</div>
       <button type="button" id="google-${formPrefix}-btn" class="oauth-btn oauth-btn-google">
-        ${gSvg} Continuar com Google
+        ${gSvg} Continue with Google
       </button>
       <button type="button" id="facebook-${formPrefix}-btn" class="oauth-btn oauth-btn-facebook">
-        ${fSvg} Continuar com Facebook
+        ${fSvg} Continue with Facebook
       </button>
     `;
   }
@@ -362,52 +362,52 @@ class AuthSystem {
 
         <!-- ═══ LOGIN ═══ -->
         <form class="auth-form" id="login-form" style="display:block;">
-          <h2>Entrar</h2>
+          <h2>Sign In</h2>
           <div id="login-error" role="alert"></div>
-          <input type="email" id="login-email" name="email" placeholder="E-mail" required autocomplete="email">
-          <input type="password" id="login-password" name="password" placeholder="Senha" required autocomplete="current-password">
-          <button type="submit">Entrar</button>
+          <input type="email" id="login-email" name="email" placeholder="Email" required autocomplete="email">
+          <input type="password" id="login-password" name="password" placeholder="Password" required autocomplete="current-password">
+          <button type="submit">Sign In</button>
           ${this.createOAuthButtons('login')}
           <div class="auth-toggle">
-            Não tem conta? <button type="button" id="show-register-btn">Criar conta grátis</button>
+            No account? <button type="button" id="show-register-btn">Create free account</button>
           </div>
         </form>
 
         <!-- ═══ CADASTRO COMPLETO ═══ -->
         <form class="auth-form" id="register-form" style="display:none;">
-          <h2>Criar Conta</h2>
+          <h2>Create Account</h2>
           <div id="register-error" role="alert"></div>
 
-          <div class="auth-section-label">Informações Pessoais</div>
+          <div class="auth-section-label">Personal Information</div>
           <div class="auth-row-2">
-            <input type="text" id="reg-firstname" placeholder="Nome *" required autocomplete="given-name">
-            <input type="text" id="reg-lastname"  placeholder="Sobrenome *" required autocomplete="family-name">
+            <input type="text" id="reg-firstname" placeholder="First Name *" required autocomplete="given-name">
+            <input type="text" id="reg-lastname"  placeholder="Last Name *" required autocomplete="family-name">
           </div>
-          <input type="email" id="reg-email" placeholder="E-mail *" required autocomplete="email">
-          <input type="tel"   id="reg-phone" placeholder="Telefone * ex: 11999990000" required autocomplete="tel">
+          <input type="email" id="reg-email" placeholder="Email *" required autocomplete="email">
+          <input type="tel"   id="reg-phone" placeholder="Phone * e.g. +1 555 000 0000" required autocomplete="tel">
 
-          <div class="auth-section-label">Senha</div>
-          <input type="password" id="reg-password"         placeholder="Senha * (mín. 8 caracteres)" required autocomplete="new-password">
-          <input type="password" id="reg-confirm-password" placeholder="Confirmar senha *"           required autocomplete="new-password">
+          <div class="auth-section-label">Password</div>
+          <input type="password" id="reg-password"         placeholder="Password * (min. 8 characters)" required autocomplete="new-password">
+          <input type="password" id="reg-confirm-password" placeholder="Confirm Password *"           required autocomplete="new-password">
           <div class="auth-password-strength" id="reg-strength" aria-live="polite"></div>
 
-          <div class="auth-section-label">Endereço de Entrega</div>
-          <input type="text" id="reg-street"     placeholder="Rua / Avenida *" required autocomplete="street-address">
+          <div class="auth-section-label">Delivery Address</div>
+          <input type="text" id="reg-street"     placeholder="Street / Avenue *" required autocomplete="street-address">
           <div class="auth-row-2">
-            <input type="text" id="reg-number"     placeholder="Número *" required>
-            <input type="text" id="reg-complement" placeholder="Complemento" autocomplete="address-line2">
+            <input type="text" id="reg-number"     placeholder="Number *" required>
+            <input type="text" id="reg-complement" placeholder="Apt / Suite" autocomplete="address-line2">
           </div>
-          <input type="text" id="reg-city" placeholder="Cidade *" required autocomplete="address-level2">
+          <input type="text" id="reg-city" placeholder="City *" required autocomplete="address-level2">
           <div class="auth-row-2">
-            <input type="text" id="reg-state"   placeholder="Estado (UF) *" required maxlength="2" style="text-transform:uppercase;" autocomplete="address-level1">
-            <input type="text" id="reg-zipcode" placeholder="CEP *" required maxlength="9" autocomplete="postal-code">
+            <input type="text" id="reg-state"   placeholder="State / Province *" required maxlength="50" style="text-transform:uppercase;" autocomplete="address-level1">
+            <input type="text" id="reg-zipcode" placeholder="ZIP / Postal Code *" required maxlength="12" autocomplete="postal-code">
           </div>
-          <input type="text" id="reg-country" placeholder="País *" value="Brasil" required autocomplete="country-name">
+          <input type="text" id="reg-country" placeholder="Country *" value="United States" required autocomplete="country-name">
 
-          <button type="submit">Criar Conta</button>
+          <button type="submit">Create Account</button>
           ${this.createOAuthButtons('register')}
           <div class="auth-toggle">
-            Já tem conta? <button type="button" id="show-login-btn">Entrar</button>
+            Already have an account? <button type="button" id="show-login-btn">Sign In</button>
           </div>
         </form>
       </div>
@@ -458,15 +458,14 @@ class AuthSystem {
       const v  = e.target.value;
       if (!v) { el.textContent = ''; return; }
       const score = (v.length >= 8 ? 1 : 0) + (/[A-Z]/.test(v) ? 1 : 0) + (/\d/.test(v) ? 1 : 0) + (/[^A-Za-z0-9]/.test(v) ? 1 : 0);
-      if (score <= 1) { el.className = 'auth-password-strength strength-weak';   el.textContent = '🔴 Senha fraca'; }
-      else if (score === 2) { el.className = 'auth-password-strength strength-medium'; el.textContent = '🟡 Senha média'; }
-      else { el.className = 'auth-password-strength strength-strong'; el.textContent = '🟢 Senha forte'; }
+      if (score <= 1) { el.className = 'auth-password-strength strength-weak';   el.textContent = '🔴 Weak password'; }
+      else if (score === 2) { el.className = 'auth-password-strength strength-medium'; el.textContent = '🟡 Medium password'; }
+      else { el.className = 'auth-password-strength strength-strong'; el.textContent = '🟢 Strong password'; }
     });
 
-    // Auto-formato CEP
+    // ZIP code auto format (international)
     document.getElementById('reg-zipcode')?.addEventListener('input', (e) => {
-      let v = e.target.value.replace(/\D/g, '').slice(0, 8);
-      if (v.length > 5) v = v.slice(0, 5) + '-' + v.slice(5);
+      let v = e.target.value.replace(/\s/g, '').slice(0, 12);
       e.target.value = v;
     });
 
@@ -474,7 +473,7 @@ class AuthSystem {
     const handleGoogle = () => {
       const clientId = window.GOOGLE_CLIENT_ID || '';
       if (!clientId || typeof google === 'undefined' || !google?.accounts?.id) {
-        this._showError('login-error', 'Google Sign-In não configurado. Defina window.GOOGLE_CLIENT_ID.');
+        this._showError('login-error', 'Google Sign-In not configured. Set window.GOOGLE_CLIENT_ID.');
         document.getElementById('login-form').style.display = 'block';
         document.getElementById('register-form').style.display = 'none';
         return;
@@ -483,13 +482,13 @@ class AuthSystem {
         google.accounts.id.initialize({ client_id: clientId, callback: (r) => this.loginWithGoogle(r) });
         google.accounts.id.prompt((notification) => {
           if (notification.isNotDisplayed() || notification.isSkippedMoment()) {
-            // Fallback: abre popup do Google manualmente
+            // Fallback: open Google popup manually
             const authUrl = `https://accounts.google.com/o/oauth2/auth?client_id=${encodeURIComponent(clientId)}&redirect_uri=${encodeURIComponent(window.location.origin)}&response_type=token&scope=email+profile`;
             window.open(authUrl, 'google-login', 'width=500,height=600');
           }
         });
       } catch (err) {
-        this._showError('login-error', 'Erro ao inicializar Google Sign-In.');
+        this._showError('login-error', 'Failed to initialize Google Sign-In.');
         document.getElementById('login-form').style.display = 'block';
         document.getElementById('register-form').style.display = 'none';
       }
@@ -501,7 +500,7 @@ class AuthSystem {
     // Facebook OAuth
     const handleFacebook = () => {
       if (typeof FB === 'undefined') {
-        alert('Facebook SDK não carregado. Adicione o SDK do Facebook ao site.');
+        alert('Facebook SDK not loaded. Please add the Facebook SDK to the site.');
         return;
       }
       FB.login((res) => { if (res.status === 'connected') this.loginWithFacebook(res); }, { scope: 'email,public_profile' });
@@ -528,20 +527,18 @@ class AuthSystem {
     const city       = g('reg-city');
     const state      = g('reg-state').toUpperCase();
     const zipcode    = g('reg-zipcode').replace(/\D/g, '');
-    const country    = g('reg-country') || 'Brasil';
+    const country    = g('reg-country') || 'United States';
 
     const err = (msg) => this._showError('register-error', msg);
 
-    if (!firstname || !lastname)                               { err('Nome e sobrenome são obrigatórios.'); return; }
-    if (!email || !email.includes('@') || !email.includes('.')) { err('E-mail inválido.'); return; }
-    if (phone.length < 10 || phone.length > 11)                { err('Telefone inválido. Use DDD + número (10 ou 11 dígitos).'); return; }
-    if (password.length < 8)                                   { err('A senha deve ter pelo menos 8 caracteres.'); return; }
-    if (!/[A-Z]/.test(password))                               { err('A senha deve ter pelo menos uma letra maiúscula.'); return; }
-    if (!/\d/.test(password))                                  { err('A senha deve conter pelo menos um número.'); return; }
-    if (password !== confirmPwd)                               { err('As senhas não coincidem.'); return; }
-    if (!street || !number || !city)                           { err('Preencha todos os campos de endereço obrigatórios.'); return; }
-    if (!state || state.length !== 2)                          { err('Estado inválido (use a sigla de 2 letras, ex: SP).'); return; }
-    if (zipcode.length !== 8)                                  { err('CEP inválido (deve ter 8 dígitos).'); return; }
+    if (!firstname || !lastname)                               { err('First and last name are required.'); return; }
+    if (!email || !email.includes('@') || !email.includes('.')) { err('Invalid email address.'); return; }
+    if (phone.length < 7)                                      { err('Invalid phone number.'); return; }
+    if (password.length < 8)                                   { err('Password must be at least 8 characters.'); return; }
+    if (!/[A-Z]/.test(password))                               { err('Password must contain at least one uppercase letter.'); return; }
+    if (!/\d/.test(password))                                  { err('Password must contain at least one number.'); return; }
+    if (password !== confirmPwd)                               { err('Passwords do not match.'); return; }
+    if (!street || !number || !city)                           { err('Please fill in all required address fields.'); return; }
 
     const address = { street, number, complement, city, state, zipcode, country };
     this.register(`${firstname} ${lastname}`, email, password, phone, address);
@@ -566,17 +563,17 @@ class AuthSystem {
       });
       const data = await response.json();
       if (!data.success) {
-        if (errEl) errEl.innerHTML = `<div class="auth-error">${_escHtml(data.error || 'Erro ao registrar')}</div>`;
+        if (errEl) errEl.innerHTML = `<div class="auth-error">${_escHtml(data.error || 'Registration failed')}</div>`;
         return;
       }
       currentUser = data.user;
-      if (errEl) errEl.innerHTML = `<div class="auth-success">✅ Conta criada com sucesso!</div>`;
+      if (errEl) errEl.innerHTML = `<div class="auth-success">✅ Account created successfully!</div>`;
       setTimeout(() => {
         document.getElementById('auth-modal')?.classList.remove('active');
         this.updateUIForLoggedIn();
       }, 1200);
     } catch (_) {
-      if (errEl) errEl.innerHTML = `<div class="auth-error">Erro de conexão. Tente novamente.</div>`;
+      if (errEl) errEl.innerHTML = `<div class="auth-error">Connection error. Please try again.</div>`;
     }
   }
 
@@ -594,17 +591,17 @@ class AuthSystem {
       });
       const data = await response.json();
       if (!data.success) {
-        if (errEl) errEl.innerHTML = `<div class="auth-error">${_escHtml(data.error || 'Credenciais inválidas')}</div>`;
+        if (errEl) errEl.innerHTML = `<div class="auth-error">${_escHtml(data.error || 'Invalid credentials')}</div>`;
         return;
       }
       currentUser = data.user;
-      if (errEl) errEl.innerHTML = `<div class="auth-success">✅ Login realizado!</div>`;
+      if (errEl) errEl.innerHTML = `<div class="auth-success">✅ Login successful!</div>`;
       setTimeout(() => {
         document.getElementById('auth-modal')?.classList.remove('active');
         this.updateUIForLoggedIn();
       }, 600);
     } catch (_) {
-      if (errEl) errEl.innerHTML = `<div class="auth-error">Erro de conexão. Tente novamente.</div>`;
+      if (errEl) errEl.innerHTML = `<div class="auth-error">Connection error. Please try again.</div>`;
     }
   }
 
@@ -632,11 +629,11 @@ class AuthSystem {
         body: JSON.stringify({ idToken: response.credential })
       });
       const data = await res.json();
-      if (!data.success) { alert(_escHtml(data.error) || 'Erro ao fazer login com Google'); return; }
+      if (!data.success) { alert(_escHtml(data.error) || 'Google login failed'); return; }
       currentUser = data.user;
       document.getElementById('auth-modal')?.classList.remove('active');
       this.updateUIForLoggedIn();
-    } catch (_) { alert('Erro ao fazer login com Google. Tente novamente.'); }
+    } catch (_) { alert('Google login failed. Please try again.'); }
   }
 
   /* ────────────────────────────────────────────────────────────────
@@ -654,11 +651,11 @@ class AuthSystem {
         })
       });
       const data = await res.json();
-      if (!data.success) { alert(_escHtml(data.error) || 'Erro ao fazer login com Facebook'); return; }
+      if (!data.success) { alert(_escHtml(data.error) || 'Facebook login failed'); return; }
       currentUser = data.user;
       document.getElementById('auth-modal')?.classList.remove('active');
       this.updateUIForLoggedIn();
-    } catch (_) { alert('Erro ao fazer login com Facebook. Tente novamente.'); }
+    } catch (_) { alert('Facebook login failed. Please try again.'); }
   }
 
   /* ────────────────────────────────────────────────────────────────
@@ -671,11 +668,11 @@ class AuthSystem {
     panel.className = 'user-panel';
     panel.setAttribute('role', 'menu');
     panel.innerHTML = `
-      <div class="user-panel-header" id="user-name">Usuário</div>
-      <div class="user-panel-item" onclick="location.href='profile.html'"   role="menuitem" tabindex="0">👤 Perfil</div>
-      <div class="user-panel-item" onclick="location.href='orders.html'"    role="menuitem" tabindex="0">📦 Meus Pedidos</div>
-      <div class="user-panel-item" onclick="location.href='addresses.html'" role="menuitem" tabindex="0">📍 Endereços</div>
-      <div class="user-panel-item user-panel-logout" onclick="window.authSystem?.logout()" role="menuitem" tabindex="0">🚪 Sair</div>
+      <div class="user-panel-header" id="user-name">User</div>
+      <div class="user-panel-item" onclick="location.href='profile.html'"   role="menuitem" tabindex="0">👤 Profile</div>
+      <div class="user-panel-item" onclick="location.href='orders.html'"    role="menuitem" tabindex="0">📦 My Orders</div>
+      <div class="user-panel-item" onclick="location.href='addresses.html'" role="menuitem" tabindex="0">📍 Addresses</div>
+      <div class="user-panel-item user-panel-logout" onclick="window.authSystem?.logout()" role="menuitem" tabindex="0">🚪 Sign Out</div>
     `;
     document.body.appendChild(panel);
 
@@ -698,16 +695,16 @@ class AuthSystem {
     if (fab && currentUser) {
       const initial = currentUser.name?.charAt(0)?.toUpperCase() || '?';
       fab.textContent = initial;
-      fab.title = `Logado como ${currentUser.name}`;
+      fab.title = `Signed in as ${currentUser.name}`;
     }
     const el = document.getElementById('user-name');
-    if (el && currentUser) el.textContent = currentUser.name || 'Usuário';
+    if (el && currentUser) el.textContent = currentUser.name || 'User';
     window.currentUser = currentUser;
   }
 
   updateUIForLoggedOut() {
     const fab = document.getElementById('fab-login');
-    if (fab) { fab.innerHTML = '👤'; fab.title = 'Entrar / Login'; }
+    if (fab) { fab.innerHTML = '👤'; fab.title = 'Sign In / Login'; }
     window.currentUser = null;
   }
 

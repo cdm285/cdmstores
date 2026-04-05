@@ -62,7 +62,7 @@ const cart = new Cart();
 function adicionarCarrinho(productId, productName, productPrice) {
   cart.add(productId, productName, productPrice, 1);
   atualizarCarrinhoUI();
-  mostrarNotificacao(`${productName} adicionado ao carrinho!`, 'success');
+  mostrarNotificacao(`${productName} added to cart!`, 'success');
 
   // Sincronização com backend em background (falha silenciosa)
   fetch(`${API_BASE}/cart/add`, {
@@ -77,7 +77,7 @@ function removerItemCarrinho(productId) {
   cart.remove(productId);
   atualizarCarrinhoUI();
   atualizarCarrinhoVisualizacao();
-  mostrarNotificacao('Produto removido do carrinho', 'info');
+  mostrarNotificacao('Product removed from cart', 'info');
 }
 
 // ─── Atualizar quantidade ────────────────────────────────────────────────────
@@ -120,7 +120,7 @@ function atualizarCarrinhoVisualizacao() {
   if (!itemsList) return;
 
   if (cart.items.length === 0) {
-    itemsList.innerHTML = '<p class="cart-empty">Carrinho vazio</p>';
+    itemsList.innerHTML = '<p class="cart-empty">Cart is empty</p>';
     calcularTotalLocal();
     return;
   }
@@ -128,8 +128,8 @@ function atualizarCarrinhoVisualizacao() {
   itemsList.innerHTML = cart.items.map(item => `
     <div class="cart-item" style="display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid #eee;gap:10px;">
       <div style="flex:1;min-width:0;">
-        <div style="font-weight:600;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(item.name || 'Produto')}</div>
-        <div style="color:#666;font-size:12px;margin-top:2px;">R$ ${Number(item.price).toFixed(2)} cada</div>
+        <div style="font-weight:600;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(item.name || 'Product')}</div>
+        <div style="color:#666;font-size:12px;margin-top:2px;">$${Number(item.price).toFixed(2)} each</div>
       </div>
       <div style="display:flex;align-items:center;gap:6px;flex-shrink:0;">
         <button onclick="atualizarQuantidade(${Number(item.product_id)}, -1)"
@@ -149,7 +149,7 @@ function atualizarCarrinhoVisualizacao() {
 // ─── Calcular total (local, sem API) ─────────────────────────────────────────
 function calcularTotalLocal() {
   const subtotal = cart.getSubtotal();
-  const frete = 15.00;
+  const frete = subtotal >= 199 ? 0 : 9.99;
   const desconto = parseFloat(localStorage.getItem('cdm_discount') || '0') || 0;
   const total = Math.max(0, subtotal - desconto + frete);
 
@@ -158,6 +158,8 @@ function calcularTotalLocal() {
   if (el('discount-info')) el('discount-info').style.display = desconto > 0 ? 'flex' : 'none';
   if (el('cart-discount')) el('cart-discount').textContent = desconto.toFixed(2);
   if (el('cart-total-amount')) el('cart-total-amount').textContent = total.toFixed(2);
+  const shippingDisplay = el('cart-shipping-display');
+  if (shippingDisplay) shippingDisplay.textContent = subtotal >= 199 ? 'Free 🎉' : `$${frete.toFixed(2)}`;
 }
 
 // Alias para compatibilidade com código antigo
@@ -178,7 +180,7 @@ function aplicarCupom() {
     localStorage.setItem('cdm_coupon', cupom);
     calcularTotalLocal();
     if (couponInput) couponInput.value = '';
-    mostrarNotificacao(`Cupom ${cupom} aplicado! Desconto: R$ ${desconto.toFixed(2)}`, 'success');
+    mostrarNotificacao(`Coupon ${cupom} applied! Discount: $${desconto.toFixed(2)}`, 'success');
   } else {
     mostrarNotificacao('Cupom inválido!', 'error');
   }
