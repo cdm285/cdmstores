@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="pt-BR">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -323,21 +323,60 @@
     </style>
 </head>
 <body>
-    <header class="navbar">
-        <div class="navbar-container">
-            <div class="navbar-brand">
-                <a href="/" style="text-decoration: none; color: inherit;">
-                    <h1>CDM Stores 🛍️</h1>
-                </a>
-            </div>
-            <nav class="navbar-menu">
-                <a href="/" class="nav-link">Home</a>
-                <a href="/#products" class="nav-link">Produtos</a>
-                <a href="#" onclick="openChat()" class="nav-link">🤖</a>
-                <span id="nav-auth-placeholder"></span>
-            </nav>
+    <header class="header" id="site-header">
+        <div class="header-logo">
+            <a href="index.html" aria-label="CDM STORES">
+                <img src="./assets/logo-premium.png" class="premium-logo-img" alt="CDM STORES" fetchpriority="high">
+            </a>
         </div>
+        <div class="header-nav-container">
+            <nav class="header-nav" aria-label="Main navigation">
+                <a href="index.html" class="nav-link" data-i18n="nav.home">Home</a>
+                <a href="index.html#produtos" class="nav-link" data-i18n="nav.products">Products</a>
+                <a href="#" class="nav-link" onclick="event.preventDefault();window.openAuthModal&&window.openAuthModal('register')" data-i18n="nav.signup">Sign Up</a>
+            </nav>
+            <div class="desktop-lang" role="group" aria-label="Language">
+                <button class="desktop-lang-btn" data-lang="pt" aria-pressed="false">PT</button>
+                <span class="desktop-lang-sep">|</span>
+                <button class="desktop-lang-btn active" data-lang="en" aria-pressed="true">EN</button>
+                <span class="desktop-lang-sep">|</span>
+                <button class="desktop-lang-btn" data-lang="es" aria-pressed="false">ES</button>
+            </div>
+        </div>
+        <div class="header-actions">
+            <a href="index.html#produtos" class="header-cta" data-i18n="nav.products">Products</a>
+        </div>
+        <button class="hamburger" id="hamburger-btn" aria-label="Open navigation menu" aria-expanded="false" aria-controls="mobile-nav">
+            <span class="hamburger-line"></span>
+            <span class="hamburger-line"></span>
+            <span class="hamburger-line"></span>
+        </button>
     </header>
+
+    <div class="mobile-nav" id="mobile-nav" aria-hidden="true" role="dialog" aria-modal="true" aria-label="Navigation menu">
+        <div class="mobile-nav-header">
+            <a href="index.html" class="mobile-nav-logo">CDM STORES</a>
+            <button class="mobile-nav-close" id="mobile-nav-close" aria-label="Close menu">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+            </button>
+        </div>
+        <nav class="mobile-nav-links" aria-label="Mobile navigation">
+            <a href="index.html" class="mobile-nav-link" data-i18n="nav.home">Home</a>
+            <a href="index.html#produtos" class="mobile-nav-link" data-i18n="nav.products">Products</a>
+            <a href="#" class="mobile-nav-link" onclick="event.preventDefault();window.openAuthModal&&window.openAuthModal('register')" data-i18n="nav.signup">Sign Up</a>
+        </nav>
+        <div class="mobile-nav-footer">
+            <div class="mobile-nav-lang-label">Language</div>
+            <div class="mobile-lang" role="group" aria-label="Language">
+                <button class="mobile-lang-btn" data-lang="pt" aria-pressed="false">PT</button>
+                <span class="mobile-lang-sep">|</span>
+                <button class="mobile-lang-btn active" data-lang="en" aria-pressed="true">EN</button>
+                <span class="mobile-lang-sep">|</span>
+                <button class="mobile-lang-btn" data-lang="es" aria-pressed="false">ES</button>
+            </div>
+        </div>
+    </div>
+    <div class="mobile-nav-overlay" id="mobile-nav-overlay" aria-hidden="true"></div>
 
     <div class="addresses-container">
         <div class="addresses-header">
@@ -434,6 +473,7 @@
         </div>
     </div>
 
+    <script src="./js/script.js" defer></script>
     <script src="./js/auth.js"></script>
     <script src="./js/chatbot.js"></script>
     <script>

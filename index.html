@@ -92,12 +92,13 @@
             <a href="index.html" class="mobile-nav-link" data-i18n="nav.home">Home</a>
             <a href="#produtos" class="mobile-nav-link" data-i18n="nav.products">Products</a>
             <a href="#sobre" class="mobile-nav-link" data-i18n="nav.sobre">About</a>
-            <a href="#contato" class="mobile-nav-link" data-i18n="nav.contato">Contact</a>
+            <a href="#" class="mobile-nav-link" onclick="event.preventDefault();window.openAuthModal&&window.openAuthModal('register')" data-i18n="nav.signup">Sign Up</a>
         </nav>
 
         <div class="mobile-nav-footer">
             <!-- Language switcher — text only, no flags -->
-            <div class="mobile-lang" role="group" aria-label="Idioma">
+            <div class="mobile-nav-lang-label">Language</div>
+            <div class="mobile-lang" role="group" aria-label="Language">
                 <button class="mobile-lang-btn" data-lang="pt" aria-pressed="false">PT</button>
                 <span class="mobile-lang-sep">|</span>
                 <button class="mobile-lang-btn active" data-lang="en" aria-pressed="true">EN</button>

@@ -6,6 +6,7 @@ const translations = {
         "nav.track": "Rastreio",
         "nav.sobre": "Sobre",
         "nav.contato": "Contato",
+        "nav.signup": "Entrar / Cadastrar",
         "hero.title": "Eletrônicos Premium, Entrega Garantida.",
         "hero.subtitle": "Produtos de alta qualidade com entrega rápida, pagamento seguro e rastreio profissional.",
         "hero.cta": "Comprar Agora",
@@ -68,8 +69,7 @@ const translations = {
         "nav.support": "Support",
         "nav.track": "Tracking",
         "nav.sobre": "About",
-        "nav.contato": "Contact",
-        "hero.title": "Premium Electronics, Guaranteed Delivery.",
+        "nav.contato": "Contact",        "nav.signup": "Sign Up",        "hero.title": "Premium Electronics, Guaranteed Delivery.",
         "hero.subtitle": "Crafted for performance. Built for reliability.",
         "hero.cta": "Shop Now",
         "hero.track": "Track Order →",
@@ -132,6 +132,7 @@ const translations = {
         "nav.track": "Seguimiento",
         "nav.sobre": "Sobre nosotros",
         "nav.contato": "Contacto",
+        "nav.signup": "Registrarse",
         "hero.title": "Electrónicos Premium, Entrega Garantizada.",
         "hero.subtitle": "Articulado para el rendimiento. Creado para la confiabilidad.",
         "hero.cta": "Comprar Ahora",
@@ -223,10 +224,6 @@ const state = {
 };
 
 function detectLang() {
-    const nav = navigator.language || navigator.userLanguage;
-    if (!nav) return "en";
-    if (nav.toLowerCase().startsWith("es")) return "es";
-    if (nav.toLowerCase().startsWith("pt")) return "pt";
     return "en";
 }
 
