@@ -12,7 +12,8 @@
     <title>CDM STORES — Premium Electronics</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:ital,wght@0,400;0,500;0,600;0,700;0,800;0,900;1,900&display=swap" rel="stylesheet">
+    <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Inter:ital,wght@0,400;0,500;0,600;0,700;0,800;0,900;1,900&display=swap" onload="this.rel='stylesheet'">
+    <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:ital,wght@0,400;0,500;0,600;0,700;0,800;0,900;1,900&display=swap"></noscript>
     <link rel="stylesheet" href="css/global.css">
     <link rel="stylesheet" href="css/mobile.css">
 </head>
@@ -38,7 +39,7 @@
         <!-- LOGO -->
         <div class="header-logo">
             <a href="index.html" aria-label="CDM STORES">
-                <img src="./assets/logo-premium.png" class="premium-logo-img" alt="CDM STORES" fetchpriority="high">
+                <img src="./assets/logo-premium.png" class="premium-logo-img" alt="CDM STORES" fetchpriority="high" width="180" height="46">
             </a>
         </div>
 
@@ -233,7 +234,7 @@
             <article class="card">
                 <div class="card-badge badge-new">Novo</div>
                 <div class="card-img-wrap">
-                    <img src="./assets/product-1.jpg" alt="" class="card-product-img" loading="lazy" onerror="this.style.display='none'">
+                    <img src="./assets/product-1.jpg" alt="" class="card-product-img" loading="lazy" width="200" height="200" onerror="this.style.display='none'">
                     <svg class="card-img" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
                       <rect width="200" height="200" fill="transparent"/>
                       <circle cx="100" cy="80" r="35" fill="#2563eb"/>
@@ -264,7 +265,7 @@
             <article class="card">
                 <div class="card-badge badge-sale">-23%</div>
                 <div class="card-img-wrap">
-                    <img src="./assets/product-2.jpg" alt="" class="card-product-img" loading="lazy" onerror="this.style.display='none'">
+                    <img src="./assets/product-2.jpg" alt="" class="card-product-img" loading="lazy" width="200" height="200" onerror="this.style.display='none'">
                     <svg class="card-img" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
                       <rect width="200" height="200" fill="transparent"/>
                       <rect x="60" y="40" width="80" height="120" rx="8" fill="#d97706"/>
@@ -294,7 +295,7 @@
             <!-- PRODUTO 3 -->
             <article class="card">
                 <div class="card-img-wrap">
-                    <img src="./assets/product-3.jpg" alt="" class="card-product-img" loading="lazy" onerror="this.style.display='none'">
+                    <img src="./assets/product-3.jpg" alt="" class="card-product-img" loading="lazy" width="200" height="200" onerror="this.style.display='none'">
                     <svg class="card-img" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
                       <rect width="200" height="200" fill="transparent"/>
                       <line x1="50" y1="100" x2="150" y2="100" stroke="#7c3aed" stroke-width="12" stroke-linecap="round"/>
@@ -323,7 +324,7 @@
             <article class="card">
                 <div class="card-badge badge-premium">Premium</div>
                 <div class="card-img-wrap">
-                    <img src="./assets/product-4.jpg" alt="" class="card-product-img" loading="lazy" onerror="this.style.display='none'">
+                    <img src="./assets/product-4.jpg" alt="" class="card-product-img" loading="lazy" width="200" height="200" onerror="this.style.display='none'">
                     <svg class="card-img" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
                       <rect width="200" height="200" fill="transparent"/>
                       <rect x="50" y="60" width="100" height="70" rx="10" fill="#059669"/>
@@ -426,7 +427,7 @@
     <footer class="footer" role="contentinfo">
         <div class="footer-inner">
             <div class="footer-brand">
-                <img src="./assets/logo-premium.png" alt="CDM STORES" class="footer-logo">
+                <img src="./assets/logo-premium.png" alt="CDM STORES" class="footer-logo" width="120" height="34" loading="lazy">
                 <p>Premium electronics with fast delivery and dedicated support.</p>
                 <div class="footer-social">
                     <a href="#" aria-label="Instagram CDM STORES" rel="noopener">

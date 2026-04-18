@@ -12,7 +12,7 @@ class ChatBot {
   }
 
   _init() {
-    // Aguardar DOM + um tick para deixar auth.js criar o fab-container primeiro
+    // FAB is fixed-position — safe to init immediately after DOMContentLoaded
     const setup = () => {
       this._injectStyles();
       this._createFabButton();
@@ -20,9 +20,9 @@ class ChatBot {
       this._bindEvents();
     };
     if (document.readyState === 'loading') {
-      document.addEventListener('DOMContentLoaded', () => setTimeout(setup, 120));
+      document.addEventListener('DOMContentLoaded', setup);
     } else {
-      setTimeout(setup, 120);
+      setup();
     }
   }
 

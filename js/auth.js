@@ -39,8 +39,9 @@ class AuthSystem {
    * ──────────────────────────────────────────────────────────────── */
   initAuthUI() {
     this.injectStyles();
-    this.createUserButton();
+    this.createFloatingButtons();
     this.createAuthModal();
+    this.createUserPanel();
   }
 
   /* ────────────────────────────────────────────────────────────────
@@ -415,7 +416,6 @@ class AuthSystem {
 
     document.body.appendChild(modal);
     this._bindModalEvents(modal);
-    this.createUserPanel();
   }
 
   /* ────────────────────────────────────────────────────────────────

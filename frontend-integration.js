@@ -3,7 +3,7 @@
  * Carrinho 100% local (localStorage) — não depende do backend para funcionar.
  */
 
-const API_BASE = 'https://cdmstores.com/api';
+const CDM_API = 'https://cdmstores.com/api';
 
 // ─── Carrinho local ───────────────────────────────────────────────────────────
 class Cart {
@@ -65,7 +65,7 @@ function adicionarCarrinho(productId, productName, productPrice) {
   mostrarNotificacao(`${productName} added to cart!`, 'success');
 
   // Sincronização com backend em background (falha silenciosa)
-  fetch(`${API_BASE}/cart/add`, {
+  fetch(`${CDM_API}/cart/add`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ product_id: productId, quantity: 1 })
@@ -213,7 +213,7 @@ function escapeHtml(str) {
 // ─── Carregarmos produtos (compatibilidade) ───────────────────────────────────
 async function carregarProdutos() {
   try {
-    const r = await fetch(`${API_BASE}/products`);
+    const r = await fetch(`${CDM_API}/products`);
     const { data } = await r.json();
     return data || [];
   } catch (_) { return []; }
