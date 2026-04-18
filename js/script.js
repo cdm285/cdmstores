@@ -60,12 +60,7 @@ const translations = {
         "auth.login_link": "Já tem conta? Entrar",
         "auth.google": "Entrar com Google",
         "auth.facebook": "📘 Entrar com Facebook",
-        "auth.user_login": "👤 Entrar",
-        "chat.open": "Chat",
-        "chat.placeholder": "Digite sua mensagem...",
-        "chat.welcome": "Olá! Como posso ajudar?",
-        "chat.fallback": "Anotei sua mensagem. Nossa equipe vai ajudar já já.",
-        "chat.send": "Enviar"
+        "auth.user_login": "👤 Entrar"
     },
     en: {
         "nav.home": "Home",
@@ -128,12 +123,7 @@ const translations = {
         "auth.login_link": "Already have an account? Login",
         "auth.google": "Login with Google",
         "auth.facebook": "📘 Login with Facebook",
-        "auth.user_login": "👤 Login",
-        "chat.open": "Chat",
-        "chat.placeholder": "Type your message...",
-        "chat.welcome": "Hi! How can I help?",
-        "chat.fallback": "Got it. Our team will help soon.",
-        "chat.send": "Send"
+        "auth.user_login": "👤 Login"
     },
     es: {
         "nav.home": "Inicio",
@@ -196,12 +186,7 @@ const translations = {
         "auth.login_link": "¿Ya tienes cuenta? Ingresar",
         "auth.google": "Ingresar con Google",
         "auth.facebook": "📘 Ingresar con Facebook",
-        "auth.user_login": "👤 Ingresar",
-        "chat.open": "Chat",
-        "chat.placeholder": "Escribe tu mensaje...",
-        "chat.welcome": "¡Hola! ¿Cómo puedo ayudar?",
-        "chat.fallback": "Recibí tu mensaje. Te ayudaremos pronto.",
-        "chat.send": "Enviar"
+        "auth.user_login": "👤 Ingresar"
     }
 };
 
@@ -373,34 +358,6 @@ function applyTranslations(lang) {
     const fabLogin = document.getElementById("fab-login");
     if (fabLogin) fabLogin.title = translations[lang]?.["auth.user_login"] || "👤 Entrar";
 
-    // Traduzir FAB chat (se existir)
-    const fabChat = document.getElementById("fab-chat");
-    if (fabChat) fabChat.title = translations[lang]?.["chat.open"] || "💬 Chat";
-
-    // Traduzir chat
-    const chatInput = document.getElementById("cdm-chat-input");
-    if (chatInput) chatInput.setAttribute("placeholder", translations[lang]?.["chat.placeholder"] || "Digite sua mensagem...");
-    
-    const chatSend = document.getElementById("cdm-chat-send");
-    if (chatSend) chatSend.textContent = translations[lang]?.["chat.send"] || "Enviar";
-    
-    const chatHeader = document.querySelector(".cdm-chat-header");
-    if (chatHeader) chatHeader.textContent = "💬 CDM " + (translations[lang]?.["chat.open"] || "Chat");
-
-    // Limpar e reinicializar mensagens do chat com novo idioma
-    const chatBody = document.getElementById("cdm-chat-body");
-    if (chatBody && chatBody.children.length > 0) {
-        chatBody.innerHTML = '';
-        const appendMsg = (text, cls = "") => {
-            const p = document.createElement("div");
-            p.className = `cdm-chat-msg ${cls}`;
-            p.textContent = text;
-            chatBody.appendChild(p);
-            chatBody.scrollTop = chatBody.scrollHeight;
-        };
-        appendMsg(translations[lang]?.["chat.welcome"] || "Olá!", "bot");
-    }
-
     updateCheckoutSelection();
 }
 
@@ -562,225 +519,13 @@ function initTracking() {
     });
 }
 
-function initChat() {
-    const existing = document.querySelector(".cdm-chat");
-    if (existing) return;
-
-    // Garantir que o fab-container existe
-    let fabContainer = document.getElementById('fab-container');
-    if (!fabContainer) {
-        fabContainer = document.createElement('div');
-        fabContainer.id = 'fab-container';
-        fabContainer.className = 'fab-container';
-        document.body.appendChild(fabContainer);
-    }
-
-    // Criar o container do chat
-    const wrapper = document.createElement("div");
-    wrapper.className = "cdm-chat";
-    wrapper.innerHTML = `
-        <style>
-            .cdm-chat { position: fixed; right: 16px; bottom: 80px; z-index: 9998; font-family: system-ui, -apple-system, sans-serif; }
-            .cdm-chat-window { width: 280px; max-height: 380px; background: #fff; border: 1px solid #FF6B6B; border-radius: 12px; box-shadow: 0 12px 30px rgba(0,0,0,0.18); display: none; flex-direction: column; overflow: hidden; }
-            .cdm-chat-window.active { display: flex; }
-            .cdm-chat-header { padding: 10px 12px; background: linear-gradient(135deg, #FF6B6B, #FF8E53); color: #fff; font-weight: 700; }
-            .cdm-chat-body { padding: 10px; flex: 1; overflow-y: auto; background: #f7faff; }
-            .cdm-chat-msg { margin-bottom: 8px; padding: 8px 10px; border-radius: 8px; background: #e8f4f8; }
-            .cdm-chat-msg.you { text-align: right; background: #FF6B6B; color: white; margin-left: 40px; }
-            .cdm-chat-msg.bot { text-align: left; background: #e8f4f8; margin-right: 40px; }
-            .cdm-chat-input { display: flex; padding: 10px; gap: 8px; border-top: 1px solid #e5e8f0; }
-            .cdm-chat-input input { flex: 1; padding: 10px; border: 1px solid #d3d8e0; border-radius: 8px; font-size: 12px; }
-            .cdm-chat-input button { padding: 10px 12px; border: none; background: linear-gradient(135deg, #FF6B6B, #FF8E53); color: #fff; border-radius: 8px; font-weight: 700; cursor: pointer; font-size: 12px; }
-        </style>
-        <div class="cdm-chat-window" id="cdm-chat-window">
-            <div class="cdm-chat-header">💬 CDM Chat</div>
-            <div class="cdm-chat-body" id="cdm-chat-body"></div>
-            <div class="cdm-chat-input">
-                <input type="text" id="cdm-chat-input" placeholder="Mensagem...">
-                <button id="cdm-chat-send">Send</button>
-            </div>
-        </div>
-    `;
-    document.body.appendChild(wrapper);
-
-    // Criar FAB de chat
-    const chatFab = document.createElement('button');
-    chatFab.id = 'fab-chat';
-    chatFab.className = 'fab fab-chat';
-    chatFab.title = 'Abrir Chat';
-    chatFab.innerHTML = '💬';
-
-    chatFab.addEventListener('click', () => {
-        const chatWindow = document.getElementById('cdm-chat-window');
-        if (chatWindow) {
-            chatWindow.classList.toggle('active');
-        }
-    });
-
-    fabContainer.appendChild(chatFab);
-
-    const win = document.getElementById("cdm-chat-window");
-    const body = document.getElementById("cdm-chat-body");
-    const input = document.getElementById("cdm-chat-input");
-    const send = document.getElementById("cdm-chat-send");
-
-    const appendMsg = (text, cls = "") => {
-        const p = document.createElement("div");
-        p.className = `cdm-chat-msg ${cls}`;
-        p.textContent = text;
-        body.appendChild(p);
-        body.scrollTop = body.scrollHeight;
-    };
-
-    appendMsg(translations[state.lang]?.["chat.welcome"] || "Olá!", "bot");
-
-    const respond = (text) => {
-        const lower = text.toLowerCase().trim();
-        const lang = state.lang;
-
-        // Detecção de Rastreio (Tracking)
-        if (lower.match(/rastreio|rastrear|tracking|track|código|code|pedido|order|entrega|delivery/)) {
-            const responses = {
-                pt: "📦 Use a aba Rastreio e cole seu código (ex: CDM123456BR). Você pode acompanhar aqui ou enviar o código que respondo!",
-                en: "📦 Go to Tracking tab and paste your code (ex: CDM123456BR). You can track here or send the code!",
-                es: "📦 Ve a la pestaña Rastreo y pega tu código (ej: CDM123456BR). ¡Puedes rastrear aquí o enviar el código!"
-            };
-            appendMsg(responses[lang] || responses.pt, "bot");
-            return;
-        }
-
-        // Detecção de Pagamento & Stripe
-        if (lower.match(/pagamento|payment|pagar|pay|cartão|card|pix|stripe|valor|preço|price/)) {
-            const responses = {
-                pt: "💳 Aceitamos Stripe com cartão crédito/débito. Totalmente seguro (PCI-DSS). Problemas? Fale com suporte!",
-                en: "💳 We accept Stripe with credit/debit cards. Fully secure (PCI-DSS). Issues? Contact support!",
-                es: "💳 Aceptamos Stripe con tarjeta crédito/débito. Totalmente seguro (PCI-DSS). ¿Problemas? ¡Contacta soporte!"
-            };
-            appendMsg(responses[lang] || responses.pt, "bot");
-            return;
-        }
-
-        // Detecção de Frete & Envio
-        if (lower.match(/frete|envio|shipping|entrega|quando|quando chega|quando llega|prazo/)) {
-            const responses = {
-                pt: "🚚 Entregamos mundialmente com rastreio. Prazo médio: 3-7 dias úteis. Frete grátis em pedidos acima de $199!",
-                en: "🚚 We deliver worldwide with tracking. Average time: 3-7 business days. Free shipping on orders over $199!",
-                es: "🚚 Entregamos a todo el mundo con rastreo. Tiempo promedio: 3-7 días hábiles. ¡Envío gratis en pedidos acima de $199!"
-            };
-            appendMsg(responses[lang] || responses.pt, "bot");
-            return;
-        }
-
-        // Detecção de Produtos
-        if (lower.match(/produto|product|comprar|buy|cual|qual|o que|what|fone|carregador|cabo|headphones|charger|cable/)) {
-            const responses = {
-                pt: "🛍️ Temos Fone Bluetooth, Carregador USB-C e Cabo Lightning. Clique em Produtos para ver detalhes e valores!",
-                en: "🛍️ We have Bluetooth Headphones, USB-C Charger, and Lightning Cable. Click Products to see details!",
-                es: "🛍️ Tenemos Auriculares Bluetooth, Cargador USB-C y Cable Lightning. ¡Haz clic en Productos para ver detalles!"
-            };
-            appendMsg(responses[lang] || responses.pt, "bot");
-            return;
-        }
-
-        // Detecção de Autenticação & Conta
-        if (lower.match(/login|entrar|criar conta|account|sign up|cadastro|registrar|password|senha|usuário|user/)) {
-            const responses = {
-                pt: "👤 Clique no ícone azul 👤 no canto direito para Entrar ou Criar Conta. Support Google & Facebook!",
-                en: "👤 Click the blue icon 👤 on the right corner to Login or Create Account. Support Google & Facebook!",
-                es: "👤 Haz clic en el icono azul 👤 en la esquina derecha para Entrar o Crear Cuenta. ¡Support Google & Facebook!"
-            };
-            appendMsg(responses[lang] || responses.pt, "bot");
-            return;
-        }
-
-        // Detecção de Carrinho
-        if (lower.match(/carrinho|cart|adicionar|add|remover|remove|comprar|checkout|pedido|order/)) {
-            const responses = {
-                pt: "🛒 Clique no ícone 🛒 para abrir seu carrinho, adicionar produtos e finalizar compra com segurança!",
-                en: "🛒 Click the 🛒 icon to open your cart, add products, and checkout safely!",
-                es: "🛒 ¡Haz clic en el icono 🛒 para abrir tu carrito, agregar productos y pagar seguro!"
-            };
-            appendMsg(responses[lang] || responses.pt, "bot");
-            return;
-        }
-
-        // Detecção de Atendimento & Suporte
-        if (lower.match(/atendimento|suporte|support|ajuda|help|problema|issue|contato|contact|fone|phone|email/)) {
-            const responses = {
-                pt: "📞 Vá em Atendimento para falar conosco. Equipe disponível 24/7 para ajudar!",
-                en: "📞 Go to Support to talk with us. Team available 24/7 to help!",
-                es: "📞 Ve a Atención para hablar nosotros. ¡Equipo disponible 24/7 para ayudarte!"
-            };
-            appendMsg(responses[lang] || responses.pt, "bot");
-            return;
-        }
-
-        // Detecção de Promoção & Cupom
-        if (lower.match(/promoção|promo|cupom|coupon|desconto|discount|oferta|offer/)) {
-            const responses = {
-                pt: "🎉 Temos promoções especiais! Use cupom na página de checkout. Fique de olho em nossas redes!",
-                en: "🎉 We have special promotions! Use coupon at checkout. Follow our social media!",
-                es: "🎉 ¡Tenemos promociones especiales! Usa cupón en checkout. ¡Síguenos en redes sociales!"
-            };
-            appendMsg(responses[lang] || responses.pt, "bot");
-            return;
-        }
-
-        // Resposta padrão amigável
-        const defaultResponses = {
-            pt: "😊 Ótima pergunta! Você pode explorar Produtos, Rastreio, fazer login ou falar com Atendimento. Como posso ajudar mais?",
-            en: "😊 Great question! You can explore Products, Tracking, login or reach Support. How else can I help?",
-            es: "😊 ¡Excelente pregunta! Puedes explorar Productos, Rastreo, iniciar sesión o contactar Atención. ¿Cómo puedo ayudarte más?"
-        };
-        appendMsg(defaultResponses[lang] || defaultResponses.pt, "bot");
-    };
-
-    const handleSend = () => {
-        const text = input.value.trim();
-        if (!text) return;
-        appendMsg(text, "you");
-        input.value = "";
-        setTimeout(() => respond(text), 300);
-    };
-
-    send.addEventListener("click", handleSend);
-    input.addEventListener("keypress", (e) => {
-        if (e.key === "Enter") handleSend();
-    });
-}
+// initChat() removido — chatbot.js é o chatbot orquestrado com IA
 
 document.addEventListener("DOMContentLoaded", () => {
-    // Pequeno delay para garantir que auth.js foi carregado e estilos aplicados
-    setTimeout(() => {
-        // Garantir que fab-container existe
-        let fabContainer = document.getElementById('fab-container');
-        if (!fabContainer) {
-            fabContainer = document.createElement('div');
-            fabContainer.id = 'fab-container';
-            fabContainer.className = 'fab-container';
-            document.body.appendChild(fabContainer);
-        }
-
-        // Garantir que fab-login existe (criado por auth.js)
-        if (!document.getElementById('fab-login')) {
-            const loginFab = document.createElement('button');
-            loginFab.id = 'fab-login';
-            loginFab.className = 'fab fab-login';
-            loginFab.title = 'Login / Entrar';
-            loginFab.innerHTML = '👤';
-            loginFab.addEventListener('click', () => {
-                const modal = document.getElementById('auth-modal');
-                if (modal) modal.classList.add('active');
-            });
-            fabContainer.appendChild(loginFab);
-        }
-    }, 100);
-
     initLanguageSwitcher();
     initMobileNav();
     initHeaderScroll();
     initProductButtons();
     initCheckout();
     initTracking();
-    // initChat() desabilitado — chatbot.js tem widget superior com integração AI
 });
