@@ -323,7 +323,7 @@ class AuthSystem {
     container.appendChild(loginFab);
   }
 
-  createUserButton() { this.createFloatingButtons(); }
+  createUserButton() { return; }
 
   isMobile() { return window.innerWidth <= 768; }
 

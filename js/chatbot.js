@@ -43,12 +43,15 @@ class ChatBot {
 
     const btn = document.createElement('button');
     btn.id = 'chatbot-fab';
-    btn.className = 'fab';
-    btn.style.background = 'linear-gradient(135deg, #00AFFF, #9B4DFF)';
-    btn.style.color = 'white';
+    btn.className = 'chatbot-fab-bright';
     btn.title = 'Abrir chat';
     btn.setAttribute('aria-label', 'Abrir chat de suporte');
-    btn.innerHTML = '💬';
+    btn.innerHTML = `
+      <span class="chatbot-fab-icon-wrap" aria-hidden="true">
+        <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+      </span>
+      <span class="chatbot-fab-label">Chat</span>
+    `;
     btn.addEventListener('click', () => this.toggle());
 
     // Inserir ANTES do fab-login para chatbot aparecer abaixo do login
@@ -110,6 +113,83 @@ class ChatBot {
    * ────────────────────────────────────────────────────────────── */
   _injectStyles() {
     if (document.getElementById('chatbot-styles')) return;
+
+    // Sempre injetar estilos do FAB independente do auth.js
+    if (!document.getElementById('chatbot-fab-base')) {
+      const base = document.createElement('style');
+      base.id = 'chatbot-fab-base';
+      base.innerHTML = `
+        .fab-container {
+          position: fixed;
+          bottom: 20px;
+          right: 20px;
+          z-index: 11050;
+          display: flex;
+          flex-direction: column;
+          gap: 12px;
+          align-items: flex-end;
+        }
+        .chatbot-fab-bright {
+          width: 88px;
+          min-height: 88px;
+          padding: 10px 9px 9px;
+          border-radius: 22px;
+          border: none;
+          cursor: pointer;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
+          gap: 6px;
+          background: linear-gradient(145deg, rgba(12,20,44,0.96), rgba(12,122,255,0.94));
+          box-shadow: 0 12px 28px rgba(0,136,255,0.28), 0 0 0 1px rgba(255,255,255,0.14) inset;
+          position: relative;
+          animation: chatbotFloat 4.5s ease-in-out infinite;
+          transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }
+        .chatbot-fab-bright:hover {
+          transform: translateY(-3px) scale(1.02);
+          box-shadow: 0 16px 36px rgba(0,136,255,0.40);
+        }
+        .chatbot-fab-bright::before {
+          content: '';
+          position: absolute;
+          inset: -6px;
+          border-radius: 26px;
+          background: radial-gradient(circle, rgba(0,173,255,0.38), rgba(0,173,255,0) 70%);
+          filter: blur(10px);
+          z-index: -1;
+        }
+        .chatbot-fab-icon-wrap {
+          width: 42px;
+          height: 42px;
+          border-radius: 50%;
+          display: grid;
+          place-items: center;
+          background: rgba(255,255,255,0.15);
+        }
+        .chatbot-fab-label {
+          font-size: 11px;
+          font-weight: 800;
+          letter-spacing: 0.12em;
+          text-transform: uppercase;
+          color: #fff;
+          font-family: inherit;
+        }
+        @keyframes chatbotFloat {
+          0%, 100% { transform: translateY(0); }
+          50%       { transform: translateY(-4px); }
+        }
+        @media (max-width: 768px) {
+          .fab-container { bottom: 14px; right: 14px; }
+          .chatbot-fab-bright { width: 78px; min-height: 78px; padding: 9px 7px 7px; border-radius: 20px; }
+          .chatbot-fab-icon-wrap { width: 38px; height: 38px; }
+          .chatbot-fab-label { font-size: 10px; }
+        }
+      `;
+      document.head.appendChild(base);
+    }
+
     const s = document.createElement('style');
     s.id = 'chatbot-styles';
     s.innerHTML = `
