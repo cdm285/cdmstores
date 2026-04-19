@@ -301,27 +301,10 @@ class AuthSystem {
   }
 
   /* ────────────────────────────────────────────────────────────────
-   * Criar FAB de Login
+   * Criar FAB de Login — removido (login/register via nav)
    * ──────────────────────────────────────────────────────────────── */
   createFloatingButtons() {
-    let container = document.getElementById('fab-container');
-    if (!container) {
-      container = document.createElement('div');
-      container.id = 'fab-container';
-      container.className = 'fab-container';
-      document.body.appendChild(container);
-    }
-    if (document.getElementById('fab-login')) return;
-    const loginFab = document.createElement('button');
-    loginFab.id = 'fab-login';
-    loginFab.className = 'fab fab-login';
-    loginFab.title = 'Entrar / Login';
-    loginFab.setAttribute('aria-label', 'Abrir login');
-    loginFab.innerHTML = '👤';
-    loginFab.addEventListener('click', () => {
-      document.getElementById('auth-modal')?.classList.add('active');
-    });
-    container.appendChild(loginFab);
+    // FAB removido — acesso via links Login / Sign Up no menu de navegação
   }
 
   createUserButton() { return; }
@@ -715,6 +698,20 @@ class AuthSystem {
 document.addEventListener('DOMContentLoaded', () => {
   window.authSystem = new AuthSystem();
 });
+
+/* ── Global helper usado pelos links de nav ──────────────────────── */
+window.openAuthModal = function(tab) {
+  const modal = document.getElementById('auth-modal');
+  if (!modal) { window.authSystem?.initAuthUI(); return; }
+  modal.classList.add('active');
+  if (tab === 'register') {
+    document.getElementById('login-form').style.display    = 'none';
+    document.getElementById('register-form').style.display = 'block';
+  } else {
+    document.getElementById('register-form').style.display = 'none';
+    document.getElementById('login-form').style.display    = 'block';
+  }
+};
 
 window.currentUser = currentUser;
 

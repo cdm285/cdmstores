@@ -77,7 +77,7 @@ class ChatBot {
     modal.innerHTML = `
       <div class="chatbot-header">
         <div class="chatbot-header-info">
-          <span class="chatbot-avatar">🤖</span>
+          <span class="chatbot-avatar"><img src="./assets/logo-premium.png" alt="CDM STORES" style="height:32px;width:auto;display:block;filter:brightness(0)invert(1);"></span>
           <div>
             <div class="chatbot-title">CDM Assistente</div>
             <div class="chatbot-status">● Online</div>
@@ -231,7 +231,7 @@ class ChatBot {
         gap: 10px;
         color: white;
       }
-      .chatbot-avatar { font-size: 22px; }
+      .chatbot-avatar { font-size: 22px; display:flex; align-items:center; }
       .chatbot-title  { font-weight: 700; font-size: 14px; color: #fff; }
       .chatbot-status { font-size: 11px; color: rgba(255,255,255,0.8); }
 
