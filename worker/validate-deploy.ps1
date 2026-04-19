@@ -99,7 +99,7 @@ if ($missingIgnores.Count -gt 0) {
 Write-Host "  [5/7] Verificando secrets no Cloudflare (production)..." -NoNewline
 $requiredSecrets = @(
     'STRIPE_SECRET_KEY', 'STRIPE_WEBHOOK_SECRET', 'JWT_SECRET',
-    'CJ_API_KEY', 'RESEND_API_KEY', 'TURNSTILE_SECRET_KEY',
+    'RESEND_API_KEY', 'TURNSTILE_SECRET_KEY',
     'GOOGLE_CLIENT_ID', 'GOOGLE_CLIENT_SECRET',
     'FACEBOOK_APP_ID', 'FACEBOOK_APP_SECRET',
     'ORGANIC_ADMIN_KEY'

@@ -8,9 +8,6 @@ STRIPE_SECRET_KEY=sk_test_REPLACE_ME
 STRIPE_WEBHOOK_SECRET=whsec_REPLACE_ME
 STRIPE_PUBLISHABLE_KEY=pk_test_REPLACE_ME
 
-# CJdropshipping
-CJ_API_KEY=REPLACE_ME
-
 # Auth / JWT  (mín. 64 chars — gerar com o comando abaixo)
 # PowerShell: [Convert]::ToBase64String((1..64|%{Get-Random -Max 256}))
 JWT_SECRET=REPLACE_WITH_64_CHAR_RANDOM_STRING
