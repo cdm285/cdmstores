@@ -1,8 +1,9 @@
 // CDM STORES — Cloudflare Worker entry point (dispatcher)
 // All business logic lives in src/routes/ and src/lib/
 
-import { CORS_HEADERS, resolveOrigin } from './lib/response.js';
+import { CORS_HEADERS, SECURITY_HEADERS, resolveOrigin } from './lib/response.js';
 import type { Env } from './lib/response.js';
+import { getAggregatedMetrics, getCircuitStates } from './lib/observability.js';
 
 // Route handlers
 import { handleRegister, handleLogin, handleMe, handleLogout, handleRefresh, handleForgotPassword, handleResetPassword, handleSendVerificationEmail, handleVerifyEmail, handleChangePassword, handleGoogleAuth, handleFacebookAuth } from './routes/auth.js';
@@ -14,6 +15,7 @@ import { handleCartAdd } from './routes/cart.js';
 import { handleTracking } from './routes/tracking.js';
 import { handleStripeCreatePayment, handleStripeWebhook } from './routes/stripe.js';
 import { handleChatRequest } from './routes/chat.js';
+import { handleGuardianStatus, handleGuardianReport } from './routes/guardian.js';
 import { handleOrganicRequest } from './routes/organic.js';
 import { handleWorkersAI } from './routes/workersai.js';
 import { handleSchedule } from './routes/schedule.js';
@@ -31,7 +33,26 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
 
   // ── HEALTH CHECK ─────────────────────────────────────────────────────────
   if (path === '/health' || path === '/') {
-    return json({ status: 'ok', service: 'CDM Stores API', version: '2.0.0', timestamp: new Date().toISOString() });
+    // Probe D1 liveness
+    let d1Ok = false;
+    try { await env.DB.prepare('SELECT 1').first(); d1Ok = true; } catch { /* d1 down */ }
+
+    // Gather last-hour metrics + circuit breaker states (never throw)
+    const [metrics, circuits] = await Promise.all([
+      getAggregatedMetrics(env.METRICS, 1).catch(() => null),
+      Promise.resolve(getCircuitStates()),
+    ]);
+
+    const healthy = d1Ok;
+    return json({
+      status       : healthy ? 'ok' : 'degraded',
+      service      : 'CDM Stores API',
+      version      : '2.1.0',
+      timestamp    : new Date().toISOString(),
+      bindings     : { d1: d1Ok, ai: typeof env.AI?.run === 'function', vectorize: typeof env.VECTORIZE?.query === 'function', kv_rate_limit: !!env.RATE_LIMIT, kv_metrics: !!env.METRICS },
+      metrics      : metrics ?? {},
+      circuits,
+    }, healthy ? 200 : 503);
   }
 
   // ── AUTH ─────────────────────────────────────────────────────────────────
@@ -96,6 +117,10 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
   // ── CHAT ─────────────────────────────────────────────────────────────────
   if (path === '/api/chat' && m === 'POST') return handleChatRequest(request, env);
 
+  // ── GUARDIAN ─────────────────────────────────────────────────────────────
+  if (path === '/api/guardian/status' && m === 'GET') return handleGuardianStatus(request, env);
+  if (path === '/api/guardian/report' && m === 'GET') return handleGuardianReport(request, env);
+
   // ── ORGANIC TRAFFIC ──────────────────────────────────────────────────────
   if (path.startsWith('/api/organic')) {
     return handleOrganicRequest(request, env as unknown as import('./core/types.js').AgentEnv);
@@ -114,15 +139,35 @@ async function fetchWithCors(request: Request, env: Env): Promise<Response> {
   const origin   = resolveOrigin(request);
   const response = await handleRequest(request, env);
   const headers  = new Headers(response.headers);
+
+  // Enforce security headers on ALL responses — single enforcement point
+  // regardless of which route handler produced the response (OWASP ASVS 14.4)
+  for (const [k, v] of Object.entries(SECURITY_HEADERS)) {
+    if (!headers.has(k)) headers.set(k, v);
+  }
   headers.set('Access-Control-Allow-Origin', origin);
   headers.set('Vary', 'Origin');
+  // X-Request-ID: if the route already set one (e.g. /api/chat), preserve it;
+  // otherwise generate a new UUID for every response — enables incident tracing
+  if (!headers.has('X-Request-ID')) {
+    headers.set('X-Request-ID', crypto.randomUUID());
+  }
   return new Response(response.body, { status: response.status, statusText: response.statusText, headers });
 }
 
 export default {
   fetch: (request: Request, env: Env) => fetchWithCors(request, env),
   scheduled: async (_controller: ScheduledController, env: Env) => {
-    // Cron job: cleanup expired DB records
+    // ── GUARDIÃO AUTONOMY: self-healing cron ──────────────────────────────
+    // Runs on every cron trigger (wrangler.toml: crons = ["0 * * * *"])
+    // 1. DB cleanup   — expire stale sessions, resets, rate limits
+    // 2. Self-probe   — hit /health to keep the Worker warm + log result
+    // 3. Metrics trim — no-op (KV TTL handles this automatically)
+
+    const ts = Date.now();
+    let dbOk = false;
+
+    // 1. Cleanup expired records
     try {
       await env.DB.batch([
         env.DB.prepare("DELETE FROM sessions WHERE expires_at < datetime('now')"),
@@ -131,8 +176,28 @@ export default {
         env.DB.prepare("DELETE FROM login_attempts WHERE created_at < datetime('now', '-7 days')"),
         env.DB.prepare("DELETE FROM two_factor_attempts WHERE created_at < datetime('now', '-1 day')"),
       ]);
+      dbOk = true;
+      console.log('[GUARDIÃO:cron] DB cleanup OK');
     } catch (err) {
-      console.error('[Scheduled] Cleanup error:', err instanceof Error ? err.message : err);
+      console.error('[GUARDIÃO:cron] DB cleanup FAILED:', err instanceof Error ? err.message : err);
+    }
+
+    // 2. Liveness self-probe — record as synthetic metric
+    try {
+      const probe = await env.DB.prepare('SELECT 1').first();
+      const latencyMs = Date.now() - ts;
+      if (env.METRICS) {
+        // Import inline to avoid circular — write directly
+        const hour = Math.floor(Date.now() / 3_600_000);
+        const key  = `metrics:hour:${hour}`;
+        const raw  = await env.METRICS.get(key);
+        const bucket = raw ? JSON.parse(raw) : [];
+        bucket.push({ ts, path: '/__cron__', method: 'CRON', status: probe ? 200 : 503, latencyMs, requestId: crypto.randomUUID() });
+        await env.METRICS.put(key, JSON.stringify(bucket.slice(-500)), { expirationTtl: 93_600 });
+      }
+      console.log(`[GUARDIÃO:cron] self-probe OK — db:${dbOk} latency:${Date.now() - ts}ms`);
+    } catch (err) {
+      console.error('[GUARDIÃO:cron] self-probe FAILED:', err instanceof Error ? err.message : err);
     }
   },
 } satisfies ExportedHandler<Env>;

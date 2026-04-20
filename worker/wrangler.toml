@@ -3,6 +3,10 @@ main = "src/index.ts"
 compatibility_date = "2025-03-01"
 compatibility_flags = ["nodejs_compat"]
 
+# GUARDIÃO autonomy — hourly self-healing cron
+[triggers]
+crons = ["0 * * * *"]
+
 # ─── AMBIENTE PADRÃO (wrangler dev / workers.dev) ────────────────
 # Usado quando nenhum --env é passado (testes locais)
 
@@ -20,6 +24,15 @@ binding = "AI"
 [[vectorize]]
 binding = "VECTORIZE"
 index_name = "cdmstores-embeddings"
+
+# KV Namespaces (rate limiting e métricas de alta performance)
+[[kv_namespaces]]
+binding = "RATE_LIMIT"
+id = "7dad331501eb450db45caec361695072"
+
+[[kv_namespaces]]
+binding = "METRICS"
+id = "dc526d4e383248ee8bb86f3db33ebdfa"
 
 # ─── PRODUÇÃO ────────────────────────────────────────────────────
 # Deploy: wrangler deploy --env production
@@ -40,7 +53,20 @@ binding = "DB"
 database_name = "cdmstores"          # banco de PRODUÇÃO
 database_id = "a22156d2-037a-400d-9408-d064020b4ca8"
 
+# KV Namespaces (mesmos IDs — KV é global por conta)
+[[env.production.kv_namespaces]]
+binding = "RATE_LIMIT"
+id = "7dad331501eb450db45caec361695072"
+
+[[env.production.kv_namespaces]]
+binding = "METRICS"
+id = "dc526d4e383248ee8bb86f3db33ebdfa"
+
 # Rotas de produção (precisam de zona ativa no Cloudflare)
+[[env.production.routes]]
+pattern = "cdmstores.com/health"
+zone_name = "cdmstores.com"
+
 [[env.production.routes]]
 pattern = "cdmstores.com/api/*"
 zone_name = "cdmstores.com"
