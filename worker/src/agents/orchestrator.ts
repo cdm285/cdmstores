@@ -17,24 +17,28 @@
  */
 
 import {
-  AgentContext, AgentEnv, AgentResult, IntentCategory, OrchestratorOutput, SessionMessage, SessionState,
+    AgentContext, AgentEnv, AgentResult, IntentCategory, OrchestratorOutput, SessionMessage, SessionState,
 } from '../core/types.js';
 
 // ── Agents: Security ──────────────────────────────────────────────────────────
 import { securityAgent } from './security.js';
 
 // ── Agents: NLP / Intent / Language ──────────────────────────────────────────
-import { nlpAgent, intentAgent, languageAgent } from './nlp.js';
+import { intentAgent, languageAgent, nlpAgent } from './nlp.js';
 
 // ── Agents: Memory ────────────────────────────────────────────────────────────
 import {
-  shortMemoryAgent, longMemoryAgent, semanticMemoryAgent,
-  episodicMemoryAgent, contextAgent,
+    contextAgent,
+    episodicMemoryAgent,
+    longMemoryAgent, semanticMemoryAgent,
+    shortMemoryAgent,
 } from './memory.js';
 
 // ── Agents: Reasoning ─────────────────────────────────────────────────────────
 import {
-  promptingAgent, reasoningAgent, planningAgent, summarizationAgent,
+    planningAgent,
+    promptingAgent, reasoningAgent,
+    summarizationAgent,
 } from './reasoning.js';
 
 // ── Agents: Personality ───────────────────────────────────────────────────────
@@ -42,21 +46,34 @@ import { emotionAgent, personalityAgent, styleAgent } from './personality.js';
 
 // ── Agents: Actions ───────────────────────────────────────────────────────────
 import {
-  cartAgent, orderAgent, trackingAgent, couponAgent,
-  productAgent, schedulingAgent, whatsAppAgent, notificationAgent,
-  paymentAgent, fallbackAgent, escalationAgent,
+    cartAgent,
+    couponAgent,
+    escalationAgent,
+    fallbackAgent,
+    notificationAgent,
+    orderAgent,
+    paymentAgent,
+    productAgent, schedulingAgent,
+    trackingAgent,
+    whatsAppAgent,
 } from './actions.js';
 
 // ── Agents: Quality ───────────────────────────────────────────────────────────
 import {
-  qualityAgent, validationAgent, errorCorrectionAgent,
-  selfRepairAgent, selfCorrectionAgent, qualityCheckAgent,
+    errorCorrectionAgent,
+    qualityAgent,
+    qualityCheckAgent,
+    selfCorrectionAgent,
+    selfRepairAgent,
+    validationAgent,
 } from './quality.js';
 
 // ── Agents: Monitoring ────────────────────────────────────────────────────────
 import {
-  logAgent, monitoringAgent,
-  selfOptimizationAgent, securityCheckAgent, responseCheckAgent,
+    logAgent, monitoringAgent,
+    responseCheckAgent,
+    securityCheckAgent,
+    selfOptimizationAgent,
 } from './monitoring.js';
 
 // ─── Pipeline trace ───────────────────────────────────────────────────────────
@@ -412,6 +429,7 @@ export class Orchestrator {
         if (intent.confidence > 85 && r.success) {
           return semanticMemoryAgent.run(ctx, 'write', undefined, `Q: ${message}\nA: ${r.response ?? finalResponse}`);
         }
+        return undefined;
       }).catch(() => {}),
     ]).catch(() => {});
 

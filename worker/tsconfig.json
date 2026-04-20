@@ -1,17 +1,33 @@
 {
   "compilerOptions": {
+    // ─ Target ─────────────────────────────────────────────────────
     "target": "ES2022",
     "module": "ES2022",
     "lib": ["ES2022"],
+    "moduleResolution": "bundler",
+
+    // ─ Types ────────────────────────────────────────────────────
+    // NOTE: "node" is required for node:crypto / node:buffer (nodejs_compat flag)
     "types": ["@cloudflare/workers-types", "node"],
-    "declaration": true,
+
+    // ─ Output ─────────────────────────────────────────────────────────────────
     "rootDir": "./src",
     "outDir": "./dist",
+    "declaration": true,
+
+    // ─ Strict mode ────────────────────────────────────────────────────────────
     "strict": true,
+    // NOTE: enable these incrementally as unused imports/params are cleaned up:
+    // "noUnusedLocals": true,
+    // "noUnusedParameters": true,
+    "noImplicitReturns": true,
+    "noFallthroughCasesInSwitch": true,
+
+    // ─ Interop ─────────────────────────────────────────────────
     "esModuleInterop": true,
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
-    "moduleResolution": "bundler"
+    "resolveJsonModule": true
   },
   "include": ["src/**/*"],
   "exclude": ["node_modules", "dist"]
