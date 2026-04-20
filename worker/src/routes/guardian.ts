@@ -16,9 +16,19 @@
  * to infrastructure tooling. Sensitive data (keys, user IDs) is never exposed.
  */
 
-import { json } from '../lib/response.js';
+import { getAggregatedMetrics, getCircuitStates, kvRateLimit } from '../lib/observability.js';
 import type { Env } from '../lib/response.js';
-import { getAggregatedMetrics, getCircuitStates } from '../lib/observability.js';
+import { json } from '../lib/response.js';
+
+/** 30 requests / 60 s per IP on public monitoring endpoints. */
+async function guardianRateLimit(request: Request, env: Env): Promise<Response | null> {
+  const ip = request.headers.get('CF-Connecting-IP') ?? 'unknown';
+  const rl = await kvRateLimit(env.RATE_LIMIT, `guardian:${ip}`, 30, 60);
+  if (!rl.allowed) {
+    return json({ success: false, error: 'Too many requests' }, 429);
+  }
+  return null;
+}
 
 // ── Agent pipeline manifest ────────────────────────────────────────────────
 const AGENT_PIPELINE = [
@@ -109,7 +119,9 @@ function computeGrade(
 }
 
 // ── Activation Report Handler ──────────────────────────────────────────────
-export async function handleGuardianReport(_request: Request, env: Env): Promise<Response> {
+export async function handleGuardianReport(request: Request, env: Env): Promise<Response> {
+  const rateLimit = await guardianRateLimit(request, env);
+  if (rateLimit) {return rateLimit;}
   const ts = Date.now();
 
   let d1Ok = false;
@@ -259,7 +271,9 @@ export async function handleGuardianReport(_request: Request, env: Env): Promise
 }
 
 // ── Handler ────────────────────────────────────────────────────────────────
-export async function handleGuardianStatus(_request: Request, env: Env): Promise<Response> {
+export async function handleGuardianStatus(request: Request, env: Env): Promise<Response> {
+  const rateLimit = await guardianRateLimit(request, env);
+  if (rateLimit) {return rateLimit;}
   const ts = Date.now();
 
   // 1. Probe D1 liveness

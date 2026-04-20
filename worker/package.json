@@ -11,6 +11,7 @@
     "preview": "wrangler dev --remote --env staging",
     "typecheck": "tsc --noEmit",
     "typecheck:watch": "tsc --noEmit --watch",
+    "predeploy": "tsc --noEmit && eslint src --ext .ts --max-warnings 0",
     "test": "node test-suite-e2e.mjs",
     "test:stress": "node stress-guardian.mjs",
     "test:prod": "BASE_URL=https://cdmstores.com node test-suite-e2e.mjs",

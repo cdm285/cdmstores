@@ -86,7 +86,25 @@ zone_name = "cdmstores.com"
 # Substitua o database_id abaixo com o ID retornado.
 
 [env.staging]
+name = "cdmstores-backend-staging"
 vars = { ENVIRONMENT = "staging" }
+
+# AI + Vectorize — mesmos bindings de conta (sem separação por env necessária)
+[env.staging.ai]
+binding = "AI"
+
+[[env.staging.vectorize]]
+binding = "VECTORIZE"
+index_name = "cdmstores-embeddings"
+
+# KV Namespaces (mesmos IDs — KV é global por conta)
+[[env.staging.kv_namespaces]]
+binding = "RATE_LIMIT"
+id = "7dad331501eb450db45caec361695072"
+
+[[env.staging.kv_namespaces]]
+binding = "METRICS"
+id = "dc526d4e383248ee8bb86f3db33ebdfa"
 
 [[env.staging.d1_databases]]
 binding = "DB"

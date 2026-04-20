@@ -108,14 +108,16 @@ function extractText(raw: unknown): string {
 
 /** Verify the shared secret sent as X-Organic-Key header. */
 async function adminGuard(request: Request, env: AgentEnv): Promise<boolean> {
-  // If no JWT_SECRET is configured, reject all POST requests in production.
-  if (!env.JWT_SECRET) {
+  // ORGANIC_SECRET must be set in production. Falls back to JWT_SECRET only for
+  // backward-compat during rollout — set ORGANIC_SECRET as soon as possible.
+  const secret = env.ORGANIC_SECRET ?? env.JWT_SECRET;
+  if (!secret) {
     return false;
   }
   const key = request.headers.get('X-Organic-Key') ?? '';
-  // Constant-time comparison using subtle — avoids timing attacks.
+  // Constant-time comparison — avoids timing attacks.
   const keyBytes = new TextEncoder().encode(key);
-  const secretBytes = new TextEncoder().encode(env.JWT_SECRET);
+  const secretBytes = new TextEncoder().encode(secret);
   if (keyBytes.length !== secretBytes.length) {
     return false;
   }

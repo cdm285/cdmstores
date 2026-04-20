@@ -19,10 +19,12 @@ export interface Env {
   RESEND_API_KEY?: string;
   APP_URL?: string;
   GOOGLE_CLIENT_ID?: string;
-  GOOGLE_CLIENT_SECRET?: string;
+  // GOOGLE_CLIENT_SECRET removed — Google auth uses idToken/accessToken validation only (no server-side OAuth code exchange)
   FACEBOOK_APP_ID?: string;
   FACEBOOK_APP_SECRET?: string;
   TURNSTILE_SECRET_KEY?: string;
+  /** Shared secret for POST /api/organic endpoints (X-Organic-Key header). Keep separate from JWT_SECRET. */
+  ORGANIC_SECRET?: string;
   ENVIRONMENT?: string;
 }
 
