@@ -142,7 +142,8 @@ export class MainOrchestrator {
       intent &&
       intent !== 'unknown' &&
       intent !== 'greeting' &&
-      intent !== 'farewell'
+      intent !== 'farewell' &&
+      intent !== 'payment' // payment has a dedicated inline response below
     ) {
       const actionReq = buildRequestFromContext(ctx);
       if (actionReq) {
@@ -150,12 +151,24 @@ export class MainOrchestrator {
         applyActionResult(ctx, actionResult);
         if (actionResult.success && actionResult.response) {
           finalResponse = actionResult.response;
+          ctx.flags.skipSelfRepair = true; // Tier 4 responses are authoritative — don't let selfRepairAgent overwrite them
         }
         // On failure, fall through to full AI path (graceful degradation)
       }
     }
 
-    // ── 7b. Greetings / farewells — no AI needed ─────────────────────────────
+    // ── 7b. Payment intent — dedicated inline response ────────────────────────
+    if (!finalResponse && intent === 'payment') {
+      const paymentMap: Record<string, string> = {
+        pt: '💳 **Formas de pagamento aceitas:**\n\n• **Cartão de Crédito/Débito** — Visa, Mastercard, Elo e mais (via Stripe)\n• **PIX** — aprovação instantânea\n• **Boleto Bancário** — prazo de 1–3 dias úteis\n\nTodos os pagamentos são processados com segurança via Stripe (PCI-DSS nível 1). Precisa de mais informações?',
+        en: '💳 **Accepted payment methods:**\n\n• **Credit/Debit Card** — Visa, Mastercard, Elo and more (via Stripe)\n• **PIX** — instant approval\n• **Bank Slip** — 1–3 business days\n\nAll payments are securely processed via Stripe (PCI-DSS Level 1). Need more info?',
+        es: '💳 **Métodos de pago aceptados:**\n\n• **Tarjeta de Crédito/Débito** — Visa, Mastercard, Elo y más (via Stripe)\n• **PIX** — aprobación instantánea\n• **Boleto Bancário** — plazo de 1–3 días hábiles\n\nTodos los pagos se procesan de forma segura via Stripe (PCI-DSS nivel 1). ¿Necesitas más información?',
+      };
+      finalResponse = paymentMap[ctx.detectedLang] ?? paymentMap.pt;
+      ctx.flags.skipSelfRepair = true;
+    }
+
+    // ── 7c. Greetings / farewells — no AI needed ─────────────────────────────
     if (!finalResponse && (intent === 'greeting' || intent === 'farewell')) {
       const greetMap: Record<string, Record<string, string>> = {
         greeting: {
