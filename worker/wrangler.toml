@@ -39,7 +39,7 @@ id = "dc526d4e383248ee8bb86f3db33ebdfa"
 
 [env.production]
 name = "cdmstores-backend"
-vars = { ENVIRONMENT = "production" }
+vars = { ENVIRONMENT = "production", APP_URL = "https://cdmstores.com" }
 
 [env.production.ai]
 binding = "AI"

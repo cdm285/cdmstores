@@ -64,6 +64,29 @@ function buildPrompt(ctx: ExtendedAgentContext, userMessage: string): PromptMess
     system += `\n\nInformações relevantes da base de conhecimento:\n${ctx.semanticCtx}`;
   }
 
+  // Inject product catalog for product/cart/payment intents (avoid generic AI response)
+  const productIntent = ctx.intent === 'product_query' || ctx.intent === 'cart_action';
+  const paymentIntent = ctx.intent === 'payment';
+  if (productIntent) {
+    system +=
+      '\n\nCatálogo de produtos (preços em R$):\n' +
+      '• Fone Bluetooth — R$ 89,90 (50 un em estoque)\n' +
+      '• Carregador USB-C 65W — R$ 49,90 (100 un em estoque)\n' +
+      '• Cabo Lightning 2m — R$ 29,90 (esgotado)\n' +
+      '• Caixa de Som Portátil — R$ 149,90 (5 un em estoque)\n' +
+      'Frete padrão: R$ 15,00. Entrega em 3–7 dias úteis.\n' +
+      'Mostre os produtos com preços quando perguntado sobre catálogo.';
+  }
+  if (paymentIntent) {
+    system +=
+      '\n\nFormas de pagamento aceitas na CDM STORES:\n' +
+      '• Cartão de crédito/débito (via Stripe) — todas as bandeiras\n' +
+      '• PIX — aprovação instantânea\n' +
+      '• Boleto bancário — prazo de 1–3 dias úteis\n' +
+      'Pagamentos são processados com segurança via Stripe (PCI-DSS nível 1).\n' +
+      'Responda com essas informações de pagamento quando perguntado sobre formas de pagar.';
+  }
+
   // Append episodic (order history)
   if (ctx.recentOrders?.length) {
     const ordersText = ctx.recentOrders

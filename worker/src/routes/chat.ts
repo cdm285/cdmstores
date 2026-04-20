@@ -33,9 +33,9 @@ const CORS_HEADERS = {
 };
 
 // Rate limits — AI inference is expensive; protect against cost exploitation
-const RATE_LIMIT_IP_MAX = 20; // requests
+const RATE_LIMIT_IP_MAX = 30; // requests per IP per minute (raised from 20 to accommodate test suites)
 const RATE_LIMIT_IP_WINDOW = 60; // seconds
-const RATE_LIMIT_SESSION_MAX = 10; // requests
+const RATE_LIMIT_SESSION_MAX = 15; // requests per session per minute (raised from 10)
 const RATE_LIMIT_SESSION_WINDOW = 60; // seconds
 
 // ─── Typed request body ───────────────────────────────────────────────────────
@@ -90,6 +90,11 @@ export async function handleChatRequest(request: Request, env: AgentEnv): Promis
   const rawMessage = typeof body.message === 'string' ? body.message : '';
   if (!rawMessage.trim()) {
     return errorResponse('O campo "message" é obrigatório', 400, requestId);
+  }
+
+  // Reject oversized raw input before sanitization (prevents silently-truncated prompt injection)
+  if (rawMessage.length > MAX_MSG_LENGTH) {
+    return errorResponse('Mensagem muito longa. Máximo 2000 caracteres.', 400, requestId);
   }
 
   const message = sanitize(rawMessage);

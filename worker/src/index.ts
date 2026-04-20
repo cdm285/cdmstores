@@ -9,18 +9,18 @@ import { CORS_HEADERS, SECURITY_HEADERS, resolveOrigin } from './lib/response.js
 // Route handlers
 import { json } from './lib/response.js';
 import {
-  handleChangePassword,
-  handleFacebookAuth,
-  handleForgotPassword,
-  handleGoogleAuth,
-  handleLogin,
-  handleLogout,
-  handleMe,
-  handleRefresh,
-  handleRegister,
-  handleResetPassword,
-  handleSendVerificationEmail,
-  handleVerifyEmail,
+    handleChangePassword,
+    handleFacebookAuth,
+    handleForgotPassword,
+    handleGoogleAuth,
+    handleLogin,
+    handleLogout,
+    handleMe,
+    handleRefresh,
+    handleRegister,
+    handleResetPassword,
+    handleSendVerificationEmail,
+    handleVerifyEmail,
 } from './routes/auth.js';
 import { handleCartAdd } from './routes/cart.js';
 import { handleChatRequest } from './routes/chat.js';
@@ -32,19 +32,19 @@ import { handleSchedule } from './routes/schedule.js';
 import { handleStripeCreatePayment, handleStripeWebhook } from './routes/stripe.js';
 import { handleTracking } from './routes/tracking.js';
 import {
-  handle2FADisable,
-  handle2FASetup,
-  handle2FAVerify,
-  handle2FAVerifySetup,
+    handle2FADisable,
+    handle2FASetup,
+    handle2FAVerify,
+    handle2FAVerifySetup,
 } from './routes/twofa.js';
 import {
-  handleCreateAddress,
-  handleDeleteAddress,
-  handleGetAddresses,
-  handleSetDefaultAddress,
-  handleUpdateAddress,
-  handleUpdateProfile,
-  handleUserOrders,
+    handleCreateAddress,
+    handleDeleteAddress,
+    handleGetAddresses,
+    handleSetDefaultAddress,
+    handleUpdateAddress,
+    handleUpdateProfile,
+    handleUserOrders,
 } from './routes/user.js';
 import { handleWorkersAI } from './routes/workersai.js';
 
@@ -59,7 +59,7 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
   }
 
   // ── HEALTH CHECK ─────────────────────────────────────────────────────────
-  if (path === '/health' || path === '/') {
+  if (path === '/health' || path === '/api/health' || path === '/') {
     // Probe D1 liveness
     let d1Ok = false;
     try {

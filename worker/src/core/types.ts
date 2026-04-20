@@ -13,8 +13,10 @@ export interface AgentEnv {
   METRICS?: KVNamespace; // observability metrics store
   JWT_SECRET?: string;
   RESEND_API_KEY?: string;
-  APP_URL?: string;  /** Shared secret for POST /api/organic endpoints. Must differ from JWT_SECRET. */
-  ORGANIC_SECRET?: string;}
+  APP_URL?: string;
+  /** Shared secret for POST /api/organic endpoints. Must differ from JWT_SECRET. */
+  ORGANIC_ADMIN_KEY?: string;
+}
 
 // ─── Messages ──────────────────────────────────────────────────────────────────
 export interface AgentMessage {

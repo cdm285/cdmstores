@@ -23,8 +23,8 @@ export interface Env {
   FACEBOOK_APP_ID?: string;
   FACEBOOK_APP_SECRET?: string;
   TURNSTILE_SECRET_KEY?: string;
-  /** Shared secret for POST /api/organic endpoints (X-Organic-Key header). Keep separate from JWT_SECRET. */
-  ORGANIC_SECRET?: string;
+  /** Shared secret for POST /api/organic endpoints (X-Organic-Key header). Must differ from JWT_SECRET. */
+  ORGANIC_ADMIN_KEY?: string;
   ENVIRONMENT?: string;
 }
 

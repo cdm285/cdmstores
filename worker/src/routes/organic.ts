@@ -108,9 +108,9 @@ function extractText(raw: unknown): string {
 
 /** Verify the shared secret sent as X-Organic-Key header. */
 async function adminGuard(request: Request, env: AgentEnv): Promise<boolean> {
-  // ORGANIC_SECRET must be set in production. Falls back to JWT_SECRET only for
-  // backward-compat during rollout — set ORGANIC_SECRET as soon as possible.
-  const secret = env.ORGANIC_SECRET ?? env.JWT_SECRET;
+  // ORGANIC_ADMIN_KEY is the production secret (wrangler secret). Falls back to
+  // JWT_SECRET only if ORGANIC_ADMIN_KEY is not yet configured.
+  const secret = env.ORGANIC_ADMIN_KEY ?? env.JWT_SECRET;
   if (!secret) {
     return false;
   }
