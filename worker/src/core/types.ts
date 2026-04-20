@@ -157,3 +157,9 @@ export abstract class BaseAgent {
 }
 
 export const QUALITY_THRESHOLD = 55; // minimum score to pass quality gate
+
+// ─── Workers AI dynamic typing ────────────────────────────────────────────────
+// @cloudflare/workers-types Ai interface uses model-literal overloads that don't
+// cover custom/preview models. Cast env.AI to AiFlex to call run() generically.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export type AiFlex = { run(model: string, params: Record<string, unknown>): Promise<any> };

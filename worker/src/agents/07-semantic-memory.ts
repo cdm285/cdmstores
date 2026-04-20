@@ -15,16 +15,12 @@
 
 import type { ExtendedAgentContext } from '../core/agent-context.js';
 import { addTrace } from '../core/agent-context.js';
-import type { AgentEnv } from '../core/types.js';
+import type { AgentEnv, AiFlex } from '../core/types.js';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 const EMBED_MODEL = '@cf/baai/bge-m3';
 const SCORE_THRESHOLD = 0.7;
 const TOP_K = 5;
-
-// ─── Helper: AiFlex cast (Workers AI dynamic typing) ─────────────────────────
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-type AiFlex = { run(model: string, params: Record<string, unknown>): Promise<any> };
 
 // ─── Agent ────────────────────────────────────────────────────────────────────
 export class Agent07SemanticMemory {

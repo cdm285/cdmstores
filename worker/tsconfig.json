@@ -11,9 +11,10 @@
     "types": ["@cloudflare/workers-types", "node"],
 
     // ─ Output ─────────────────────────────────────────────────────────────────
+    // outDir is kept so `tsc` without --noEmit doesn't pollute src/
+    // declaration is NOT needed — this project is a Worker, not a published library
     "rootDir": "./src",
     "outDir": "./dist",
-    "declaration": true,
 
     // ─ Strict mode ────────────────────────────────────────────────────────────
     "strict": true,
@@ -21,6 +22,9 @@
     "noUnusedParameters": true,
     "noImplicitReturns": true,
     "noFallthroughCasesInSwitch": true,
+    // exactOptionalPropertyTypes: true — recommended future improvement
+    // Requires updating optional fields in: action-schema.ts, pipeline.ts, agent-context.ts,
+    // orchestrator.ts, 10-action-router.ts, 17-notification.ts, routes/chat.ts, routes/auth.ts
 
     // ─ Interop ─────────────────────────────────────────────────
     "esModuleInterop": true,

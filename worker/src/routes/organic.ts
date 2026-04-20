@@ -23,13 +23,14 @@
  *   • D1 writes use prepared statements (no SQLi)
  */
 
-import type { AgentEnv } from '../core/types.js';
+import type { AgentEnv, AiFlex } from '../core/types.js';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
-// Cast to `any` because `@cloudflare/workers-types` AiModels map may lag behind
-// available runtime models — same pattern used in routes/ai.ts.
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const AI_MODEL = '@cf/meta/llama-3.1-8b-instruct-fast' as any;
+const AI_MODEL = '@cf/meta/llama-3.1-8b-instruct-fast';
+// @cloudflare/workers-types uses model-literal overloads that don't cover preview models.
+// runAI wraps the AiFlex cast so call sites stay clean.
+const runAI = (ai: AgentEnv['AI'], params: Record<string, unknown>) =>
+  (ai as AiFlex).run(AI_MODEL, params);
 const MAX_TOKENS = 512;
 const PAGE_LIMIT = 50;
 
@@ -132,7 +133,7 @@ Liste 3 temas de artigo relevantes para o CDM STORES em 2026.
 Cada tema deve ser uma frase curta (máx 8 palavras), separados por quebra de linha.
 Não use números, bullets ou caracteres especiais. Apenas os temas.`;
 
-  const raw = (await env.AI.run(AI_MODEL, {
+  const raw = (await runAI(env.AI, {
     messages: [{ role: 'user', content: prompt }],
     max_tokens: 100,
   })) as AiTextResponse;
@@ -149,7 +150,7 @@ async function plannerGenerateCalendar(env: AgentEnv): Promise<string[]> {
   const prompt = `Crie um calendário de 30 temas de conteúdo para um e-commerce (CDM STORES) para os próximos 30 dias a partir de hoje.
 Cada linha: apenas o tema (máx 10 palavras). Sem números, sem bullets. Um tema por linha.`;
 
-  const raw = (await env.AI.run(AI_MODEL, {
+  const raw = (await runAI(env.AI, {
     messages: [{ role: 'user', content: prompt }],
     max_tokens: 512,
   })) as AiTextResponse;
@@ -171,7 +172,7 @@ Formato JSON com as chaves "title" e "body".
 - body: texto do artigo (2–3 parágrafos, máx 400 palavras)
 Responda APENAS com JSON válido, sem texto adicional.`;
 
-  const raw = (await env.AI.run(AI_MODEL, {
+  const raw = (await runAI(env.AI, {
     messages: [{ role: 'user', content: prompt }],
     max_tokens: MAX_TOKENS,
   })) as AiTextResponse;
@@ -207,7 +208,7 @@ Responda APENAS com JSON válido contendo:
 - "keywords": array de 5 palavras-chave relevantes
 - "metaDescription": meta description (máx 155 caracteres)`;
 
-  const raw = (await env.AI.run(AI_MODEL, {
+  const raw = (await runAI(env.AI, {
     messages: [{ role: 'user', content: prompt }],
     max_tokens: 200,
   })) as AiTextResponse;
@@ -250,7 +251,7 @@ async function socialCreatePosts(article: Article, seo: SeoData, env: AgentEnv):
 Inclua emojis relevantes. Cada post em uma linha separada. Máx 240 caracteres por post.
 Adicione o link cdmstores.com no último post.`;
 
-  const raw = (await env.AI.run(AI_MODEL, {
+  const raw = (await runAI(env.AI, {
     messages: [{ role: 'user', content: prompt }],
     max_tokens: 300,
   })) as AiTextResponse;

@@ -45,6 +45,27 @@ export default tseslint.config(
     },
   },
 
+  // Type-checked rules — catches async bugs that plain TypeScript cannot detect.
+  // Requires parserOptions.projectService so ESLint has full type information.
+  {
+    files: ['**/*.ts'],
+    languageOptions: {
+      parserOptions: {
+        projectService: true,
+        tsconfigRootDir: import.meta.dirname,
+      },
+    },
+    rules: {
+      '@typescript-eslint/no-floating-promises': 'error',
+      '@typescript-eslint/await-thenable': 'error',
+      // checksVoidReturn: false — async route handlers in Hono/itty-router are intentional
+      '@typescript-eslint/no-misused-promises': ['error', { checksVoidReturn: false }],
+      // Disabled: many agents implement an async interface contract but don't
+      // internally await — removing `async` would break the pipeline type signature.
+      '@typescript-eslint/require-await': 'off',
+    },
+  },
+
   // Ignore build artifacts, test scripts and browser-side JS
   {
     ignores: ['dist/**', 'node_modules/**', '*.mjs', '*.js', 'src/**/*.js'],

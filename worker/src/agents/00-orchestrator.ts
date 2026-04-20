@@ -93,8 +93,10 @@ export class MainOrchestrator {
       return { success: false, response: BLOCKED[lang] ?? BLOCKED.pt };
     }
 
-    // ── 2. Tier 1: NLP + Language (can run independently) ───────────────────
-    await Promise.all([agent01NLP.execute(ctx, msg), agent03Language.execute(ctx, msg)]);
+    // ── 2. Tier 1: NLP + Language ───────────────────────────────────────
+    // NLP is async; Language + Intent are synchronous (void) — run them inline.
+    await agent01NLP.execute(ctx, msg);
+    agent03Language.execute(ctx, msg);
 
     // Intent needs entities from NLP (sequential after NLP)
     agent02Intent.execute(ctx, msg);

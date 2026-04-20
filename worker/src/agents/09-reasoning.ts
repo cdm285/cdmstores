@@ -20,7 +20,7 @@
 
 import type { ExtendedAgentContext } from '../core/agent-context.js';
 import { addTrace } from '../core/agent-context.js';
-import type { AgentEnv } from '../core/types.js';
+import type { AgentEnv, AiFlex } from '../core/types.js';
 
 // ─── Model IDs ────────────────────────────────────────────────────────────────
 const MODEL_SMALL = '@cf/meta/llama-3.1-8b-instruct-fp8';
@@ -51,10 +51,6 @@ function getPersona(lang: string): string {
   }
   return PERSONA_PT;
 }
-
-// ─── AiFlex cast (Workers AI dynamic typing) ──────────────────────────────────
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-type AiFlex = { run(model: string, params: Record<string, unknown>): Promise<any> };
 
 type PromptMessage = { role: 'system' | 'user' | 'assistant'; content: string };
 
