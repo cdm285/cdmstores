@@ -8,7 +8,9 @@ export interface AgentEnv {
   DB: D1Database;
   AI: Ai;
   VECTORIZE: VectorizeIndex;
-  KV?: KVNamespace;
+  KV?: KVNamespace;         // legacy alias
+  RATE_LIMIT?: KVNamespace; // high-performance rate limiting
+  METRICS?: KVNamespace;    // observability metrics store
   JWT_SECRET?: string;
   RESEND_API_KEY?: string;
   APP_URL?: string;

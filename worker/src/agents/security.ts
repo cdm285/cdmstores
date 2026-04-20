@@ -13,22 +13,38 @@ export class SecurityAgent extends BaseAgent {
   readonly id = '27-security';
   readonly name = 'SecurityAgent';
 
-  private static readonly MAX_LENGTH = 500;
+  // Aligned with chat.ts MAX_MSG_LENGTH — messages up to 2000 chars are valid
+  private static readonly MAX_LENGTH = 2_000;
 
   private static readonly INJECTION_PATTERNS = [
-    /ignore previous instructions/i,
-    /ignore all instructions/i,
-    /you are now/i,
-    /act as/i,
-    /jailbreak/i,
-    /system prompt/i,
+    // Classic prompt injection / jailbreak
+    /ignore\s+(previous|all|prior)\s+instructions/i,
+    /disregard\s+(all|previous|prior)\s+instructions/i,
+    /\bjailbreak\b/i,
+    /\bDAN\b/,                                     // "Do Anything Now" jailbreak
+    /\bsystem\s+prompt\b/i,
+    // Role override attempts
+    /\byou\s+are\s+now\s+(a|an|the)\b/i,
+    /\bact\s+as\s+(a|an|the)\s+\w+\s+(without|with\s+no)\b/i,
+    /\bpretend\s+(you\s+are|to\s+be)\b/i,
+    /\bfrom\s+now\s+on\s+(you|ignore|forget)\b/i,
+    // XSS
     /<script[\s>]/i,
     /javascript:/i,
     /on\w+\s*=/i,
+    /vbscript:/i,
+    // SQL injection
     /union\s+select/i,
     /drop\s+table/i,
-    /--\s*$/,
     /;\s*delete\s/i,
+    /--\s*$/,
+    /'\s*or\s+'1'\s*=\s*'1/i,
+    // Template / SSTI injection
+    /\{\{.*\}\}/,                                  // Handlebars / Jinja-style
+    /\$\{.*\}/,                                    // JS template literal in input
+    // SSRF probing
+    /\bfile:\/\//i,
+    /\b(169\.254\.|127\.|10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.)/,
   ];
 
   async run(ctx: AgentContext, message: string): Promise<AgentResult> {

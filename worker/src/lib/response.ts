@@ -8,6 +8,8 @@ export interface Env {
   DB: D1Database;
   AI: Ai;
   VECTORIZE: VectorizeIndex;
+  RATE_LIMIT?: KVNamespace;
+  METRICS?: KVNamespace;
   STRIPE_SECRET_KEY?: string;
   STRIPE_WEBHOOK_SECRET?: string;
   STRIPE_PUBLISHABLE_KEY?: string;
@@ -22,15 +24,23 @@ export interface Env {
   ENVIRONMENT?: string;
 }
 
-// ─── Security headers (OWASP ASVS 14.4, PCI-DSS 6.2.4) ───────────────────────
+// ─── Security headers (OWASP ASVS 14.4, PCI-DSS 6.2.4, HSTS RFC 6797) ─────────
 export const SECURITY_HEADERS: Record<string, string> = {
-  'Content-Type'          : 'application/json',
-  'X-Content-Type-Options': 'nosniff',
-  'X-Frame-Options'       : 'DENY',
-  'Referrer-Policy'       : 'strict-origin-when-cross-origin',
-  'Permissions-Policy'    : 'camera=(), microphone=(), geolocation=()',
-  'Cache-Control'         : 'no-store',
-  'Pragma'                : 'no-cache',
+  'Content-Type'                     : 'application/json',
+  'X-Content-Type-Options'           : 'nosniff',
+  'X-Frame-Options'                  : 'DENY',
+  'Referrer-Policy'                  : 'strict-origin-when-cross-origin',
+  'Permissions-Policy'               : 'camera=(), microphone=(), geolocation=(), payment=(self)',
+  'Cache-Control'                    : 'no-store',
+  'Pragma'                           : 'no-cache',
+  // HSTS — force HTTPS, 1 year, all subdomains, preload-eligible (RFC 6797)
+  'Strict-Transport-Security'        : 'max-age=31536000; includeSubDomains; preload',
+  // CSP — API responses must never be rendered as HTML (OWASP A05)
+  'Content-Security-Policy'          : "default-src 'none'; frame-ancestors 'none'",
+  // Cross-origin isolation (Spectre mitigation)
+  'Cross-Origin-Opener-Policy'       : 'same-origin',
+  // Allow fetch from any origin (REST API), but disallow embedding
+  'Cross-Origin-Resource-Policy'     : 'cross-origin',
 };
 
 export const ALLOWED_ORIGINS = new Set([
