@@ -91,11 +91,11 @@ try {
 # ─── Etapa 4: Deploy ─────────────────────────────────────────────────────────
 Log "`n[Etapa 4/4] Iniciando deploy $( if ($DryRun) { '(DRY RUN — sem publicação real)' } )..." White
 
-$deployArgs = @('wrangler', 'deploy', '--env', $Env)
+$deployArgs = @('deploy', '--env', $Env)
 if ($DryRun) { $deployArgs += '--dry-run' }
 
 try {
-    $deployOutput = npx @($deployArgs[1..($deployArgs.Length-1)]) 2>&1 | Out-String
+    $deployOutput = npx wrangler @deployArgs 2>&1 | Out-String
     # Sanitizar output antes de exibir/salvar
     $deployOutput = $deployOutput -replace '(sk_live|sk_test|whsec_|rk_live|re_)[A-Za-z0-9_\-]+', '[REDACTED]'
 

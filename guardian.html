@@ -1,0 +1,510 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>GUARDIÃO CDM STORES — Operations Dashboard</title>
+  <style>
+    :root {
+      --bg:        #0d1117;
+      --bg-card:   #161b22;
+      --bg-panel:  #1c2128;
+      --border:    #30363d;
+      --text:      #e6edf3;
+      --muted:     #8b949e;
+      --green:     #3fb950;
+      --yellow:    #d29922;
+      --red:       #f85149;
+      --blue:      #58a6ff;
+      --purple:    #bc8cff;
+      --accent:    #1a56db;
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: "Segoe UI", -apple-system, BlinkMacSystemFont, monospace;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      font-size: 14px;
+    }
+
+    /* ── TOP BAR ─────────────────────────────────────────────────── */
+    .topbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 12px 24px;
+      background: var(--bg-card);
+      border-bottom: 1px solid var(--border);
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+    .topbar-brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-weight: 700;
+      font-size: 16px;
+      letter-spacing: .5px;
+    }
+    .topbar-brand .shield {
+      font-size: 22px;
+    }
+    .topbar-right {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+    .grade-badge {
+      padding: 4px 14px;
+      border-radius: 20px;
+      font-weight: 700;
+      font-size: 12px;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+    }
+    .grade-OPERATIONAL { background: rgba(63,185,80,.15); color: var(--green); border: 1px solid rgba(63,185,80,.4); }
+    .grade-DEGRADED    { background: rgba(210,153,34,.15); color: var(--yellow); border: 1px solid rgba(210,153,34,.4); }
+    .grade-INCIDENT    { background: rgba(248,81,73,.15); color: var(--red); border: 1px solid rgba(248,81,73,.4); }
+
+    .refresh-btn {
+      background: var(--bg-panel);
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 6px 14px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 13px;
+      transition: background .15s;
+    }
+    .refresh-btn:hover { background: #2d333b; }
+
+    .last-updated {
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    /* ── GRID ────────────────────────────────────────────────────── */
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+      gap: 16px;
+      padding: 20px 24px;
+      max-width: 1400px;
+      margin: 0 auto;
+    }
+    .grid-wide { grid-column: 1 / -1; }
+
+    /* ── CARDS ───────────────────────────────────────────────────── */
+    .card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 18px 20px;
+    }
+    .card-title {
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 1.2px;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 14px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    /* ── STAT ROWS ───────────────────────────────────────────────── */
+    .stat-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 6px 0;
+      border-bottom: 1px solid #21262d;
+    }
+    .stat-row:last-child { border-bottom: none; }
+    .stat-label { color: var(--muted); font-size: 13px; }
+    .stat-value { font-weight: 600; font-size: 13px; }
+
+    /* ── BINDING DOTS ────────────────────────────────────────────── */
+    .bindings-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+    .binding-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 10px;
+      background: var(--bg-panel);
+      border-radius: 6px;
+      font-size: 13px;
+    }
+    .dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+    .dot-ok      { background: var(--green); box-shadow: 0 0 6px var(--green); }
+    .dot-warn    { background: var(--yellow); }
+    .dot-err     { background: var(--red); animation: pulse-red 1s infinite; }
+
+    @keyframes pulse-red {
+      0%, 100% { box-shadow: 0 0 4px var(--red); }
+      50%       { box-shadow: 0 0 12px var(--red); }
+    }
+
+    /* ── CIRCUIT STATES ──────────────────────────────────────────── */
+    .circuit-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 7px 0;
+      border-bottom: 1px solid #21262d;
+      font-size: 13px;
+    }
+    .circuit-item:last-child { border-bottom: none; }
+    .circuit-state {
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-size: 11px;
+      font-weight: 700;
+    }
+    .state-CLOSED    { background: rgba(63,185,80,.2);  color: var(--green); }
+    .state-OPEN      { background: rgba(248,81,73,.2);  color: var(--red);   }
+    .state-HALF_OPEN { background: rgba(210,153,34,.2); color: var(--yellow);}
+    .state-empty     { color: var(--muted); font-style: italic; font-size: 12px; }
+
+    /* ── METRICS ─────────────────────────────────────────────────── */
+    .metrics-tabs {
+      display: flex;
+      gap: 4px;
+      margin-bottom: 14px;
+    }
+    .tab-btn {
+      padding: 4px 12px;
+      border-radius: 4px;
+      border: 1px solid var(--border);
+      background: transparent;
+      color: var(--muted);
+      cursor: pointer;
+      font-size: 12px;
+      font-weight: 600;
+      transition: all .15s;
+    }
+    .tab-btn.active {
+      background: var(--accent);
+      border-color: var(--accent);
+      color: #fff;
+    }
+
+    /* ── BIG NUMBER ──────────────────────────────────────────────── */
+    .big-number {
+      font-size: 36px;
+      font-weight: 700;
+      line-height: 1;
+      margin-bottom: 4px;
+    }
+    .big-sub { color: var(--muted); font-size: 12px; }
+
+    /* ── ALERTS ──────────────────────────────────────────────────── */
+    .alert-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      padding: 8px 0;
+      border-bottom: 1px solid #21262d;
+      font-size: 13px;
+      line-height: 1.4;
+    }
+    .alert-item:last-child { border-bottom: none; }
+    .alert-ok   { color: var(--green); }
+    .alert-warn { color: var(--yellow); }
+
+    /* ── AGENT TABLE ─────────────────────────────────────────────── */
+    .agent-table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+    .agent-table th {
+      text-align: left;
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: .8px;
+      color: var(--muted);
+      padding: 4px 8px 10px;
+      border-bottom: 1px solid var(--border);
+    }
+    .agent-table td {
+      padding: 7px 8px;
+      font-size: 12px;
+      border-bottom: 1px solid #21262d;
+    }
+    .agent-table tr:last-child td { border-bottom: none; }
+    .agent-id {
+      font-family: monospace;
+      font-weight: 700;
+      color: var(--blue);
+      width: 32px;
+    }
+    .agent-role {
+      color: var(--muted);
+      font-style: italic;
+    }
+
+    /* ── SECURITY ────────────────────────────────────────────────── */
+    .sec-tag {
+      display: inline-block;
+      background: rgba(88,166,255,.1);
+      border: 1px solid rgba(88,166,255,.25);
+      color: var(--blue);
+      border-radius: 4px;
+      padding: 2px 7px;
+      font-size: 11px;
+      margin: 2px;
+    }
+
+    /* ── LATENCY BAR ─────────────────────────────────────────────── */
+    .latency-bar-wrap { margin-top: 6px; }
+    .latency-label { display: flex; justify-content: space-between; margin-bottom: 3px; font-size: 12px; color: var(--muted); }
+    .latency-track { height: 6px; background: #21262d; border-radius: 3px; }
+    .latency-fill  { height: 100%; border-radius: 3px; background: var(--blue); transition: width .5s; }
+
+    /* ── FOOTER ──────────────────────────────────────────────────── */
+    .footer {
+      text-align: center;
+      padding: 20px;
+      color: var(--muted);
+      font-size: 11px;
+      border-top: 1px solid var(--border);
+      margin-top: 8px;
+    }
+
+    /* ── SPINNER ─────────────────────────────────────────────────── */
+    .spinner {
+      display: inline-block;
+      width: 14px; height: 14px;
+      border: 2px solid var(--border);
+      border-top-color: var(--blue);
+      border-radius: 50%;
+      animation: spin .6s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+  </style>
+</head>
+<body>
+
+<!-- TOP BAR -->
+<div class="topbar">
+  <div class="topbar-brand">
+    <span class="shield">🛡</span>
+    GUARDIÃO CDM STORES
+    <span style="color:var(--muted);font-weight:400;font-size:13px">— Operations Dashboard</span>
+  </div>
+  <div class="topbar-right">
+    <span class="grade-badge grade-OPERATIONAL" id="grade-badge">—</span>
+    <button class="refresh-btn" onclick="loadStatus()">⟳ Refresh</button>
+    <span class="last-updated" id="last-updated">Loading…</span>
+  </div>
+</div>
+
+<!-- GRID -->
+<div class="grid">
+
+  <!-- SYSTEM GRADE + RESPONSE TIME -->
+  <div class="card">
+    <div class="card-title">📊 System Overview</div>
+    <div class="big-number" id="overview-grade">—</div>
+    <div class="big-sub" id="overview-ts">—</div>
+    <div style="height:12px"></div>
+    <div class="stat-row">
+      <span class="stat-label">Response Time</span>
+      <span class="stat-value" id="overview-ms">—</span>
+    </div>
+    <div class="stat-row">
+      <span class="stat-label">Mode</span>
+      <span class="stat-value" style="color:var(--purple)">Enterprise</span>
+    </div>
+    <div class="stat-row">
+      <span class="stat-label">Version</span>
+      <span class="stat-value" style="color:var(--blue)" id="overview-version">2.1.0</span>
+    </div>
+  </div>
+
+  <!-- BINDINGS -->
+  <div class="card">
+    <div class="card-title">🔌 Bindings</div>
+    <div class="bindings-grid" id="bindings-grid">
+      <div class="binding-item"><span class="spinner"></span> Loading…</div>
+    </div>
+  </div>
+
+  <!-- ALERTS -->
+  <div class="card">
+    <div class="card-title">🔔 Alerts</div>
+    <div id="alerts-list"><div class="state-empty">Loading…</div></div>
+  </div>
+
+  <!-- METRICS CARD -->
+  <div class="card">
+    <div class="card-title">📈 Metrics</div>
+    <div class="metrics-tabs">
+      <button class="tab-btn active" onclick="switchMetrics('1h', this)">1h</button>
+      <button class="tab-btn" onclick="switchMetrics('24h', this)">24h</button>
+    </div>
+    <div id="metrics-body"><div class="state-empty">Loading…</div></div>
+  </div>
+
+  <!-- CIRCUIT BREAKERS -->
+  <div class="card">
+    <div class="card-title">⚡ Circuit Breakers</div>
+    <div id="circuits-list"><div class="state-empty">Loading…</div></div>
+  </div>
+
+  <!-- SECURITY -->
+  <div class="card">
+    <div class="card-title">🔒 Security Posture</div>
+    <div id="security-body"><div class="state-empty">Loading…</div></div>
+  </div>
+
+  <!-- AGENT PIPELINE -->
+  <div class="card grid-wide">
+    <div class="card-title">🤖 Agent Pipeline (19 agents)</div>
+    <table class="agent-table" id="agent-table">
+      <thead><tr><th>ID</th><th>Name</th><th>Role</th><th>Status</th></tr></thead>
+      <tbody><tr><td colspan="4" class="state-empty">Loading…</td></tr></tbody>
+    </table>
+  </div>
+
+</div>
+
+<div class="footer">
+  GUARDIÃO CDM STORES — Enterprise Monitoring · <a href="/api/guardian/status" style="color:var(--blue);text-decoration:none" target="_blank">/api/guardian/status</a> · <span id="footer-ts">—</span>
+</div>
+
+<script>
+  const API = '/api/guardian/status';
+  let metricsData = null;
+
+  async function loadStatus() {
+    document.getElementById('last-updated').textContent = 'Refreshing…';
+    try {
+      const res  = await fetch(API);
+      const data = await res.json();
+      metricsData = data.metrics;
+      render(data);
+    } catch (e) {
+      document.getElementById('last-updated').textContent = 'ERROR: ' + e.message;
+    }
+  }
+
+  function render(d) {
+    // Grade
+    const gradeEl = document.getElementById('grade-badge');
+    gradeEl.textContent = d.grade;
+    gradeEl.className = 'grade-badge grade-' + d.grade;
+
+    // Overview
+    document.getElementById('overview-grade').textContent = d.grade;
+    document.getElementById('overview-grade').style.color =
+      d.grade === 'OPERATIONAL' ? 'var(--green)' :
+      d.grade === 'DEGRADED'    ? 'var(--yellow)' : 'var(--red)';
+    document.getElementById('overview-ts').textContent = new Date(d.timestamp).toLocaleString();
+    document.getElementById('overview-ms').textContent = d.responseMs + 'ms';
+
+    // Last updated
+    document.getElementById('last-updated').textContent = 'Updated ' + new Date().toLocaleTimeString();
+    document.getElementById('footer-ts').textContent = new Date().toISOString();
+
+    // Bindings
+    const bKeys = { d1: 'D1 Database', ai: 'Workers AI', vectorize: 'Vectorize', kvRateLimit: 'KV Rate Limit', kvMetrics: 'KV Metrics' };
+    document.getElementById('bindings-grid').innerHTML = Object.entries(d.bindings)
+      .map(([k, v]) => `<div class="binding-item"><span class="dot ${v ? 'dot-ok' : 'dot-err'}"></span>${bKeys[k] || k}</div>`)
+      .join('');
+
+    // Alerts
+    document.getElementById('alerts-list').innerHTML = d.alerts
+      .map(a => {
+        const ok = a.startsWith('No active');
+        return `<div class="alert-item ${ok ? 'alert-ok' : 'alert-warn'}">${ok ? '✓' : '⚠'} ${a}</div>`;
+      }).join('');
+
+    // Metrics (default 1h)
+    renderMetrics('1h');
+
+    // Circuit breakers
+    const circuits = d.circuits;
+    const cKeys = Object.keys(circuits);
+    document.getElementById('circuits-list').innerHTML = cKeys.length === 0
+      ? `<div class="state-empty">No circuits triggered yet — all CLOSED by default</div>`
+      : cKeys.map(k => `
+          <div class="circuit-item">
+            <span>${k}</span>
+            <div style="display:flex;align-items:center;gap:8px">
+              <span style="color:var(--muted);font-size:11px">${circuits[k].failures} fail</span>
+              <span class="circuit-state state-${circuits[k].state}">${circuits[k].state}</span>
+            </div>
+          </div>`).join('');
+
+    // Security
+    const s = d.security;
+    document.getElementById('security-body').innerHTML = `
+      <div class="stat-row"><span class="stat-label">Injection Patterns</span><span class="stat-value" style="color:var(--green)">${s.injectionPatterns}</span></div>
+      <div class="stat-row"><span class="stat-label">Max Message Length</span><span class="stat-value">${s.maxMessageLength.toLocaleString()} chars</span></div>
+      <div class="stat-row"><span class="stat-label">Rate Limit IP/min</span><span class="stat-value">${s.rateLimiting.chatIpMaxPerMin}</span></div>
+      <div class="stat-row"><span class="stat-label">Rate Limit Session/min</span><span class="stat-value">${s.rateLimiting.chatSessionMaxPerMin}</span></div>
+      <div class="stat-row"><span class="stat-label">JWT Algorithm</span><span class="stat-value">${s.jwtAlgorithm}</span></div>
+      <div class="stat-row"><span class="stat-label">Password Hash</span><span class="stat-value">${s.passwordHashing}</span></div>
+      <div class="stat-row"><span class="stat-label">2FA Standard</span><span class="stat-value">${s.totpStandard}</span></div>
+      <div class="stat-row"><span class="stat-label">Bot Protection</span><span class="stat-value">${s.botProtection}</span></div>
+      <div style="margin-top:10px">${s.headersEnforced.map(h => `<span class="sec-tag">${h}</span>`).join('')}</div>`;
+
+    // Agent pipeline
+    const tbody = document.querySelector('#agent-table tbody');
+    tbody.innerHTML = d.pipeline.agents.map(a => `
+      <tr>
+        <td class="agent-id">${a.id}</td>
+        <td style="font-weight:600">${a.name}</td>
+        <td class="agent-role">${a.role}</td>
+        <td><span class="circuit-state state-CLOSED">ACTIVE</span></td>
+      </tr>`).join('');
+  }
+
+  function renderMetrics(window) {
+    if (!metricsData) return;
+    const m = metricsData[window];
+    if (!m || m.note) {
+      document.getElementById('metrics-body').innerHTML = `<div class="state-empty">No traffic recorded yet in ${window} window</div>`;
+      return;
+    }
+    const maxLatency = 5000;
+    document.getElementById('metrics-body').innerHTML = `
+      <div class="stat-row"><span class="stat-label">Total Requests</span><span class="stat-value" style="color:var(--blue)">${m.totalRequests.toLocaleString()}</span></div>
+      <div class="stat-row"><span class="stat-label">Error Rate</span><span class="stat-value" style="color:${m.errorRate > 0.05 ? 'var(--red)' : 'var(--green)'}">${(m.errorRate * 100).toFixed(1)}%</span></div>
+      <div class="stat-row"><span class="stat-label">Rate Limit Hits</span><span class="stat-value">${m.rateLimitHits}</span></div>
+      <div class="stat-row"><span class="stat-label">p99 Latency</span><span class="stat-value">${m.p99LatencyMs}ms</span></div>
+      <div class="latency-bar-wrap">
+        <div class="latency-label"><span>Avg Latency</span><span>${m.avgLatencyMs}ms</span></div>
+        <div class="latency-track"><div class="latency-fill" style="width:${Math.min(100, (m.avgLatencyMs / maxLatency) * 100)}%"></div></div>
+      </div>
+      ${m.topPaths.length > 0 ? '<div style="margin-top:10px;font-size:11px;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.8px">Top Paths</div>' + m.topPaths.slice(0,5).map(p => `<div class="stat-row"><span class="stat-label">${p.path}</span><span class="stat-value">${p.count}</span></div>`).join('') : ''}`;
+  }
+
+  function switchMetrics(window, btn) {
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    renderMetrics(window);
+  }
+
+  // Auto-refresh every 30s
+  loadStatus();
+  setInterval(loadStatus, 30_000);
+</script>
+</body>
+</html>
