@@ -1,0 +1,71 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "TypeScript: Check",
+      "type": "shell",
+      "command": "npx tsc --noEmit",
+      "options": { "cwd": "${workspaceFolder}/worker" },
+      "group": "build",
+      "presentation": { "reveal": "always", "panel": "shared" },
+      "problemMatcher": "$tsc"
+    },
+    {
+      "label": "TypeScript: Watch",
+      "type": "shell",
+      "command": "npx tsc --noEmit --watch",
+      "options": { "cwd": "${workspaceFolder}/worker" },
+      "group": "build",
+      "isBackground": true,
+      "presentation": { "reveal": "always", "panel": "dedicated" },
+      "problemMatcher": "$tsc-watch"
+    },
+    {
+      "label": "Wrangler: Dev (local)",
+      "type": "shell",
+      "command": "npx wrangler dev",
+      "options": { "cwd": "${workspaceFolder}/worker" },
+      "group": "build",
+      "isBackground": true,
+      "presentation": { "reveal": "always", "panel": "dedicated" },
+      "problemMatcher": []
+    },
+    {
+      "label": "Wrangler: Deploy (production)",
+      "type": "shell",
+      "command": "npx wrangler deploy --env production",
+      "options": { "cwd": "${workspaceFolder}/worker" },
+      "group": "build",
+      "presentation": { "reveal": "always", "panel": "shared" },
+      "problemMatcher": []
+    },
+    {
+      "label": "Test: E2E Suite",
+      "type": "shell",
+      "command": "node test-suite-e2e.mjs",
+      "options": { "cwd": "${workspaceFolder}/worker" },
+      "group": "test",
+      "presentation": { "reveal": "always", "panel": "shared" },
+      "problemMatcher": []
+    },
+    {
+      "label": "Test: Stress Guardian",
+      "type": "shell",
+      "command": "node stress-guardian.mjs",
+      "options": { "cwd": "${workspaceFolder}/worker" },
+      "group": "test",
+      "presentation": { "reveal": "always", "panel": "shared" },
+      "problemMatcher": []
+    },
+    {
+      "label": "Wrangler: Tail (logs produção)",
+      "type": "shell",
+      "command": "npx wrangler tail --env production",
+      "options": { "cwd": "${workspaceFolder}/worker" },
+      "group": "build",
+      "isBackground": true,
+      "presentation": { "reveal": "always", "panel": "dedicated" },
+      "problemMatcher": []
+    }
+  ]
+}

@@ -1,0 +1,45 @@
+{
+  "recommendations": [
+    // ── JA INSTALADAS ───────────────────────────────────────────────
+    "eamodio.gitlens",                    // Git supercharged
+    "github.copilot",                     // AI completions
+    "github.copilot-chat",                // AI chat
+    "github.vscode-pull-request-github", // Pull requests
+    "github.vscode-github-actions",      // GitHub Actions
+    "dbaeumer.vscode-eslint",            // ESLint
+    "ms-vscode.powershell",             // PowerShell
+    "donjayamanne.githistory",           // Git history
+    "ritwickdey.liveserver",             // Live server for HTML
+    "mtxr.sqltools",                     // SQL Tools
+    "mtxr.sqltools-driver-sqlite",       // SQLite driver
+
+    // ── ESSENCIAIS — INSTALAR ──────────────────────────────────────
+    "esbenp.prettier-vscode",            // Prettier formatter (OBRIGATORIO)
+    "usernamehw.errorlens",              // Erros inline no editor
+    "PKief.material-icon-theme",         // Icones de arquivo melhores
+    "streetsidesoftware.code-spell-checker", // Spell check em codigo
+
+    // ── TYPESCRIPT / JAVASCRIPT ───────────────────────────────
+    "christian-kohler.npm-intellisense", // Auto-complete imports npm
+    "wix.vscode-import-cost",            // Mostra tamanho de imports
+
+    // ── CLOUDFLARE / WORKERS ─────────────────────────────────
+    "tamasfe.even-better-toml",          // Syntax highlighting para wrangler.toml
+
+    // ── TESTES ─────────────────────────────────────────────────
+    "ms-playwright.playwright",          // Playwright e2e tests
+
+    // ── PRODUTIVIDADE ──────────────────────────────────────────
+    "Gruntfuggly.todo-tree",             // TODOs/FIXMEs no explorer
+    "wayou.vscode-todo-highlight",       // Highlight de TODO no codigo
+    "naumovs.color-highlight",           // Preview de cores CSS no editor
+    "formulahendry.auto-rename-tag",     // Auto rename HTML tags
+
+    // ── SEGURANCA / QUALIDADE ────────────────────────────────
+    "snyk-security.snyk-vulnerability-scanner", // Snyk vulnerabilities
+    "rvest.vs-code-prettier-eslint"      // Prettier + ESLint integrado
+  ],
+  "unwantedRecommendations": [
+    "ms-mssql.mssql"                     // Nao usamos SQL Server neste projeto
+  ]
+}

@@ -1,0 +1,223 @@
+{
+  // ══════════════════════════════════════════════════════════════
+  //  CDM STORES — VS Code Settings
+  //  Optimized for: TypeScript · Cloudflare Workers · Node.js
+  // ══════════════════════════════════════════════════════════════
+
+  // ── EDITOR ──────────────────────────────────────────────────
+  "editor.formatOnSave": true,
+  "editor.formatOnPaste": false,
+  "editor.formatOnType": false,
+  "editor.defaultFormatter": "esbenp.prettier-vscode",
+  "editor.codeActionsOnSave": {
+    "source.organizeImports": "explicit",
+    "source.fixAll.eslint": "explicit"
+  },
+  "editor.tabSize": 2,
+  "editor.insertSpaces": true,
+  "editor.detectIndentation": false,
+  "editor.rulers": [100],
+  "editor.wordWrap": "off",
+  "editor.minimap.enabled": false,
+  "editor.stickyScroll.enabled": true,
+  "editor.bracketPairColorization.enabled": true,
+  "editor.guides.bracketPairs": "active",
+  "editor.inlayHints.enabled": "on",
+  "editor.suggestSelection": "first",
+  "editor.quickSuggestionsDelay": 50,
+  "editor.acceptSuggestionOnCommitCharacter": true,
+  "editor.snippetSuggestions": "top",
+  "editor.linkedEditing": true,
+  "editor.renderWhitespace": "boundary",
+  "editor.cursorBlinking": "smooth",
+  "editor.smoothScrolling": true,
+  "editor.fontLigatures": true,
+  "editor.fontSize": 14,
+  "editor.lineHeight": 22,
+
+  // ── AUTO SAVE ────────────────────────────────────────────────
+  "files.autoSave": "onFocusChange",
+  "files.autoSaveDelay": 1000,
+
+  // ── FILES ────────────────────────────────────────────────────
+  "files.eol": "\n",
+  "files.trimTrailingWhitespace": true,
+  "files.insertFinalNewline": true,
+  "files.trimFinalNewlines": true,
+  "files.associations": {
+    "*.ps1": "powershell",
+    "*.psm1": "powershell",
+    "*.sql": "sql",
+    "*.toml": "toml",
+    "*.mjs": "javascript",
+    "wrangler.toml": "toml",
+    ".env*": "dotenv"
+  },
+  "files.exclude": {
+    "**/node_modules": true,
+    "**/dist": true,
+    "**/.wrangler": true,
+    "**/__pycache__": true,
+    "**/*.pyc": true
+  },
+  "search.exclude": {
+    "**/node_modules": true,
+    "**/dist": true,
+    "**/.wrangler": true
+  },
+
+  // ── TYPESCRIPT ───────────────────────────────────────────────
+  "typescript.preferences.quoteStyle": "single",
+  "typescript.preferences.importModuleSpecifier": "relative",
+  "typescript.updateImportsOnFileMove.enabled": "always",
+  "typescript.suggest.autoImports": true,
+  "typescript.suggest.completeFunctionCalls": true,
+  "typescript.inlayHints.parameterNames.enabled": "literals",
+  "typescript.inlayHints.variableTypes.enabled": false,
+  "typescript.inlayHints.returnTypes.enabled": true,
+  "typescript.inlayHints.functionLikeReturnTypes.enabled": true,
+  "typescript.inlayHints.enumMemberValues.enabled": true,
+  "typescript.tsdk": "worker/node_modules/typescript/lib",
+  "typescript.enablePromptUseWorkspaceTsdk": true,
+  "[typescript]": {
+    "editor.defaultFormatter": "esbenp.prettier-vscode",
+    "editor.formatOnSave": true
+  },
+  "[typescriptreact]": {
+    "editor.defaultFormatter": "esbenp.prettier-vscode",
+    "editor.formatOnSave": true
+  },
+
+  // ── JAVASCRIPT ───────────────────────────────────────────────
+  "javascript.preferences.quoteStyle": "single",
+  "javascript.updateImportsOnFileMove.enabled": "always",
+  "javascript.suggest.autoImports": true,
+  "[javascript]": {
+    "editor.defaultFormatter": "esbenp.prettier-vscode",
+    "editor.formatOnSave": true
+  },
+  "[json]": {
+    "editor.defaultFormatter": "esbenp.prettier-vscode",
+    "editor.formatOnSave": true
+  },
+  "[jsonc]": {
+    "editor.defaultFormatter": "esbenp.prettier-vscode",
+    "editor.formatOnSave": true
+  },
+
+  // ── ESLINT ───────────────────────────────────────────────────
+  "eslint.enable": true,
+  "eslint.validate": ["javascript", "typescript"],
+  "eslint.run": "onSave",
+  "eslint.workingDirectories": [{"directory": "worker", "changeProcessCWD": true}],
+
+  // ── GIT + GITLENS ────────────────────────────────────────────
+  "git.autofetch": true,
+  "git.autofetchPeriod": 180,
+  "git.confirmSync": false,
+  "git.enableSmartCommit": true,
+  "git.smartCommitChanges": "staged",
+  "git.postCommitCommand": "none",
+  "git.branchProtection": ["main"],
+  "git.branchProtectionPrompt": "alwaysCommitToNewBranch",
+  "gitlens.currentLine.enabled": true,
+  "gitlens.currentLine.format": "${author}, ${agoOrDate} · ${message}",
+  "gitlens.hovers.currentLine.over": "line",
+  "gitlens.blame.highlight.enabled": true,
+  "gitlens.codeLens.enabled": true,
+  "gitlens.codeLens.recentChange.enabled": true,
+  "gitlens.codeLens.authors.enabled": true,
+  "gitlens.statusBar.enabled": true,
+  "gitlens.views.commits.showBranchComparison": "working",
+  "gitlens.telemetry.enabled": false,
+
+  // ── TERMINAL ─────────────────────────────────────────────────
+  "terminal.integrated.defaultProfile.windows": "PowerShell 7",
+  "terminal.integrated.profiles.windows": {
+    "PowerShell 7": {
+      "source": "PowerShell",
+      "icon": "terminal-powershell",
+      "args": ["-NoLogo"]
+    },
+    "Git Bash": {
+      "source": "Git Bash"
+    }
+  },
+  "terminal.integrated.env.windows": {
+    "PSModulePath": "${env:PSModulePath}"
+  },
+  "terminal.integrated.fontSize": 13,
+  "terminal.integrated.cursorStyle": "line",
+  "terminal.integrated.scrollback": 5000,
+  "terminal.integrated.cwd": "${workspaceFolder}",
+  "terminal.integrated.tabs.enabled": true,
+
+  // ── POWERSHELL ───────────────────────────────────────────────
+  "powershell.powerShellDefaultVersion": "PowerShell 7",
+  "powershell.powerShellAdditionalExePaths": [
+    {
+      "exePath": "C:/Program Files/PowerShell/7/pwsh.exe",
+      "versionName": "PowerShell 7"
+    }
+  ],
+  "powershell.scriptAnalysis.enable": true,
+  "powershell.scriptAnalysis.settingsPath": "${workspaceFolder}/.vscode/PSScriptAnalyzerSettings.psd1",
+  "powershell.codeFormatting.preset": "Allman",
+  "[powershell]": {
+    "editor.formatOnSave": true,
+    "editor.tabSize": 4
+  },
+
+  // ── SQL / SQLTOOLS ───────────────────────────────────────────
+  "sqltools.connections": [
+    {
+      "name": "CDMStores D1 Local",
+      "driver": "SQLite",
+      "database": "${workspaceFolder}/worker/.wrangler/state/v3/d1/miniflare-D1DatabaseObject/91206a759ffabc2cf9cc58e68c4df6d67592eb9899f42573de9cc0a157de6e0a.sqlite",
+      "group": "CDMStores"
+    }
+  ],
+  "sqltools.autoConnectTo": "CDMStores D1 Local",
+  "sqltools.useNodeRuntime": true,
+  "mssql.intelliSense.enableIntelliSense": false,
+  "[sql]": {
+    "editor.defaultFormatter": null,
+    "editor.tabSize": 2
+  },
+
+  // ── COPILOT ──────────────────────────────────────────────────
+  "github.copilot.enable": {
+    "*": true,
+    "plaintext": false,
+    "markdown": true,
+    "scminput": true
+  },
+  "github.copilot.editor.enableAutoCompletions": true,
+
+  // ── EXPLORER ─────────────────────────────────────────────────
+  "explorer.compactFolders": false,
+  "explorer.confirmDelete": true,
+  "explorer.confirmDragAndDrop": false,
+  "explorer.sortOrder": "type",
+  "workbench.tree.indent": 16,
+  "workbench.editor.enablePreview": false,
+  "workbench.editor.tabCloseButton": "right",
+  "workbench.startupEditor": "none",
+
+  // ── PROBLEMS / ERRORS ────────────────────────────────────────
+  "problems.showCurrentInStatus": true,
+
+  // ── HTML / CSS ───────────────────────────────────────────────
+  "[html]": {
+    "editor.defaultFormatter": "esbenp.prettier-vscode",
+    "editor.formatOnSave": true
+  },
+  "[css]": {
+    "editor.defaultFormatter": "esbenp.prettier-vscode",
+    "editor.formatOnSave": true
+  },
+  "emmet.triggerExpansionOnTab": true,
+  "emmet.includeLanguages": {
+    "javascript": "javascriptreact"
+  }
+}
