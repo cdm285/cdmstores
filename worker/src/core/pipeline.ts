@@ -26,9 +26,10 @@
  *   const report = await pipeline.run(ctx);
  */
 
+import { logger } from '../lib/logger.js';
+import type { ActionRequest, ActionResult } from './action-schema.js';
 import type { ExtendedAgentContext } from './agent-context.js';
 import { addTrace } from './agent-context.js';
-import type { ActionRequest, ActionResult }          from './action-schema.js';
 
 // ─── Step types ───────────────────────────────────────────────────────────────
 /** A single async operation that receives and mutates the context. */
@@ -36,49 +37,49 @@ export type StepFn<T = ExtendedAgentContext> = (ctx: T) => Promise<void> | void;
 
 /** Internal step descriptor */
 interface PipelineStep<T> {
-  kind         : 'sequential' | 'parallel' | 'branch';
-  name         : string;
-  fns?         : StepFn<T>[];                           // sequential or parallel
-  condition?   : (ctx: T) => boolean;                   // branch condition
-  thenName?    : string;
-  thenFns?     : StepFn<T>[];
-  elseName?    : string;
-  elseFns?     : StepFn<T>[];
-  timeoutMs?   : number;
-  skip?        : (ctx: T) => boolean;                   // skip this step entirely
+  kind: 'sequential' | 'parallel' | 'branch';
+  name: string;
+  fns?: StepFn<T>[]; // sequential or parallel
+  condition?: (ctx: T) => boolean; // branch condition
+  thenName?: string;
+  thenFns?: StepFn<T>[];
+  elseName?: string;
+  elseFns?: StepFn<T>[];
+  timeoutMs?: number;
+  skip?: (ctx: T) => boolean; // skip this step entirely
 }
 
 // ─── Report ───────────────────────────────────────────────────────────────────
 export interface StepReport {
-  name       : string;
-  kind       : string;
-  success    : boolean;
-  latencyMs  : number;
-  skipped    : boolean;
-  error?     : string;
+  name: string;
+  kind: string;
+  success: boolean;
+  latencyMs: number;
+  skipped: boolean;
+  error?: string;
 }
 
 export interface Tier4ActionReport {
-  actionType  : string;
-  success     : boolean;
-  latencyMs   : number;
-  error?      : string;
+  actionType: string;
+  success: boolean;
+  latencyMs: number;
+  error?: string;
 }
 
 export interface PipelineReport {
-  pipelineName   : string;
-  success        : boolean;
-  totalMs        : number;
-  stepsExecuted  : number;
-  stepsSkipped   : number;
-  stepsFailed    : number;
-  steps          : StepReport[];
-  tier4Actions?  : Tier4ActionReport[];
+  pipelineName: string;
+  success: boolean;
+  totalMs: number;
+  stepsExecuted: number;
+  stepsSkipped: number;
+  stepsFailed: number;
+  steps: StepReport[];
+  tier4Actions?: Tier4ActionReport[];
 }
 
 // ─── Pipeline class ───────────────────────────────────────────────────────────
 export class Pipeline<T extends ExtendedAgentContext = ExtendedAgentContext> {
-  private readonly steps : PipelineStep<T>[] = [];
+  private readonly steps: PipelineStep<T>[] = [];
 
   constructor(private readonly name: string) {}
 
@@ -86,9 +87,9 @@ export class Pipeline<T extends ExtendedAgentContext = ExtendedAgentContext> {
 
   /** Add a sequential step. Execution stops on unhandled error. */
   step(
-    name       : string,
-    fn         : StepFn<T>,
-    options?   : { timeoutMs?: number; skip?: (ctx: T) => boolean },
+    name: string,
+    fn: StepFn<T>,
+    options?: { timeoutMs?: number; skip?: (ctx: T) => boolean },
   ): this {
     this.steps.push({ kind: 'sequential', name, fns: [fn], ...options });
     return this;
@@ -96,9 +97,9 @@ export class Pipeline<T extends ExtendedAgentContext = ExtendedAgentContext> {
 
   /** Add multiple functions that run concurrently via Promise.allSettled. */
   parallel(
-    name     : string,
-    fns      : StepFn<T>[],
-    options? : { timeoutMs?: number; skip?: (ctx: T) => boolean },
+    name: string,
+    fns: StepFn<T>[],
+    options?: { timeoutMs?: number; skip?: (ctx: T) => boolean },
   ): this {
     this.steps.push({ kind: 'parallel', name, fns, ...options });
     return this;
@@ -109,15 +110,15 @@ export class Pipeline<T extends ExtendedAgentContext = ExtendedAgentContext> {
    * Exactly one branch is executed; the other is skipped.
    */
   branch(
-    condition  : (ctx: T) => boolean,
-    thenName   : string,
-    thenFns    : StepFn<T>[],
-    elseName?  : string,
-    elseFns?   : StepFn<T>[],
+    condition: (ctx: T) => boolean,
+    thenName: string,
+    thenFns: StepFn<T>[],
+    elseName?: string,
+    elseFns?: StepFn<T>[],
   ): this {
     this.steps.push({
-      kind      : 'branch',
-      name      : `branch(${thenName}|${elseName ?? 'skip'})`,
+      kind: 'branch',
+      name: `branch(${thenName}|${elseName ?? 'skip'})`,
       condition,
       thenName,
       thenFns,
@@ -138,7 +139,13 @@ export class Pipeline<T extends ExtendedAgentContext = ExtendedAgentContext> {
 
     for (const step of this.steps) {
       if (step.skip?.(ctx)) {
-        steps.push({ name: step.name, kind: step.kind, success: true, latencyMs: 0, skipped: true });
+        steps.push({
+          name: step.name,
+          kind: step.kind,
+          success: true,
+          latencyMs: 0,
+          skipped: true,
+        });
         skipped++;
         continue;
       }
@@ -150,20 +157,25 @@ export class Pipeline<T extends ExtendedAgentContext = ExtendedAgentContext> {
       try {
         switch (step.kind) {
           case 'sequential':
+            // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
             await this.runWithTimeout(step.fns![0], ctx, step.timeoutMs);
             break;
 
           case 'parallel':
+            // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
             await this.runParallel(step.fns!, ctx, step.timeoutMs);
             break;
 
           case 'branch': {
+            // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
             const takeThen = step.condition!(ctx);
             const branchFns = takeThen ? step.thenFns : step.elseFns;
             const branchName = takeThen ? (step.thenName ?? 'then') : (step.elseName ?? 'else');
             if (branchFns?.length) {
               await this.runParallel(branchFns, ctx, step.timeoutMs);
-              if (ctx.flags.debug) {console.log(`[Pipeline:${this.name}] branch → ${branchName}`);}
+              if (ctx.flags.debug) {
+                logger.debug(`[Pipeline:${this.name}] branch → ${branchName}`);
+              }
             }
             break;
           }
@@ -174,35 +186,39 @@ export class Pipeline<T extends ExtendedAgentContext = ExtendedAgentContext> {
         failed++;
         // Record in trace
         addTrace(ctx, {
-          agentId    : step.name,
-          agentName  : step.name,
-          success    : false,
-          latencyMs  : Date.now() - start,
-          confidence : 0,
+          agentId: step.name,
+          agentName: step.name,
+          success: false,
+          latencyMs: Date.now() - start,
+          confidence: 0,
           error,
         });
-        if (ctx.flags.debug) {console.error(`[Pipeline:${this.name}] STEP FAILED: ${step.name}`, e);}
+        if (ctx.flags.debug) {
+          logger.error(`[Pipeline:${this.name}] STEP FAILED: ${step.name}`, e);
+        }
         // Critical steps (no error handler) halt the pipeline
-        if (step.kind === 'sequential') {break;}
+        if (step.kind === 'sequential') {
+          break;
+        }
       }
 
       steps.push({
-        name      : step.name,
-        kind      : step.kind,
+        name: step.name,
+        kind: step.kind,
         success,
-        latencyMs : Date.now() - start,
-        skipped   : false,
+        latencyMs: Date.now() - start,
+        skipped: false,
         error,
       });
     }
 
     return {
-      pipelineName   : this.name,
-      success        : failed === 0,
-      totalMs        : Date.now() - startTotal,
-      stepsExecuted  : steps.filter(s => !s.skipped).length,
-      stepsSkipped   : skipped,
-      stepsFailed    : failed,
+      pipelineName: this.name,
+      success: failed === 0,
+      totalMs: Date.now() - startTotal,
+      stepsExecuted: steps.filter(s => !s.skipped).length,
+      stepsSkipped: skipped,
+      stepsFailed: failed,
       steps,
     };
   }
@@ -210,7 +226,9 @@ export class Pipeline<T extends ExtendedAgentContext = ExtendedAgentContext> {
   // ── Internal helpers ──────────────────────────────────────────────────────
 
   private async runWithTimeout(fn: StepFn<T>, ctx: T, ms?: number): Promise<void> {
-    if (!ms) {return Promise.resolve(fn(ctx));}
+    if (!ms) {
+      return Promise.resolve(fn(ctx));
+    }
     return Promise.race([
       Promise.resolve(fn(ctx)) as Promise<void>,
       new Promise<never>((_, rej) =>
@@ -225,7 +243,9 @@ export class Pipeline<T extends ExtendedAgentContext = ExtendedAgentContext> {
     for (const r of results) {
       if (r.status === 'rejected') {
         // Log but don't halt — parallel steps are treated as best-effort
-        if (ctx.flags.debug) {console.warn(`[Pipeline] Parallel step rejected:`, r.reason);}
+        if (ctx.flags.debug) {
+          logger.warn(`[Pipeline] Parallel step rejected:`, r.reason);
+        }
       }
     }
   }
@@ -245,15 +265,17 @@ export function createPipeline<T extends ExtendedAgentContext = ExtendedAgentCon
  * but do NOT stop execution.
  */
 export async function runTier(
-  ctx   : ExtendedAgentContext,
-  name  : string,
-  fns   : StepFn<ExtendedAgentContext>[],
+  ctx: ExtendedAgentContext,
+  name: string,
+  fns: StepFn<ExtendedAgentContext>[],
 ): Promise<void> {
   const start = Date.now();
   const results = await Promise.allSettled(fns.map(f => Promise.resolve(f(ctx))));
   const errors = results.filter(r => r.status === 'rejected');
   if (ctx.flags.debug) {
-    console.log(`[Tier:${name}] ${fns.length} agents, ${errors.length} errors, ${Date.now() - start}ms`);
+    logger.debug(
+      `[Tier:${name}] ${fns.length} agents, ${errors.length} errors, ${Date.now() - start}ms`,
+    );
   }
 }
 
@@ -270,30 +292,32 @@ export async function runTier(
  *   const t4 = await runTier4(ctx, [req1, req2], agent10ActionRouter.execute.bind(agent10ActionRouter));
  */
 export async function runTier4(
-  ctx      : ExtendedAgentContext,
-  requests : ActionRequest[],
-  dispatch : (ctx: ExtendedAgentContext, req: ActionRequest) => Promise<ActionResult>,
+  ctx: ExtendedAgentContext,
+  requests: ActionRequest[],
+  dispatch: (ctx: ExtendedAgentContext, req: ActionRequest) => Promise<ActionResult>,
 ): Promise<Tier4ActionReport[]> {
   const settled = await Promise.allSettled(
     requests.map(async (req): Promise<Tier4ActionReport> => {
-      const t0     = Date.now();
+      const t0 = Date.now();
       const result = await dispatch(ctx, req);
       return {
-        actionType : req.payload.type,
-        success    : result.success,
-        latencyMs  : Date.now() - t0,
-        error      : result.error,
+        actionType: req.payload.type,
+        success: result.success,
+        latencyMs: Date.now() - t0,
+        error: result.error,
       };
     }),
   );
 
   const reports: Tier4ActionReport[] = settled.map((r, i) => {
-    if (r.status === 'fulfilled') {return r.value;}
+    if (r.status === 'fulfilled') {
+      return r.value;
+    }
     return {
-      actionType : requests[i].payload.type,
-      success    : false,
-      latencyMs  : 0,
-      error      : (r.reason as Error)?.message ?? 'unknown error',
+      actionType: requests[i].payload.type,
+      success: false,
+      latencyMs: 0,
+      error: (r.reason as Error)?.message ?? 'unknown error',
     };
   });
 
@@ -302,9 +326,9 @@ export async function runTier4(
   ctx.meta.tier4Actions = [...existing, ...reports];
 
   if (ctx.flags.debug) {
-    const ok  = reports.filter(r => r.success).length;
+    const ok = reports.filter(r => r.success).length;
     const err = reports.length - ok;
-    console.log(`[Tier4] ${reports.length} actions — ${ok} ok, ${err} failed`);
+    logger.debug(`[Tier4] ${reports.length} actions — ${ok} ok, ${err} failed`);
   }
 
   return reports;

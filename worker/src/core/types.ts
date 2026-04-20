@@ -8,9 +8,9 @@ export interface AgentEnv {
   DB: D1Database;
   AI: Ai;
   VECTORIZE: VectorizeIndex;
-  KV?: KVNamespace;         // legacy alias
+  KV?: KVNamespace; // legacy alias
   RATE_LIMIT?: KVNamespace; // high-performance rate limiting
-  METRICS?: KVNamespace;    // observability metrics store
+  METRICS?: KVNamespace; // observability metrics store
   JWT_SECRET?: string;
   RESEND_API_KEY?: string;
   APP_URL?: string;
@@ -122,8 +122,8 @@ export interface SentimentResult {
 
 // ─── Quality ──────────────────────────────────────────────────────────────────
 export interface QualityReport {
-  score: number;           // 0–100
-  passed: boolean;         // score >= QUALITY_THRESHOLD
+  score: number; // 0–100
+  passed: boolean; // score >= QUALITY_THRESHOLD
   issues: string[];
   suggestions: string[];
 }

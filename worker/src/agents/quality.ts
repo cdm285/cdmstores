@@ -8,7 +8,7 @@
  * Agent 79 — QualityCheckAgent   Gate: block if score < THRESHOLD
  */
 
-import type { AgentContext, AgentResult, QualityReport} from '../core/types.js';
+import type { AgentContext, AgentResult, QualityReport } from '../core/types.js';
 import { BaseAgent, QUALITY_THRESHOLD } from '../core/types.js';
 
 // ─── Agent 32 — QualityAgent ──────────────────────────────────────────────────
@@ -39,7 +39,7 @@ export class QualityAgent extends BaseAgent {
     const priceMatches = response.match(/R\$\s*([\d,]+)/g) ?? [];
     for (const p of priceMatches) {
       const val = parseFloat(p.replace('R$', '').replace(',', '.').trim());
-      const validPrices = [89.90, 49.90, 29.90, 149.90, 15.00, 10, 5, 20];
+      const validPrices = [89.9, 49.9, 29.9, 149.9, 15.0, 10, 5, 20];
       if (!validPrices.some(vp => Math.abs(vp - val) < 0.05)) {
         issues.push(`Possibly incorrect price mentioned: ${p}`);
         score -= 15;
@@ -47,9 +47,16 @@ export class QualityAgent extends BaseAgent {
     }
 
     // No actionable info
-    if (score > 50 && !response.includes('R$') && !response.includes('http') &&
-        !response.includes('📦') && !response.includes('✅') && !response.includes('❌') &&
-        ctx.session.intent !== 'greeting' && ctx.session.intent !== 'farewell') {
+    if (
+      score > 50 &&
+      !response.includes('R$') &&
+      !response.includes('http') &&
+      !response.includes('📦') &&
+      !response.includes('✅') &&
+      !response.includes('❌') &&
+      ctx.session.intent !== 'greeting' &&
+      ctx.session.intent !== 'farewell'
+    ) {
       suggestions.push('Response could be more specific/actionable');
       score -= 5;
     }
@@ -70,7 +77,11 @@ export class QualityAgent extends BaseAgent {
 
     ctx.meta.quality_report = report;
 
-    return this.ok(this.id, { data: report as unknown as Record<string, unknown>, confidence: score }, t);
+    return this.ok(
+      this.id,
+      { data: report as unknown as Record<string, unknown>, confidence: score },
+      t,
+    );
   }
 }
 
@@ -85,7 +96,11 @@ export class CoherenceAgent extends BaseAgent {
     // Compare with last assistant message for topic drift
     const lastAssistant = [...ctx.session.context].reverse().find(m => m.role === 'assistant');
     if (!lastAssistant) {
-      return this.ok(this.id, { data: { coherent: true, reason: 'first_turn' }, confidence: 95 }, t);
+      return this.ok(
+        this.id,
+        { data: { coherent: true, reason: 'first_turn' }, confidence: 95 },
+        t,
+      );
     }
 
     // Simple coherence: if previous was about tracking and current switches to product, flag it
@@ -118,8 +133,9 @@ export class ValidationAgent extends BaseAgent {
     }
 
     // Check response doesn't contain sensitive data patterns
-    const hasSensitive = /\b\d{4}[\s-]?\d{4}[\s-]?\d{4}[\s-]?\d{4}\b/.test(response) // credit card
-      || /\b\d{3}\.?\d{3}\.?\d{3}-?\d{2}\b/.test(response); // CPF
+    const hasSensitive =
+      /\b\d{4}[\s-]?\d{4}[\s-]?\d{4}[\s-]?\d{4}\b/.test(response) || // credit card
+      /\b\d{3}\.?\d{3}\.?\d{3}-?\d{2}\b/.test(response); // CPF
 
     if (hasSensitive) {
       return this.fail(this.id, 'Response contains potentially sensitive data', t);
@@ -148,11 +164,16 @@ export class ErrorCorrectionAgent extends BaseAgent {
     // Fix broken markdown
     if (ctx.meta.fix_markdown) {
       const boldCount = (corrected.match(/\*\*/g) ?? []).length;
-      if (boldCount % 2 !== 0) {corrected += '**';}
+      if (boldCount % 2 !== 0) {
+        corrected += '**';
+      }
     }
 
     // Remove debug artifacts
-    corrected = corrected.replace(/\[object Object\]/g, '').replace(/\bundefined\b/g, '').replace(/\bnull\b(?!\s*$)/g, '');
+    corrected = corrected
+      .replace(/\[object Object\]/g, '')
+      .replace(/\bundefined\b/g, '')
+      .replace(/\bnull\b(?!\s*$)/g, '');
 
     // Trim
     corrected = corrected.trim();
@@ -174,20 +195,31 @@ export class SelfRepairAgent extends BaseAgent {
     // If low quality, regenerate with more specific prompt
     if (report && !report.passed) {
       const repairPrompt = [
-        { role: 'system' as const, content: `Você é o assistente da CDM STORES. Responda de forma útil, clara e direta. Idioma: ${ctx.session.language}.` },
-        { role: 'user' as const, content: ctx.session.context[ctx.session.context.length - 1]?.content ?? 'Olá' },
+        {
+          role: 'system' as const,
+          content: `Você é o assistente da CDM STORES. Responda de forma útil, clara e direta. Idioma: ${ctx.session.language}.`,
+        },
+        {
+          role: 'user' as const,
+          content: ctx.session.context[ctx.session.context.length - 1]?.content ?? 'Olá',
+        },
       ];
 
       try {
         // Cast required: Workers AI TypeScript types may lag behind available models
         type AiFlex = { run(model: string, params: unknown): Promise<{ response: string }> };
-        const result = await (ctx.env.AI as unknown as AiFlex).run('@cf/meta/llama-3.1-8b-instruct-fp8', { messages: repairPrompt });
+        const result = await (ctx.env.AI as unknown as AiFlex).run(
+          '@cf/meta/llama-3.1-8b-instruct-fp8',
+          { messages: repairPrompt },
+        );
         const repaired = result.response?.trim();
         if (repaired && repaired.length > 20) {
           ctx.meta.was_repaired = true;
           return this.ok(this.id, { response: repaired, confidence: 65 }, t);
         }
-      } catch { /* fall through to original */ }
+      } catch {
+        /* fall through to original */
+      }
     }
 
     return this.ok(this.id, { response: originalResponse, confidence: 50 }, t);
@@ -208,8 +240,9 @@ export class SelfCorrectionAgent extends BaseAgent {
 
     // If EN session but response has Portuguese keywords (AI hallucination)
     if (lang === 'en') {
-      const ptOnly = /\bpedido\b|\bcarrinho\b|\bprodutos\b/i.test(corrected)
-        && !/\border\b|\bcart\b|\bproducts\b/i.test(corrected);
+      const ptOnly =
+        /\bpedido\b|\bcarrinho\b|\bprodutos\b/i.test(corrected) &&
+        !/\border\b|\bcart\b|\bproducts\b/i.test(corrected);
       if (ptOnly) {
         // Mark for logging but don't auto-translate (would cost neurons)
         ctx.meta.lang_mismatch_detected = true;
@@ -225,7 +258,7 @@ export class QualityCheckAgent extends BaseAgent {
   readonly id = '79-quality-check';
   readonly name = 'QualityCheckAgent';
 
-  async run(ctx: AgentContext, response: string): Promise<AgentResult> {
+  async run(ctx: AgentContext, _response: string): Promise<AgentResult> {
     const t = this.start();
     const report = ctx.meta.quality_report as QualityReport | undefined;
 
@@ -234,13 +267,21 @@ export class QualityCheckAgent extends BaseAgent {
     }
 
     if (!report.passed) {
-      return this.fail(this.id, `Quality gate failed: score=${report.score}, issues=${report.issues.join(', ')}`, t);
+      return this.fail(
+        this.id,
+        `Quality gate failed: score=${report.score}, issues=${report.issues.join(', ')}`,
+        t,
+      );
     }
 
-    return this.ok(this.id, {
-      data: { gate: 'pass', score: report.score },
-      confidence: report.score,
-    }, t);
+    return this.ok(
+      this.id,
+      {
+        data: { gate: 'pass', score: report.score },
+        confidence: report.score,
+      },
+      t,
+    );
   }
 }
 

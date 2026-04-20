@@ -18,9 +18,9 @@ import { addTrace } from '../core/agent-context.js';
 import type { AgentEnv } from '../core/types.js';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
-const EMBED_MODEL     = '@cf/baai/bge-m3';
-const SCORE_THRESHOLD = 0.70;
-const TOP_K           = 5;
+const EMBED_MODEL = '@cf/baai/bge-m3';
+const SCORE_THRESHOLD = 0.7;
+const TOP_K = 5;
 
 // ─── Helper: AiFlex cast (Workers AI dynamic typing) ─────────────────────────
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -28,7 +28,7 @@ type AiFlex = { run(model: string, params: Record<string, unknown>): Promise<any
 
 // ─── Agent ────────────────────────────────────────────────────────────────────
 export class Agent07SemanticMemory {
-  readonly id   = '07-semantic-memory';
+  readonly id = '07-semantic-memory';
   readonly name = 'SemanticMemoryAgent';
   readonly tier = 2;
 
@@ -38,7 +38,13 @@ export class Agent07SemanticMemory {
     const env = ctx.env as AgentEnv;
 
     if (!env.AI || !env.VECTORIZE) {
-      addTrace(ctx, { agentId: this.id, agentName: this.name, success: false, latencyMs: 0, error: 'AI or VECTORIZE binding missing' });
+      addTrace(ctx, {
+        agentId: this.id,
+        agentName: this.name,
+        success: false,
+        latencyMs: 0,
+        error: 'AI or VECTORIZE binding missing',
+      });
       return;
     }
 
@@ -54,20 +60,32 @@ export class Agent07SemanticMemory {
         : [];
 
       if (vector.length === 0) {
-        addTrace(ctx, { agentId: this.id, agentName: this.name, success: false, latencyMs: Date.now() - start, error: 'Empty embedding returned' });
+        addTrace(ctx, {
+          agentId: this.id,
+          agentName: this.name,
+          success: false,
+          latencyMs: Date.now() - start,
+          error: 'Empty embedding returned',
+        });
         return;
       }
 
       // 2. Query Vectorize
       const queryResult = await env.VECTORIZE.query(vector, {
-        topK           : TOP_K,
-        returnMetadata : 'all',
+        topK: TOP_K,
+        returnMetadata: 'all',
       });
 
       const hits = (queryResult.matches ?? []).filter(m => (m.score ?? 0) >= SCORE_THRESHOLD);
 
       if (hits.length === 0) {
-        addTrace(ctx, { agentId: this.id, agentName: this.name, success: true, latencyMs: Date.now() - start, confidence: 0 });
+        addTrace(ctx, {
+          agentId: this.id,
+          agentName: this.name,
+          success: true,
+          latencyMs: Date.now() - start,
+          confidence: 0,
+        });
         return;
       }
 
@@ -79,20 +97,26 @@ export class Agent07SemanticMemory {
         })
         .filter(Boolean);
 
-      ctx.semanticCtx       = snippets.join('\n---\n');
+      ctx.semanticCtx = snippets.join('\n---\n');
       ctx.flags.semanticMemory = true;
 
       const avgScore = hits.reduce((acc, h) => acc + (h.score ?? 0), 0) / hits.length;
       addTrace(ctx, {
-        agentId   : this.id,
-        agentName : this.name,
-        success   : true,
-        latencyMs : Date.now() - start,
+        agentId: this.id,
+        agentName: this.name,
+        success: true,
+        latencyMs: Date.now() - start,
         confidence: Math.round(avgScore * 100),
       });
     } catch (err) {
       const error = err instanceof Error ? err.message : String(err);
-      addTrace(ctx, { agentId: this.id, agentName: this.name, success: false, latencyMs: Date.now() - start, error });
+      addTrace(ctx, {
+        agentId: this.id,
+        agentName: this.name,
+        success: false,
+        latencyMs: Date.now() - start,
+        error,
+      });
     }
   }
 }

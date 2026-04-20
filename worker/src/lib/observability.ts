@@ -10,9 +10,8 @@
  * is unavailable (graceful degradation).
  */
 
-import type { Env } from './response.js';
-
 // ══════════════════════════════════════════════════════════════════════════════
+import { logger } from './logger.js';
 // SECTION 1 — KV Rate Limiter (sliding window counter)
 // ══════════════════════════════════════════════════════════════════════════════
 
@@ -29,10 +28,10 @@ import type { Env } from './response.js';
  * @param windowSecs  - Window size in seconds
  */
 export async function kvRateLimit(
-  kv          : KVNamespace | undefined,
-  key         : string,
-  maxRequests : number,
-  windowSecs  : number,
+  kv: KVNamespace | undefined,
+  key: string,
+  maxRequests: number,
+  windowSecs: number,
 ): Promise<{ allowed: boolean; remaining: number; resetIn: number }> {
   if (!kv) {
     // KV not available — fail open (do not crash the request)
@@ -41,11 +40,15 @@ export async function kvRateLimit(
 
   try {
     const bucketKey = `rl:${key}:${Math.floor(Date.now() / 1000 / windowSecs)}`;
-    const raw       = await kv.get(bucketKey);
-    const count     = raw ? parseInt(raw, 10) : 0;
+    const raw = await kv.get(bucketKey);
+    const count = raw ? parseInt(raw, 10) : 0;
 
     if (count >= maxRequests) {
-      return { allowed: false, remaining: 0, resetIn: windowSecs - (Math.floor(Date.now() / 1000) % windowSecs) };
+      return {
+        allowed: false,
+        remaining: 0,
+        resetIn: windowSecs - (Math.floor(Date.now() / 1000) % windowSecs),
+      };
     }
 
     // Increment atomically — TTL = window + 5s buffer
@@ -62,16 +65,16 @@ export async function kvRateLimit(
 // ══════════════════════════════════════════════════════════════════════════════
 
 export interface RequestMetric {
-  ts         : number;    // epoch ms
-  path       : string;
-  method     : string;
-  status     : number;
-  latencyMs  : number;
-  requestId  : string;
-  sessionId? : string;
-  ip?        : string;
-  error?     : string;
-  agentMs?   : Record<string, number>; // per-agent latencies
+  ts: number; // epoch ms
+  path: string;
+  method: string;
+  status: number;
+  latencyMs: number;
+  requestId: string;
+  sessionId?: string;
+  ip?: string;
+  error?: string;
+  agentMs?: Record<string, number>; // per-agent latencies
 }
 
 /**
@@ -80,14 +83,16 @@ export interface RequestMetric {
  * Fire-and-forget — awaiting is optional.
  */
 export async function recordMetric(
-  metricsKv : KVNamespace | undefined,
-  metric    : RequestMetric,
+  metricsKv: KVNamespace | undefined,
+  metric: RequestMetric,
 ): Promise<void> {
-  if (!metricsKv) {return;}
+  if (!metricsKv) {
+    return;
+  }
   try {
-    const hour      = Math.floor(Date.now() / 3600_000);
+    const hour = Math.floor(Date.now() / 3600_000);
     const bucketKey = `metrics:hour:${hour}`;
-    const raw       = await metricsKv.get(bucketKey);
+    const raw = await metricsKv.get(bucketKey);
     const bucket: RequestMetric[] = raw ? JSON.parse(raw) : [];
 
     bucket.push(metric);
@@ -96,7 +101,9 @@ export async function recordMetric(
 
     // TTL: keep 26h of metrics (current hour + 25h history)
     await metricsKv.put(bucketKey, JSON.stringify(trimmed), { expirationTtl: 93_600 });
-  } catch { /* never block on metrics failure */ }
+  } catch {
+    /* never block on metrics failure */
+  }
 }
 
 /**
@@ -107,46 +114,62 @@ export async function getAggregatedMetrics(
   metricsKv: KVNamespace | undefined,
   hoursBack = 1,
 ): Promise<{
-  totalRequests : number;
-  errorRate     : number;  // 0.0–1.0
-  avgLatencyMs  : number;
-  p99LatencyMs  : number;
-  topPaths      : Array<{ path: string; count: number }>;
-  rateLimitHits : number;
+  totalRequests: number;
+  errorRate: number; // 0.0–1.0
+  avgLatencyMs: number;
+  p99LatencyMs: number;
+  topPaths: Array<{ path: string; count: number }>;
+  rateLimitHits: number;
 }> {
-  const empty = { totalRequests: 0, errorRate: 0, avgLatencyMs: 0, p99LatencyMs: 0, topPaths: [], rateLimitHits: 0 };
-  if (!metricsKv) {return empty;}
+  const empty = {
+    totalRequests: 0,
+    errorRate: 0,
+    avgLatencyMs: 0,
+    p99LatencyMs: 0,
+    topPaths: [],
+    rateLimitHits: 0,
+  };
+  if (!metricsKv) {
+    return empty;
+  }
 
   try {
-    const now     = Math.floor(Date.now() / 3600_000);
+    const now = Math.floor(Date.now() / 3600_000);
     const buckets = await Promise.all(
       Array.from({ length: hoursBack }, (_, i) => metricsKv.get(`metrics:hour:${now - i}`)),
     );
 
-    const all: RequestMetric[] = buckets
-      .filter(Boolean)
-      .flatMap(b => { try { return JSON.parse(b!) as RequestMetric[]; } catch { return []; } });
+    const all: RequestMetric[] = buckets.filter(Boolean).flatMap(b => {
+      try {
+        // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+        return JSON.parse(b!) as RequestMetric[];
+      } catch {
+        return [];
+      }
+    });
 
-    if (all.length === 0) {return empty;}
+    if (all.length === 0) {
+      return empty;
+    }
 
-    const latencies   = all.map(m => m.latencyMs).sort((a, b) => a - b);
-    const errors      = all.filter(m => m.status >= 500 || m.error).length;
+    const latencies = all.map(m => m.latencyMs).sort((a, b) => a - b);
+    const errors = all.filter(m => m.status >= 500 || m.error).length;
     const rateLimited = all.filter(m => m.status === 429).length;
-    const pathCounts  = all.reduce<Record<string, number>>((acc, m) => {
+    const pathCounts = all.reduce<Record<string, number>>((acc, m) => {
       acc[m.path] = (acc[m.path] ?? 0) + 1;
       return acc;
     }, {});
 
     return {
-      totalRequests : all.length,
-      errorRate     : errors / all.length,
-      avgLatencyMs  : Math.round(latencies.reduce((s, v) => s + v, 0) / latencies.length),
-      p99LatencyMs  : latencies[Math.floor(latencies.length * 0.99)] ?? 0,
-      topPaths      : Object.entries(pathCounts)
+      totalRequests: all.length,
+      errorRate: errors / all.length,
+      avgLatencyMs: Math.round(latencies.reduce((s, v) => s + v, 0) / latencies.length),
+      p99LatencyMs: latencies[Math.floor(latencies.length * 0.99)] ?? 0,
+      topPaths: Object.entries(pathCounts)
         .sort((a, b) => b[1] - a[1])
         .slice(0, 10)
         .map(([path, count]) => ({ path, count })),
-      rateLimitHits : rateLimited,
+      rateLimitHits: rateLimited,
     };
   } catch {
     return empty;
@@ -160,25 +183,25 @@ export async function getAggregatedMetrics(
 export type CircuitState = 'CLOSED' | 'OPEN' | 'HALF_OPEN';
 
 export interface CircuitBreakerOptions {
-  failureThreshold   : number;  // failures before opening (default: 3)
-  successThreshold   : number;  // successes in HALF_OPEN to close (default: 2)
-  openDurationMs     : number;  // ms the circuit stays OPEN (default: 30_000)
-  timeoutMs          : number;  // per-call timeout in ms (default: 8_000)
+  failureThreshold: number; // failures before opening (default: 3)
+  successThreshold: number; // successes in HALF_OPEN to close (default: 2)
+  openDurationMs: number; // ms the circuit stays OPEN (default: 30_000)
+  timeoutMs: number; // per-call timeout in ms (default: 8_000)
 }
 
 interface CircuitEntry {
-  state         : CircuitState;
-  failures      : number;
-  successes     : number;
-  lastFailureTs : number;
-  openedAt      : number;
+  state: CircuitState;
+  failures: number;
+  successes: number;
+  lastFailureTs: number;
+  openedAt: number;
 }
 
 const DEFAULT_OPTIONS: CircuitBreakerOptions = {
-  failureThreshold : 3,
-  successThreshold : 2,
-  openDurationMs   : 30_000,
-  timeoutMs        : 8_000,
+  failureThreshold: 3,
+  successThreshold: 2,
+  openDurationMs: 30_000,
+  timeoutMs: 8_000,
 };
 
 // In-memory store — persists for the lifetime of a Worker instance (~minutes)
@@ -194,17 +217,29 @@ const CIRCUITS = new Map<string, CircuitEntry>();
  * @param fallback - Optional fallback value when circuit is OPEN
  */
 export async function withCircuitBreaker<T>(
-  name    : string,
-  fn      : () => Promise<T>,
-  opts    : Partial<CircuitBreakerOptions> = {},
+  name: string,
+  fn: () => Promise<T>,
+  opts: Partial<CircuitBreakerOptions> = {},
   fallback?: T,
-): Promise<{ result: T | undefined; circuitState: CircuitState; timedOut: boolean; error?: string }> {
+): Promise<{
+  result: T | undefined;
+  circuitState: CircuitState;
+  timedOut: boolean;
+  error?: string;
+}> {
   const options = { ...DEFAULT_OPTIONS, ...opts };
 
   // Initialize circuit entry
   if (!CIRCUITS.has(name)) {
-    CIRCUITS.set(name, { state: 'CLOSED', failures: 0, successes: 0, lastFailureTs: 0, openedAt: 0 });
+    CIRCUITS.set(name, {
+      state: 'CLOSED',
+      failures: 0,
+      successes: 0,
+      lastFailureTs: 0,
+      openedAt: 0,
+    });
   }
+  // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
   const circuit = CIRCUITS.get(name)!;
 
   // ── Check state ────────────────────────────────────────────────────────────
@@ -212,13 +247,22 @@ export async function withCircuitBreaker<T>(
     const elapsed = Date.now() - circuit.openedAt;
     if (elapsed >= options.openDurationMs) {
       // Transition to HALF_OPEN — allow one probe call
-      circuit.state    = 'HALF_OPEN';
+      circuit.state = 'HALF_OPEN';
       circuit.successes = 0;
-      console.warn(`[CircuitBreaker:${name}] HALF_OPEN — probing after ${Math.round(elapsed / 1000)}s`);
+      logger.warn(
+        `[CircuitBreaker:${name}] HALF_OPEN — probing after ${Math.round(elapsed / 1000)}s`,
+      );
     } else {
       // Still OPEN — reject immediately
-      console.warn(`[CircuitBreaker:${name}] OPEN — rejecting call (${Math.round((options.openDurationMs - elapsed) / 1000)}s until half-open)`);
-      return { result: fallback, circuitState: 'OPEN', timedOut: false, error: `Circuit OPEN: ${name}` };
+      logger.warn(
+        `[CircuitBreaker:${name}] OPEN — rejecting call (${Math.round((options.openDurationMs - elapsed) / 1000)}s until half-open)`,
+      );
+      return {
+        result: fallback,
+        circuitState: 'OPEN',
+        timedOut: false,
+        error: `Circuit OPEN: ${name}`,
+      };
     }
   }
 
@@ -231,7 +275,10 @@ export async function withCircuitBreaker<T>(
     result = await Promise.race([
       fn(),
       new Promise<never>((_, rej) =>
-        setTimeout(() => { timedOut = true; rej(new Error(`Circuit timeout: ${name} after ${options.timeoutMs}ms`)); }, options.timeoutMs),
+        setTimeout(() => {
+          timedOut = true;
+          rej(new Error(`Circuit timeout: ${name} after ${options.timeoutMs}ms`));
+        }, options.timeoutMs),
       ),
     ]);
 
@@ -239,17 +286,20 @@ export async function withCircuitBreaker<T>(
     if (circuit.state === 'HALF_OPEN') {
       circuit.successes++;
       if (circuit.successes >= options.successThreshold) {
-        circuit.state    = 'CLOSED';
+        circuit.state = 'CLOSED';
         circuit.failures = 0;
-        console.log(`[CircuitBreaker:${name}] CLOSED — recovered after ${circuit.successes} successes`);
+        logger.log(
+          `[CircuitBreaker:${name}] CLOSED — recovered after ${circuit.successes} successes`,
+        );
       }
     } else {
       // Gradually reset failure count on success
-      if (circuit.failures > 0) {circuit.failures = Math.max(0, circuit.failures - 1);}
+      if (circuit.failures > 0) {
+        circuit.failures = Math.max(0, circuit.failures - 1);
+      }
     }
 
     return { result, circuitState: circuit.state, timedOut: false };
-
   } catch (e) {
     execError = (e as Error).message;
 
@@ -258,11 +308,15 @@ export async function withCircuitBreaker<T>(
     circuit.lastFailureTs = Date.now();
 
     if (circuit.state === 'HALF_OPEN' || circuit.failures >= options.failureThreshold) {
-      circuit.state    = 'OPEN';
+      circuit.state = 'OPEN';
       circuit.openedAt = Date.now();
-      console.error(`[CircuitBreaker:${name}] OPEN — ${circuit.failures} failures. Will retry in ${options.openDurationMs / 1000}s`);
+      logger.error(
+        `[CircuitBreaker:${name}] OPEN — ${circuit.failures} failures. Will retry in ${options.openDurationMs / 1000}s`,
+      );
     } else {
-      console.warn(`[CircuitBreaker:${name}] failure ${circuit.failures}/${options.failureThreshold}: ${execError}`);
+      logger.warn(
+        `[CircuitBreaker:${name}] failure ${circuit.failures}/${options.failureThreshold}: ${execError}`,
+      );
     }
 
     return { result: fallback, circuitState: circuit.state, timedOut, error: execError };

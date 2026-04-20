@@ -14,8 +14,9 @@ export default tseslint.config(
   // Disable style rules that conflict with Prettier
   prettierConfig,
 
-  // Project-wide configuration
+  // Project-wide configuration — TypeScript source files only
   {
+    files: ['**/*.ts'],
     rules: {
       // ── TypeScript ─────────────────────────────────────────────
       '@typescript-eslint/no-explicit-any': 'warn',
@@ -44,8 +45,8 @@ export default tseslint.config(
     },
   },
 
-  // Ignore build artifacts and test scripts
+  // Ignore build artifacts, test scripts and browser-side JS
   {
-    ignores: ['dist/**', 'node_modules/**', '*.mjs', '*.js'],
+    ignores: ['dist/**', 'node_modules/**', '*.mjs', '*.js', 'src/**/*.js'],
   },
 );

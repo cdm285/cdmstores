@@ -22,34 +22,40 @@
  */
 
 import type { ContextInput, ExtendedAgentContext } from '../core/agent-context.js';
-import { createContext, contextToOutput, addTrace } from '../core/agent-context.js';
-import { createPipeline }                    from '../core/pipeline.js';
+import { contextToOutput, createContext } from '../core/agent-context.js';
 import type { AgentEnv, OrchestratorOutput } from '../core/types.js';
 
 // ── Tier 4 action router ───────────────────────────────────────────────────────
 import { agent10ActionRouter, buildRequestFromContext } from './10-action-router.js';
 
 // ── Numbered agents (new architecture) ───────────────────────────────────────
-import { agent01NLP }            from './01-nlp.js';
-import { agent02Intent }         from './02-intent.js';
-import { agent03Language }       from './03-language.js';
-import { agent04Context }        from './04-context.js';
-import { agent05ShortMemory }    from './05-short-memory.js';
-import { agent06LongMemory }     from './06-long-memory.js';
+import { agent01NLP } from './01-nlp.js';
+import { agent02Intent } from './02-intent.js';
+import { agent03Language } from './03-language.js';
+import { agent04Context } from './04-context.js';
+import { agent05ShortMemory } from './05-short-memory.js';
+import { agent06LongMemory } from './06-long-memory.js';
 import { agent07SemanticMemory } from './07-semantic-memory.js';
 import { agent08EpisodicMemory } from './08-episodic-memory.js';
-import { agent09Reasoning }      from './09-reasoning.js';
+import { agent09Reasoning } from './09-reasoning.js';
 
 // ── Existing action / quality / personality agents ────────────────────────────
-import { whatsAppAgent }                                                         from './actions.js';
-import { qualityAgent, validationAgent, selfRepairAgent }                        from './quality.js';
-import { emotionAgent, personalityAgent, styleAgent }                            from './personality.js';
-import { securityAgent, contentFilterAgent }                                     from './security.js';
+import { whatsAppAgent } from './actions.js';
+import { emotionAgent, personalityAgent, styleAgent } from './personality.js';
+import { qualityAgent, selfRepairAgent, validationAgent } from './quality.js';
+import { contentFilterAgent, securityAgent } from './security.js';
 
 // ─── Helper: apply ActionResult fields to context ─────────────────────────────
-function applyActionResult(ctx: ExtendedAgentContext, r: { action?: string; actionPayload?: Record<string, unknown>; response?: string }): void {
-  if (r.action)        {ctx.lastAction        = r.action;}
-  if (r.actionPayload) {ctx.lastActionPayload = r.actionPayload ?? {};}
+function applyActionResult(
+  ctx: ExtendedAgentContext,
+  r: { action?: string; actionPayload?: Record<string, unknown>; response?: string },
+): void {
+  if (r.action) {
+    ctx.lastAction = r.action;
+  }
+  if (r.actionPayload) {
+    ctx.lastActionPayload = r.actionPayload ?? {};
+  }
 }
 
 // ─── Fallback responses ───────────────────────────────────────────────────────
@@ -67,7 +73,10 @@ const BLOCKED: Record<string, string> = {
 
 // ─── Orchestrator ─────────────────────────────────────────────────────────────
 export class MainOrchestrator {
-  async process(input: ContextInput & { message: string }, env: AgentEnv): Promise<OrchestratorOutput> {
+  async process(
+    input: ContextInput & { message: string },
+    env: AgentEnv,
+  ): Promise<OrchestratorOutput> {
     const ctx = createContext(input, env);
     const msg = input.message;
 
@@ -85,17 +94,14 @@ export class MainOrchestrator {
     }
 
     // ── 2. Tier 1: NLP + Language (can run independently) ───────────────────
-    await Promise.all([
-      agent01NLP.execute(ctx, msg),
-      agent03Language.execute(ctx, msg),
-    ]);
+    await Promise.all([agent01NLP.execute(ctx, msg), agent03Language.execute(ctx, msg)]);
 
     // Intent needs entities from NLP (sequential after NLP)
     agent02Intent.execute(ctx, msg);
 
     // ── 3. Emotion ───────────────────────────────────────────────────────────
-    const emotResult   = await emotionAgent.run(ctx, msg);
-    ctx.shouldEscalate = !!(emotResult.data?.shouldEscalate);
+    const emotResult = await emotionAgent.run(ctx, msg);
+    ctx.shouldEscalate = !!emotResult.data?.shouldEscalate;
 
     // ── 4. Memory read ────────────────────────────────────────────────────────
     const sessionId = ctx.session.sessionId;
@@ -114,17 +120,28 @@ export class MainOrchestrator {
     if (ctx.shouldEscalate) {
       const r = await whatsAppAgent.run(ctx);
       applyActionResult(ctx, r);
-      return this.finalize(ctx, r.response ?? FALLBACK[ctx.detectedLang] ?? FALLBACK.pt, sessionId, msg);
+      return this.finalize(
+        ctx,
+        r.response ?? FALLBACK[ctx.detectedLang] ?? FALLBACK.pt,
+        sessionId,
+        msg,
+      );
     }
 
     // ── 7. Route ──────────────────────────────────────────────────────────────
     const intent = ctx.intent;
-    const route  = ctx.flags.forceFullPath ? 'full' : (ctx.intentRoute ?? 'full');
+    const route = ctx.flags.forceFullPath ? 'full' : (ctx.intentRoute ?? 'full');
 
     let finalResponse: string | null = null;
 
     // ── 7a. Tier 4 fast path — ActionRouter ──────────────────────────────────
-    if (route === 'fast' && intent && intent !== 'unknown' && intent !== 'greeting' && intent !== 'farewell') {
+    if (
+      route === 'fast' &&
+      intent &&
+      intent !== 'unknown' &&
+      intent !== 'greeting' &&
+      intent !== 'farewell'
+    ) {
       const actionReq = buildRequestFromContext(ctx);
       if (actionReq) {
         const actionResult = await agent10ActionRouter.execute(ctx, actionReq);
@@ -139,8 +156,16 @@ export class MainOrchestrator {
     // ── 7b. Greetings / farewells — no AI needed ─────────────────────────────
     if (!finalResponse && (intent === 'greeting' || intent === 'farewell')) {
       const greetMap: Record<string, Record<string, string>> = {
-        greeting: { pt: '👋 Olá! Como posso te ajudar hoje com a CDM STORES?', en: '👋 Hello! How can I help you with CDM STORES today?', es: '👋 ¡Hola! ¿Cómo puedo ayudarte con CDM STORES hoy?' },
-        farewell: { pt: '😊 Até logo! Foi um prazer te atender!',               en: '😊 Goodbye! It was a pleasure helping you!',          es: '😊 ¡Hasta luego! ¡Fue un placer atenderte!'          },
+        greeting: {
+          pt: '👋 Olá! Como posso te ajudar hoje com a CDM STORES?',
+          en: '👋 Hello! How can I help you with CDM STORES today?',
+          es: '👋 ¡Hola! ¿Cómo puedo ayudarte con CDM STORES hoy?',
+        },
+        farewell: {
+          pt: '😊 Até logo! Foi um prazer te atender!',
+          en: '😊 Goodbye! It was a pleasure helping you!',
+          es: '😊 ¡Hasta luego! ¡Fue un placer atenderte!',
+        },
       };
       finalResponse = greetMap[intent]?.[ctx.detectedLang] ?? greetMap[intent]?.pt ?? null;
     }
@@ -163,12 +188,14 @@ export class MainOrchestrator {
 
     // ── 9. Personality + style post-processing ────────────────────────────────
     if (finalResponse) {
-      ctx.meta.ai_response  = finalResponse;
-      ctx.meta.ai_language  = ctx.detectedLang;
-      const personResult    = await personalityAgent.run(ctx, finalResponse);
-      const styleResult     = await styleAgent.run(ctx, personResult.response ?? finalResponse);
-      const styled          = styleResult.response ?? personResult.response ?? finalResponse;
-      if (styled) {finalResponse = styled;}
+      ctx.meta.ai_response = finalResponse;
+      ctx.meta.ai_language = ctx.detectedLang;
+      const personResult = await personalityAgent.run(ctx, finalResponse);
+      const styleResult = await styleAgent.run(ctx, personResult.response ?? finalResponse);
+      const styled = styleResult.response ?? personResult.response ?? finalResponse;
+      if (styled) {
+        finalResponse = styled;
+      }
     }
 
     if (finalResponse) {
@@ -178,11 +205,15 @@ export class MainOrchestrator {
 
       if (!qualResult.data?.passed && !ctx.flags.skipSelfRepair) {
         const repairResult = await selfRepairAgent.run(ctx, finalResponse);
-        if (repairResult.response) {finalResponse = repairResult.response;}
+        if (repairResult.response) {
+          finalResponse = repairResult.response;
+        }
       }
 
       const valResult = await validationAgent.run(ctx, finalResponse ?? '');
-      if (valResult.response) {finalResponse = valResult.response;}
+      if (valResult.response) {
+        finalResponse = valResult.response;
+      }
     }
 
     finalResponse ??= FALLBACK[ctx.detectedLang] ?? FALLBACK.pt;
@@ -198,7 +229,12 @@ export class MainOrchestrator {
     return this.finalize(ctx, finalResponse, sessionId, msg);
   }
 
-  private finalize(ctx: ExtendedAgentContext, response: string, _sessionId: string, _msg: string): OrchestratorOutput {
+  private finalize(
+    ctx: ExtendedAgentContext,
+    response: string,
+    _sessionId: string,
+    _msg: string,
+  ): OrchestratorOutput {
     return contextToOutput(ctx, response);
   }
 }

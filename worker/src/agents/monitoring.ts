@@ -1,5 +1,4 @@
 /**
- * Agent 43 — LogAgent        Structured logs to D1 audit_log
  * Agent 44 — MonitoringAgent Tracks per-agent latency metrics
  * Agent 47 — AuditAgent      Security-relevant event audit trail
  * Agent 49 — HealthAgent     System health check
@@ -11,6 +10,7 @@
 
 import type { AgentContext, AgentResult } from '../core/types.js';
 import { BaseAgent } from '../core/types.js';
+import { logger } from '../lib/logger.js';
 
 // ─── Agent 43 — LogAgent ──────────────────────────────────────────────────────
 export class LogAgent extends BaseAgent {
@@ -18,18 +18,26 @@ export class LogAgent extends BaseAgent {
   readonly name = 'LogAgent';
 
   // Fire-and-forget — never throws, never blocks response
-  async run(ctx: AgentContext, event: string, details: Record<string, unknown>): Promise<AgentResult> {
+  async run(
+    ctx: AgentContext,
+    event: string,
+    details: Record<string, unknown>,
+  ): Promise<AgentResult> {
     const t = this.start();
     try {
       await ctx.env.DB.prepare(
-        'INSERT INTO audit_log (user_id, action, details, ip_address, created_at) VALUES (?, ?, ?, ?, datetime("now"))'
-      ).bind(
-        ctx.user?.id ?? null,
-        event,
-        JSON.stringify({ ...details, session_id: ctx.session.sessionId, turn: ctx.session.turn }),
-        null
-      ).run();
-    } catch { /* never block on log failure */ }
+        'INSERT INTO audit_log (user_id, action, details, ip_address, created_at) VALUES (?, ?, ?, ?, datetime("now"))',
+      )
+        .bind(
+          ctx.user?.id ?? null,
+          event,
+          JSON.stringify({ ...details, session_id: ctx.session.sessionId, turn: ctx.session.turn }),
+          null,
+        )
+        .run();
+    } catch {
+      /* never block on log failure */
+    }
     return this.ok(this.id, {}, t);
   }
 }
@@ -46,7 +54,9 @@ export class MonitoringAgent extends BaseAgent {
 
     // Log slow agents (>100ms) as warnings
     for (const [agent, ms] of Object.entries(metrics)) {
-      if (ms > 100) {console.warn(`[SLOW AGENT] ${agent}: ${ms}ms`);}
+      if (ms > 100) {
+        logger.warn(`[SLOW AGENT] ${agent}: ${ms}ms`);
+      }
     }
 
     return this.ok(this.id, { data: { recorded: Object.keys(metrics).length } }, t);
@@ -58,20 +68,30 @@ export class AuditAgent extends BaseAgent {
   readonly id = '47-audit';
   readonly name = 'AuditAgent';
 
-  async run(ctx: AgentContext, securityEvent: string, severity: 'low' | 'medium' | 'high' | 'critical'): Promise<AgentResult> {
+  async run(
+    ctx: AgentContext,
+    securityEvent: string,
+    severity: 'low' | 'medium' | 'high' | 'critical',
+  ): Promise<AgentResult> {
     const t = this.start();
     if (severity === 'high' || severity === 'critical') {
-      console.error(`[SECURITY:${severity.toUpperCase()}] ${securityEvent} — session:${ctx.session.sessionId}`);
+      logger.error(
+        `[SECURITY:${severity.toUpperCase()}] ${securityEvent} — session:${ctx.session.sessionId}`,
+      );
     }
     try {
       await ctx.env.DB.prepare(
-        'INSERT INTO audit_log (user_id, action, details, created_at) VALUES (?, ?, ?, datetime("now"))'
-      ).bind(
-        ctx.user?.id ?? null,
-        `security:${severity}:${securityEvent}`,
-        JSON.stringify({ session_id: ctx.session.sessionId }),
-      ).run();
-    } catch { /* silent */ }
+        'INSERT INTO audit_log (user_id, action, details, created_at) VALUES (?, ?, ?, datetime("now"))',
+      )
+        .bind(
+          ctx.user?.id ?? null,
+          `security:${severity}:${securityEvent}`,
+          JSON.stringify({ session_id: ctx.session.sessionId }),
+        )
+        .run();
+    } catch {
+      /* silent */
+    }
     return this.ok(this.id, { data: { severity, logged: true } }, t);
   }
 }
@@ -85,7 +105,12 @@ export class HealthAgent extends BaseAgent {
     const t = this.start();
     const status: Record<string, boolean> = {};
 
-    try { await ctx.env.DB.prepare('SELECT 1').first(); status.d1 = true; } catch { status.d1 = false; }
+    try {
+      await ctx.env.DB.prepare('SELECT 1').first();
+      status.d1 = true;
+    } catch {
+      status.d1 = false;
+    }
 
     // AI and Vectorize existence checks
     status.ai = typeof ctx.env.AI?.run === 'function';
@@ -103,10 +128,13 @@ export class HealthAgent extends BaseAgent {
 export class SelfOptimizationAgent extends BaseAgent {
   readonly id = '58-self-optimization';
   readonly name = 'SelfOptimizationAgent';
-  async run(ctx: AgentContext, response: string): Promise<AgentResult> {
+  async run(_ctx: AgentContext, response: string): Promise<AgentResult> {
     const t = this.start();
     // Remove redundant whitespace, optimize token count
-    const optimized = response.replace(/  +/g, ' ').replace(/\n{3,}/g, '\n\n').trim();
+    const optimized = response
+      .replace(/  +/g, ' ')
+      .replace(/\n{3,}/g, '\n\n')
+      .trim();
     const saved = response.length - optimized.length;
     return this.ok(this.id, { response: optimized, data: { chars_saved: saved } }, t);
   }
@@ -115,16 +143,20 @@ export class SelfOptimizationAgent extends BaseAgent {
 export class SelfConsistencyAgent extends BaseAgent {
   readonly id = '64-self-consistency';
   readonly name = 'SelfConsistencyAgent';
-  async run(ctx: AgentContext, response: string): Promise<AgentResult> {
+  async run(_ctx: AgentContext, response: string): Promise<AgentResult> {
     const t = this.start();
     // Cross-check: if response mentions a price, ensure it matches known products
     const KNOWN_PRICES = ['89,90', '49,90', '29,90', '149,90', '15,00'];
     const priceMatches = response.match(/R\$\s*[\d]+[,.][\d]{2}/g) ?? [];
     const inconsistent = priceMatches.filter(p => !KNOWN_PRICES.some(kp => p.includes(kp)));
-    return this.ok(this.id, {
-      data: { consistent: inconsistent.length === 0, inconsistencies: inconsistent },
-      confidence: inconsistent.length === 0 ? 95 : 50,
-    }, t);
+    return this.ok(
+      this.id,
+      {
+        data: { consistent: inconsistent.length === 0, inconsistencies: inconsistent },
+        confidence: inconsistent.length === 0 ? 95 : 50,
+      },
+      t,
+    );
   }
 }
 
@@ -140,15 +172,26 @@ export class SelfLearningAgent extends BaseAgent {
         .then((emb: unknown) => {
           const embedding = emb as { data?: number[][] };
           if (embedding.data?.[0]) {
-            ctx.env.VECTORIZE.upsert([{
-              id: `learned-${Date.now()}`,
-              values: embedding.data[0],
-              metadata: { content: `Q: ${userMsg}\nA: ${botResponse}`, type: 'learned', lang: ctx.session.language },
-            }]).catch(() => {});
+            ctx.env.VECTORIZE.upsert([
+              {
+                id: `learned-${Date.now()}`,
+                values: embedding.data[0],
+                metadata: {
+                  content: `Q: ${userMsg}\nA: ${botResponse}`,
+                  type: 'learned',
+                  lang: ctx.session.language,
+                },
+              },
+            ]).catch(() => {});
           }
-        }).catch(() => {});
+        })
+        .catch(() => {});
     }
-    return this.ok(this.id, { data: { learning_triggered: (ctx.session.confidence ?? 0) > 80 } }, t);
+    return this.ok(
+      this.id,
+      { data: { learning_triggered: (ctx.session.confidence ?? 0) > 80 } },
+      t,
+    );
   }
 }
 
@@ -156,11 +199,13 @@ export class SelfLearningAgent extends BaseAgent {
 export class SecurityCheckAgent extends BaseAgent {
   readonly id = '73-security-check';
   readonly name = 'SecurityCheckAgent';
-  async run(ctx: AgentContext, response: string): Promise<AgentResult> {
+  async run(_ctx: AgentContext, response: string): Promise<AgentResult> {
     const t = this.start();
     // Ensure no system prompt leakage in response
     const hasLeak = /you are a helpful|system prompt|jwt_secret|api_key/i.test(response);
-    if (hasLeak) {return this.fail(this.id, 'Potential system prompt leakage in response', t);}
+    if (hasLeak) {
+      return this.fail(this.id, 'Potential system prompt leakage in response', t);
+    }
     return this.ok(this.id, { data: { secure: true } }, t);
   }
 }
@@ -168,11 +213,13 @@ export class SecurityCheckAgent extends BaseAgent {
 export class PerformanceCheckAgent extends BaseAgent {
   readonly id = '74-performance-check';
   readonly name = 'PerformanceCheckAgent';
-  async run(ctx: AgentContext, totalMs: number): Promise<AgentResult> {
+  async run(_ctx: AgentContext, totalMs: number): Promise<AgentResult> {
     const t = this.start();
     const sla = 3000; // 3s SLA
     const ok = totalMs < sla;
-    if (!ok) {console.warn(`[PERF] Pipeline exceeded SLA: ${totalMs}ms (SLA: ${sla}ms)`);}
+    if (!ok) {
+      logger.warn(`[PERF] Pipeline exceeded SLA: ${totalMs}ms (SLA: ${sla}ms)`);
+    }
     return this.ok(this.id, { data: { within_sla: ok, totalMs, sla } }, t);
   }
 }
@@ -184,14 +231,18 @@ export class MemoryCheckAgent extends BaseAgent {
     const t = this.start();
     const contextSize = ctx.session.context.length;
     const withinBudget = contextSize <= 20;
-    return this.ok(this.id, { data: { context_size: contextSize, within_budget: withinBudget } }, t);
+    return this.ok(
+      this.id,
+      { data: { context_size: contextSize, within_budget: withinBudget } },
+      t,
+    );
   }
 }
 
 export class FlowCheckAgent extends BaseAgent {
   readonly id = '81-flow-check';
   readonly name = 'FlowCheckAgent';
-  async run(ctx: AgentContext, pipeline: string[]): Promise<AgentResult> {
+  async run(_ctx: AgentContext, pipeline: string[]): Promise<AgentResult> {
     const t = this.start();
     const required = ['27-security', '02-intent'];
     const missing = required.filter(r => !pipeline.includes(r));
@@ -206,14 +257,24 @@ export class ContinuityCheckAgent extends BaseAgent {
     const t = this.start();
     const hasHistory = ctx.session.context.length > 0;
     const turnCountOk = ctx.session.turn >= 0;
-    return this.ok(this.id, { data: { continuous: hasHistory || ctx.session.turn === 0, turn: ctx.session.turn, turnCountOk } }, t);
+    return this.ok(
+      this.id,
+      {
+        data: {
+          continuous: hasHistory || ctx.session.turn === 0,
+          turn: ctx.session.turn,
+          turnCountOk,
+        },
+      },
+      t,
+    );
   }
 }
 
 export class ResponseCheckAgent extends BaseAgent {
   readonly id = '78-response-check';
   readonly name = 'ResponseCheckAgent';
-  async run(ctx: AgentContext, response: string): Promise<AgentResult> {
+  async run(_ctx: AgentContext, response: string): Promise<AgentResult> {
     const t = this.start();
     const checks = {
       not_empty: response.trim().length > 0,
@@ -221,11 +282,17 @@ export class ResponseCheckAgent extends BaseAgent {
       not_binary: response.trim() !== 'true' && response.trim() !== 'false',
       no_raw_json: !response.trim().startsWith('{') && !response.trim().startsWith('['),
     };
-    const failed = Object.entries(checks).filter(([, v]) => !v).map(([k]) => k);
-    return this.ok(this.id, {
-      data: { checks, failed, passed: failed.length === 0 },
-      confidence: failed.length === 0 ? 95 : 30,
-    }, t);
+    const failed = Object.entries(checks)
+      .filter(([, v]) => !v)
+      .map(([k]) => k);
+    return this.ok(
+      this.id,
+      {
+        data: { checks, failed, passed: failed.length === 0 },
+        confidence: failed.length === 0 ? 95 : 30,
+      },
+      t,
+    );
   }
 }
 

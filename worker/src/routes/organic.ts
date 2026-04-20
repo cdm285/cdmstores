@@ -29,19 +29,21 @@ import type { AgentEnv } from '../core/types.js';
 // Cast to `any` because `@cloudflare/workers-types` AiModels map may lag behind
 // available runtime models — same pattern used in routes/ai.ts.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-const AI_MODEL    = '@cf/meta/llama-3.1-8b-instruct-fast' as any;
-const MAX_TOKENS  = 512;
-const PAGE_LIMIT  = 50;
+const AI_MODEL = '@cf/meta/llama-3.1-8b-instruct-fast' as any;
+const MAX_TOKENS = 512;
+const PAGE_LIMIT = 50;
 
 const CORS_HEADERS = {
-  'Content-Type'                : 'application/json',
-  'Access-Control-Allow-Origin' : '*',
+  'Content-Type': 'application/json',
+  'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
   'Access-Control-Allow-Headers': 'Content-Type, X-Organic-Key',
 };
 
 // ─── Types ────────────────────────────────────────────────────────────────────
-interface AiTextResponse { response: string }
+interface AiTextResponse {
+  response: string;
+}
 
 interface Article {
   title: string;
@@ -79,17 +81,26 @@ function json(body: unknown, status = 200): Response {
 }
 
 function sanitize(text: string, maxLen = 500): string {
+  const cleaned = text
+    .trim()
+    .slice(0, maxLen);
   // eslint-disable-next-line no-control-regex
-  return text.trim().slice(0, maxLen).replace(/[\x00-\x08\x0B-\x1F]/g, '');
+  return cleaned.replace(/[\x00-\x08\x0B-\x1F]/g, '');
 }
 
 /** Parse AI text response — graceful degradation if run() returns non-standard shape. */
 function extractText(raw: unknown): string {
-  if (typeof raw === 'string') {return raw;}
+  if (typeof raw === 'string') {
+    return raw;
+  }
   if (raw && typeof raw === 'object') {
     const r = raw as Record<string, unknown>;
-    if (typeof r.response === 'string') {return r.response;}
-    if (typeof r.result === 'string') {return r.result;}
+    if (typeof r.response === 'string') {
+      return r.response;
+    }
+    if (typeof r.result === 'string') {
+      return r.result;
+    }
   }
   return '';
 }
@@ -97,14 +108,20 @@ function extractText(raw: unknown): string {
 /** Verify the shared secret sent as X-Organic-Key header. */
 async function adminGuard(request: Request, env: AgentEnv): Promise<boolean> {
   // If no JWT_SECRET is configured, reject all POST requests in production.
-  if (!env.JWT_SECRET) {return false;}
+  if (!env.JWT_SECRET) {
+    return false;
+  }
   const key = request.headers.get('X-Organic-Key') ?? '';
   // Constant-time comparison using subtle — avoids timing attacks.
-  const keyBytes     = new TextEncoder().encode(key);
-  const secretBytes  = new TextEncoder().encode(env.JWT_SECRET);
-  if (keyBytes.length !== secretBytes.length) {return false;}
+  const keyBytes = new TextEncoder().encode(key);
+  const secretBytes = new TextEncoder().encode(env.JWT_SECRET);
+  if (keyBytes.length !== secretBytes.length) {
+    return false;
+  }
   let diff = 0;
-  for (let i = 0; i < keyBytes.length; i++) {diff |= keyBytes[i] ^ secretBytes[i];}
+  for (let i = 0; i < keyBytes.length; i++) {
+    diff |= keyBytes[i] ^ secretBytes[i];
+  }
   return diff === 0;
 }
 
@@ -115,26 +132,34 @@ Liste 3 temas de artigo relevantes para o CDM STORES em 2026.
 Cada tema deve ser uma frase curta (máx 8 palavras), separados por quebra de linha.
 Não use números, bullets ou caracteres especiais. Apenas os temas.`;
 
-  const raw = await env.AI.run(AI_MODEL, {
+  const raw = (await env.AI.run(AI_MODEL, {
     messages: [{ role: 'user', content: prompt }],
     max_tokens: 100,
-  }) as AiTextResponse;
+  })) as AiTextResponse;
 
   const text = extractText(raw);
-  return text.split('\n').map(t => t.trim()).filter(t => t.length > 3).slice(0, 3);
+  return text
+    .split('\n')
+    .map(t => t.trim())
+    .filter(t => t.length > 3)
+    .slice(0, 3);
 }
 
 async function plannerGenerateCalendar(env: AgentEnv): Promise<string[]> {
   const prompt = `Crie um calendário de 30 temas de conteúdo para um e-commerce (CDM STORES) para os próximos 30 dias a partir de hoje.
 Cada linha: apenas o tema (máx 10 palavras). Sem números, sem bullets. Um tema por linha.`;
 
-  const raw = await env.AI.run(AI_MODEL, {
+  const raw = (await env.AI.run(AI_MODEL, {
     messages: [{ role: 'user', content: prompt }],
     max_tokens: 512,
-  }) as AiTextResponse;
+  })) as AiTextResponse;
 
   const text = extractText(raw);
-  return text.split('\n').map(t => t.trim()).filter(t => t.length > 3).slice(0, 30);
+  return text
+    .split('\n')
+    .map(t => t.trim())
+    .filter(t => t.length > 3)
+    .slice(0, 30);
 }
 
 // ─── ContentAgent ─────────────────────────────────────────────────────────────
@@ -146,10 +171,10 @@ Formato JSON com as chaves "title" e "body".
 - body: texto do artigo (2–3 parágrafos, máx 400 palavras)
 Responda APENAS com JSON válido, sem texto adicional.`;
 
-  const raw = await env.AI.run(AI_MODEL, {
+  const raw = (await env.AI.run(AI_MODEL, {
     messages: [{ role: 'user', content: prompt }],
     max_tokens: MAX_TOKENS,
-  }) as AiTextResponse;
+  })) as AiTextResponse;
 
   try {
     const text = extractText(raw);
@@ -159,14 +184,16 @@ Responda APENAS com JSON válido, sem texto adicional.`;
       const parsed = JSON.parse(match[0]) as { title?: string; body?: string };
       return {
         title: sanitize(parsed.title ?? `Como ${safeTopic} está revolucionando o e-commerce`, 120),
-        body:  sanitize(parsed.body  ?? '', 2000),
+        body: sanitize(parsed.body ?? '', 2000),
       };
     }
-  } catch { /* fall through to default */ }
+  } catch {
+    /* fall through to default */
+  }
 
   return {
     title: `Como ${safeTopic} está revolucionando o e-commerce`,
-    body:  `O mercado de ${safeTopic} cresce exponencialmente. Veja como CDM STORES está liderando essa transformação.`,
+    body: `O mercado de ${safeTopic} cresce exponencialmente. Veja como CDM STORES está liderando essa transformação.`,
   };
 }
 
@@ -180,27 +207,34 @@ Responda APENAS com JSON válido contendo:
 - "keywords": array de 5 palavras-chave relevantes
 - "metaDescription": meta description (máx 155 caracteres)`;
 
-  const raw = await env.AI.run(AI_MODEL, {
+  const raw = (await env.AI.run(AI_MODEL, {
     messages: [{ role: 'user', content: prompt }],
     max_tokens: 200,
-  }) as AiTextResponse;
+  })) as AiTextResponse;
 
   try {
     const text = extractText(raw);
     const match = text.match(/\{[\s\S]*\}/);
     if (match) {
       const parsed = JSON.parse(match[0]) as {
-        title?: string; keywords?: unknown; metaDescription?: string;
+        title?: string;
+        keywords?: unknown;
+        metaDescription?: string;
       };
       return {
         title: sanitize(parsed.title ?? safeTitle, 60),
         keywords: Array.isArray(parsed.keywords)
           ? (parsed.keywords as unknown[]).map(k => sanitize(String(k), 40)).slice(0, 5)
           : ['ecommerce', 'CDM STORES', 'compras online', 'tendências 2026', 'dropshipping'],
-        metaDescription: sanitize(parsed.metaDescription ?? `Descubra ${safeTitle} — CDM STORES`, 155),
+        metaDescription: sanitize(
+          parsed.metaDescription ?? `Descubra ${safeTitle} — CDM STORES`,
+          155,
+        ),
       };
     }
-  } catch { /* fall through */ }
+  } catch {
+    /* fall through */
+  }
 
   return {
     title: `${safeTitle.slice(0, 57)}...`,
@@ -216,40 +250,48 @@ async function socialCreatePosts(article: Article, seo: SeoData, env: AgentEnv):
 Inclua emojis relevantes. Cada post em uma linha separada. Máx 240 caracteres por post.
 Adicione o link cdmstores.com no último post.`;
 
-  const raw = await env.AI.run(AI_MODEL, {
+  const raw = (await env.AI.run(AI_MODEL, {
     messages: [{ role: 'user', content: prompt }],
     max_tokens: 300,
-  }) as AiTextResponse;
+  })) as AiTextResponse;
 
-  const text  = extractText(raw);
-  const posts = text.split('\n').map(p => sanitize(p, 280)).filter(p => p.length > 5).slice(0, 3);
+  const text = extractText(raw);
+  const posts = text
+    .split('\n')
+    .map(p => sanitize(p, 280))
+    .filter(p => p.length > 5)
+    .slice(0, 3);
 
   if (posts.length === 0) {
-    return [
-      `🔥 ${seo.title} — saiba mais em cdmstores.com`,
-      `💡 ${seo.metaDescription}`,
-    ];
+    return [`🔥 ${seo.title} — saiba mais em cdmstores.com`, `💡 ${seo.metaDescription}`];
   }
   return posts;
 }
 
 // ─── AnalyticsAgent ───────────────────────────────────────────────────────────
-async function analyticsTrack(logId: number, env: AgentEnv): Promise<{ views: number; clicks: number; conversions: number }> {
+async function analyticsTrack(
+  logId: number,
+  env: AgentEnv,
+): Promise<{ views: number; clicks: number; conversions: number }> {
   // Placeholder metrics — in production this would integrate with Cloudflare Analytics / Google Analytics API
   const metrics = { views: 0, clicks: 0, conversions: 0 };
   await env.DB.prepare(
-    'INSERT INTO organic_analytics (log_id, views, clicks, conversions) VALUES (?, ?, ?, ?)'
-  ).bind(logId, metrics.views, metrics.clicks, metrics.conversions).run();
+    'INSERT INTO organic_analytics (log_id, views, clicks, conversions) VALUES (?, ?, ?, ?)',
+  )
+    .bind(logId, metrics.views, metrics.clicks, metrics.conversions)
+    .run();
   return metrics;
 }
 
 // ─── Main handler ─────────────────────────────────────────────────────────────
 export async function handleOrganicRequest(request: Request, env: AgentEnv): Promise<Response> {
   const { method, url } = request;
-  const { pathname }    = new URL(url);
+  const { pathname } = new URL(url);
 
   // ── OPTIONS preflight ──────────────────────────────────────────────────────
-  if (method === 'OPTIONS') {return new Response(null, { status: 204, headers: CORS_HEADERS });}
+  if (method === 'OPTIONS') {
+    return new Response(null, { status: 204, headers: CORS_HEADERS });
+  }
 
   // ── GET /api/organic/logs ──────────────────────────────────────────────────
   if (method === 'GET' && pathname === '/api/organic/logs') {
@@ -258,19 +300,21 @@ export async function handleOrganicRequest(request: Request, env: AgentEnv): Pro
               social_posts, status, created_at
        FROM organic_logs
        ORDER BY created_at DESC
-       LIMIT ?`
-    ).bind(PAGE_LIMIT).all<LogRow>();
+       LIMIT ?`,
+    )
+      .bind(PAGE_LIMIT)
+      .all<LogRow>();
 
     const logs = rows.results.map(r => ({
-      id:              r.id,
-      topic:           r.topic,
-      articleTitle:    r.article_title,
-      seoTitle:        r.seo_title,
-      keywords:        JSON.parse(r.seo_keywords) as string[],
+      id: r.id,
+      topic: r.topic,
+      articleTitle: r.article_title,
+      seoTitle: r.seo_title,
+      keywords: JSON.parse(r.seo_keywords) as string[],
       metaDescription: r.meta_description,
-      socialPosts:     JSON.parse(r.social_posts) as string[],
-      status:          r.status,
-      date:            r.created_at,
+      socialPosts: JSON.parse(r.social_posts) as string[],
+      status: r.status,
+      date: r.created_at,
     }));
 
     return json({ success: true, count: logs.length, logs });
@@ -282,7 +326,7 @@ export async function handleOrganicRequest(request: Request, env: AgentEnv): Pro
       `SELECT id, topic, planned_for, status
        FROM organic_calendar
        ORDER BY planned_for ASC
-       LIMIT 31`
+       LIMIT 31`,
     ).all<CalendarRow>();
 
     return json({ success: true, count: rows.results.length, calendar: rows.results });
@@ -308,21 +352,29 @@ export async function handleOrganicRequest(request: Request, env: AgentEnv): Pro
         d.setDate(d.getDate() + i);
         const dateStr = d.toISOString().split('T')[0];
         return env.DB.prepare(
-          "INSERT INTO organic_calendar (topic, planned_for, status) VALUES (?, ?, 'pending')"
+          "INSERT INTO organic_calendar (topic, planned_for, status) VALUES (?, ?, 'pending')",
         ).bind(sanitize(topic, 200), dateStr);
       });
 
       await env.DB.batch(batch);
 
-      return json({ success: true, message: `Calendário gerado com ${topics.length} temas.`, topics });
+      return json({
+        success: true,
+        message: `Calendário gerado com ${topics.length} temas.`,
+        topics,
+      });
     }
 
     // ── POST /api/organic/cycle ────────────────────────────────────────────
     if (pathname === '/api/organic/cycle') {
       const topics = await plannerGetTopics(env);
       const results: Array<{
-        topic: string; articleTitle: string; seoTitle: string;
-        keywords: string[]; socialPosts: string[]; status: string;
+        topic: string;
+        articleTitle: string;
+        seoTitle: string;
+        keywords: string[];
+        socialPosts: string[];
+        status: string;
       }> = [];
 
       for (const topic of topics) {
@@ -341,16 +393,18 @@ export async function handleOrganicRequest(request: Request, env: AgentEnv): Pro
             `INSERT INTO organic_logs
                (topic, article_title, article_body, seo_title, seo_keywords,
                 meta_description, social_posts, status)
-             VALUES (?, ?, ?, ?, ?, ?, ?, 'published')`
-          ).bind(
-            sanitize(topic, 200),
-            article.title,
-            article.body,
-            seo.title,
-            JSON.stringify(seo.keywords),
-            seo.metaDescription,
-            JSON.stringify(posts),
-          ).run();
+             VALUES (?, ?, ?, ?, ?, ?, ?, 'published')`,
+          )
+            .bind(
+              sanitize(topic, 200),
+              article.title,
+              article.body,
+              seo.title,
+              JSON.stringify(seo.keywords),
+              seo.metaDescription,
+              JSON.stringify(posts),
+            )
+            .run();
 
           const logId = insertResult.meta.last_row_id as number;
 
@@ -360,25 +414,34 @@ export async function handleOrganicRequest(request: Request, env: AgentEnv): Pro
           // 6. Mark calendar entry as published if it exists for today
           const today = new Date().toISOString().split('T')[0];
           await env.DB.prepare(
-            "UPDATE organic_calendar SET status = 'published' WHERE topic = ? AND planned_for = ? AND status = 'pending'"
-          ).bind(sanitize(topic, 200), today).run();
+            "UPDATE organic_calendar SET status = 'published' WHERE topic = ? AND planned_for = ? AND status = 'pending'",
+          )
+            .bind(sanitize(topic, 200), today)
+            .run();
 
           results.push({
             topic,
             articleTitle: article.title,
-            seoTitle:     seo.title,
-            keywords:     seo.keywords,
-            socialPosts:  posts,
-            status:       'published',
+            seoTitle: seo.title,
+            keywords: seo.keywords,
+            socialPosts: posts,
+            status: 'published',
           });
         } catch (err) {
-          results.push({ topic, articleTitle: '', seoTitle: '', keywords: [], socialPosts: [], status: `error: ${String(err)}` });
+          results.push({
+            topic,
+            articleTitle: '',
+            seoTitle: '',
+            keywords: [],
+            socialPosts: [],
+            status: `error: ${String(err)}`,
+          });
         }
       }
 
       return json({
         success: true,
-        message : `Ciclo concluído — ${results.filter(r => r.status === 'published').length}/${topics.length} temas publicados.`,
+        message: `Ciclo concluído — ${results.filter(r => r.status === 'published').length}/${topics.length} temas publicados.`,
         results,
       });
     }

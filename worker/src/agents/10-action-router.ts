@@ -28,48 +28,43 @@
 
 import type { ExtendedAgentContext } from '../core/agent-context.js';
 import { addTrace } from '../core/agent-context.js';
-import type {
-  ActionRequest,
-  ActionResult,
-  ActionType} from '../core/action-schema.js';
-import {
-  validateActionRequest,
-  failedResult,
-  buildActionRequest,
-} from '../core/action-schema.js';
+import type { ActionRequest, ActionResult, ActionType } from '../core/action-schema.js';
+import { validateActionRequest, failedResult, buildActionRequest } from '../core/action-schema.js';
 import type { IntentCategory } from '../core/types.js';
 
 // ── Tier 4 agents ─────────────────────────────────────────────────────────────
-import { agent11ProductLookup }     from './11-product-lookup.js';
-import { agent12CouponValidation }  from './12-coupon-validation.js';
-import { agent13OrderTracking }     from './13-order-tracking.js';
-import { agent14Shipping }          from './14-shipping.js';
+import { agent11ProductLookup } from './11-product-lookup.js';
+import { agent12CouponValidation } from './12-coupon-validation.js';
+import { agent13OrderTracking } from './13-order-tracking.js';
+import { agent14Shipping } from './14-shipping.js';
 import { agent15SupportEscalation } from './15-support-escalation.js';
-import { agent16DatabaseWrite }     from './16-database-write.js';
-import { agent17Notification }      from './17-notification.js';
+import { agent16DatabaseWrite } from './16-database-write.js';
+import { agent17Notification } from './17-notification.js';
 
 // ─── Intent → ActionType map ──────────────────────────────────────────────────
 const INTENT_TO_ACTION: Partial<Record<IntentCategory, ActionType>> = {
-  tracking      : 'order_track',
-  coupon        : 'coupon_validate',
-  product_query : 'product_lookup',
-  cart_action   : 'product_lookup',
-  order_history : 'order_track',
-  schedule      : 'support_escalate',
-  whatsapp      : 'support_escalate',
-  notification  : 'notification_send',
-  payment       : 'product_lookup',
+  tracking: 'order_track',
+  coupon: 'coupon_validate',
+  product_query: 'product_lookup',
+  cart_action: 'product_lookup',
+  order_history: 'order_track',
+  schedule: 'support_escalate',
+  whatsapp: 'support_escalate',
+  notification: 'notification_send',
+  payment: 'product_lookup',
 };
 
 /** Maps an intent to the Tier 4 ActionType, or null if not actionable. */
 export function intentToActionType(intent: IntentCategory | null): ActionType | null {
-  if (!intent) {return null;}
+  if (!intent) {
+    return null;
+  }
   return INTENT_TO_ACTION[intent] ?? null;
 }
 
 // ─── Router ───────────────────────────────────────────────────────────────────
 export class Agent10ActionRouter {
-  readonly id   = '10-action-router';
+  readonly id = '10-action-router';
   readonly name = 'ActionRouter';
   readonly tier = 4;
 
@@ -80,7 +75,13 @@ export class Agent10ActionRouter {
     const validationError = validateActionRequest(request);
     if (validationError) {
       const result = failedResult(request, `Validation: ${validationError}`);
-      addTrace(ctx, { agentId: this.id, agentName: this.name, success: false, latencyMs: 0, error: result.error });
+      addTrace(ctx, {
+        agentId: this.id,
+        agentName: this.name,
+        success: false,
+        latencyMs: 0,
+        error: result.error,
+      });
       ctx.meta.lastActionResult = result;
       return result;
     }
@@ -121,16 +122,20 @@ export class Agent10ActionRouter {
 
     // 3. Write result to context for downstream agents
     ctx.meta.lastActionResult = result;
-    if (result.action)        {ctx.lastAction        = result.action;}
-    if (result.actionPayload) {ctx.lastActionPayload = result.actionPayload;}
+    if (result.action) {
+      ctx.lastAction = result.action;
+    }
+    if (result.actionPayload) {
+      ctx.lastActionPayload = result.actionPayload;
+    }
 
     // 4. Trace
     addTrace(ctx, {
-      agentId   : this.id,
-      agentName : this.name,
-      success   : result.success,
-      latencyMs : Date.now() - start,
-      error     : result.error,
+      agentId: this.id,
+      agentName: this.name,
+      success: result.success,
+      latencyMs: Date.now() - start,
+      error: result.error,
     });
 
     return result;
@@ -143,67 +148,90 @@ export class Agent10ActionRouter {
  * Returns null if the intent is not actionable via Tier 4.
  */
 export function buildRequestFromContext(ctx: ExtendedAgentContext): ActionRequest | null {
-  const intent     = ctx.intent;
+  const intent = ctx.intent;
   const actionType = intentToActionType(intent);
-  if (!actionType) {return null;}
+  if (!actionType) {
+    return null;
+  }
 
-  const lang      = ctx.session.language ?? 'pt';
+  const lang = ctx.session.language ?? 'pt';
   const sessionId = ctx.session.sessionId;
-  const userId    = ctx.session.userId;
-  const entities  = ctx.entities ?? {};
+  const userId = ctx.session.userId;
+  const entities = ctx.entities ?? {};
 
   switch (actionType) {
     case 'product_lookup':
       return buildActionRequest(
         'product_lookup',
         {
-          type  : 'product_lookup',
+          type: 'product_lookup',
           params: {
-            product_id  : entities.product_id  !== undefined ? Number(entities.product_id)  : undefined,
-            query       : entities.product_name !== undefined ? String(entities.product_name) : undefined,
+            product_id: entities.product_id !== undefined ? Number(entities.product_id) : undefined,
+            query: entities.product_name !== undefined ? String(entities.product_name) : undefined,
             full_catalog: !entities.product_id && !entities.product_name,
           },
         },
-        sessionId, lang, userId,
+        sessionId,
+        lang,
+        userId,
       );
 
     case 'coupon_validate':
       return buildActionRequest(
         'coupon_validate',
         {
-          type  : 'coupon_validate',
+          type: 'coupon_validate',
           params: {
-            code       : String(entities.coupon ?? '').toUpperCase().trim(),
-            cart_total : entities.quantity ? Number(entities.quantity) : undefined,
+            code: String(entities.coupon ?? '')
+              .toUpperCase()
+              .trim(),
+            cart_total: entities.quantity ? Number(entities.quantity) : undefined,
           },
         },
-        sessionId, lang, userId,
+        sessionId,
+        lang,
+        userId,
       );
 
     case 'order_track': {
       const params = {
         tracking_code: entities.tracking_code ? String(entities.tracking_code) : undefined,
-        order_id     : entities.order_id       ? Number(entities.order_id)      : undefined,
-        email        : entities.email          ? String(entities.email)          : undefined,
+        order_id: entities.order_id ? Number(entities.order_id) : undefined,
+        email: entities.email ? String(entities.email) : undefined,
       };
-      if (!params.tracking_code && !params.order_id && !params.email) {return null;}
-      return buildActionRequest('order_track', { type: 'order_track', params }, sessionId, lang, userId);
+      if (!params.tracking_code && !params.order_id && !params.email) {
+        return null;
+      }
+      return buildActionRequest(
+        'order_track',
+        { type: 'order_track', params },
+        sessionId,
+        lang,
+        userId,
+      );
     }
 
     case 'support_escalate': {
-      const reason = intent === 'whatsapp' ? 'whatsapp_request' : intent === 'schedule' ? 'schedule_request' : 'user_request';
+      const reason =
+        intent === 'whatsapp'
+          ? 'whatsapp_request'
+          : intent === 'schedule'
+            ? 'schedule_request'
+            : 'user_request';
       return buildActionRequest(
         'support_escalate',
         {
-          type  : 'support_escalate',
+          type: 'support_escalate',
           params: {
             reason,
-            email      : entities.email ? String(entities.email) : undefined,
-            session_id : sessionId,
-            language   : lang,
+            email: entities.email ? String(entities.email) : undefined,
+            session_id: sessionId,
+            language: lang,
           },
         },
-        sessionId, lang, userId,
+        sessionId,
+        lang,
+        userId,
       );
     }
 
@@ -211,14 +239,16 @@ export function buildRequestFromContext(ctx: ExtendedAgentContext): ActionReques
       return buildActionRequest(
         'notification_send',
         {
-          type  : 'notification_send',
+          type: 'notification_send',
           params: {
-            channel  : 'email',
+            channel: 'email',
             recipient: entities.email ? String(entities.email) : '',
-            template : 'generic',
+            template: 'generic',
           },
         },
-        sessionId, lang, userId,
+        sessionId,
+        lang,
+        userId,
       );
 
     default:

@@ -12,28 +12,91 @@ export class EmotionAgent extends BaseAgent {
   readonly id = '15-emotion';
   readonly name = 'EmotionAgent';
 
-  private static readonly POSITIVE = ['bom', 'ótimo', 'excelente', 'amei', 'gostei', 'adorei', 'perfeito', 'top', 'show', 'boa', 'legal', 'great', 'love', 'perfect', 'amazing', 'genial', 'bueno', 'perfecto'];
-  private static readonly NEGATIVE = ['ruim', 'péssimo', 'horrível', 'odeio', 'problema', 'erro', 'falha', 'decepção', 'triste', 'chato', 'lento', 'broken', 'bad', 'terrible', 'awful', 'horrible', 'malo', 'terrible'];
-  private static readonly ESCALATION_TRIGGERS = ['reembolso', 'refund', 'processar', 'processo judicial', 'fraude', 'chargebak', 'chargeback', 'reclame aqui', 'procon'];
+  private static readonly POSITIVE = [
+    'bom',
+    'ótimo',
+    'excelente',
+    'amei',
+    'gostei',
+    'adorei',
+    'perfeito',
+    'top',
+    'show',
+    'boa',
+    'legal',
+    'great',
+    'love',
+    'perfect',
+    'amazing',
+    'genial',
+    'bueno',
+    'perfecto',
+  ];
+  private static readonly NEGATIVE = [
+    'ruim',
+    'péssimo',
+    'horrível',
+    'odeio',
+    'problema',
+    'erro',
+    'falha',
+    'decepção',
+    'triste',
+    'chato',
+    'lento',
+    'broken',
+    'bad',
+    'terrible',
+    'awful',
+    'horrible',
+    'malo',
+    'terrible',
+  ];
+  private static readonly ESCALATION_TRIGGERS = [
+    'reembolso',
+    'refund',
+    'processar',
+    'processo judicial',
+    'fraude',
+    'chargebak',
+    'chargeback',
+    'reclame aqui',
+    'procon',
+  ];
 
   async run(ctx: AgentContext, message: string): Promise<AgentResult> {
     const t = this.start();
     const lower = message.toLowerCase();
 
     let score = 0;
-    let positiveHits = 0, negativeHits = 0;
+    let negativeHits = 0;
 
-    EmotionAgent.POSITIVE.forEach(w => { if (lower.includes(w)) { score += 1; positiveHits++; } });
-    EmotionAgent.NEGATIVE.forEach(w => { if (lower.includes(w)) { score -= 1; negativeHits++; } });
+    EmotionAgent.POSITIVE.forEach(w => {
+      if (lower.includes(w)) {
+        score += 1;
+      }
+    });
+    EmotionAgent.NEGATIVE.forEach(w => {
+      if (lower.includes(w)) {
+        score -= 1;
+        negativeHits++;
+      }
+    });
 
-    const sentiment: SentimentResult['sentiment'] = score > 0 ? 'positive' : score < 0 ? 'negative' : 'neutral';
-    const shouldEscalate = negativeHits >= 2 || EmotionAgent.ESCALATION_TRIGGERS.some(t => lower.includes(t));
+    const sentiment: SentimentResult['sentiment'] =
+      score > 0 ? 'positive' : score < 0 ? 'negative' : 'neutral';
+    const shouldEscalate =
+      negativeHits >= 2 || EmotionAgent.ESCALATION_TRIGGERS.some(t => lower.includes(t));
 
     const result: SentimentResult = { sentiment, score, shouldEscalate };
     ctx.session.sentiment = sentiment;
     ctx.meta.should_escalate = shouldEscalate;
 
-    return this.ok(this.id, { data: result as unknown as Record<string, unknown>, confidence: 80 }, t);
+    return this.ok(
+      this.id,
+      { data: result as unknown as Record<string, unknown>, confidence: 80 },
+      t,
+    );
   }
 }
 
@@ -45,7 +108,9 @@ export class PersonalityAgent extends BaseAgent {
   async run(ctx: AgentContext, response: string): Promise<AgentResult> {
     const t = this.start();
 
-    if (!response) {return this.fail(this.id, 'Empty response', t);}
+    if (!response) {
+      return this.fail(this.id, 'Empty response', t);
+    }
 
     let adjusted = response;
 
@@ -73,7 +138,12 @@ export class PersonalityAgent extends BaseAgent {
       const lang = ctx.session.language;
       const closing = closings[lang]?.[ctx.session.turn % 2] ?? '';
       // Only add if response doesn't already end with a question
-      if (closing && !adjusted.trimEnd().endsWith('?') && !adjusted.trimEnd().endsWith('!') && adjusted.length < 300) {
+      if (
+        closing &&
+        !adjusted.trimEnd().endsWith('?') &&
+        !adjusted.trimEnd().endsWith('!') &&
+        adjusted.length < 300
+      ) {
         adjusted = adjusted.trimEnd() + '\n\n' + closing;
       }
     }
@@ -87,10 +157,16 @@ export class StyleAgent extends BaseAgent {
   readonly id = '14-style';
   readonly name = 'StyleAgent';
 
-  async run(ctx: AgentContext, response: string, channel: 'web' | 'mobile' = 'web'): Promise<AgentResult> {
+  async run(
+    _ctx: AgentContext,
+    response: string,
+    channel: 'web' | 'mobile' = 'web',
+  ): Promise<AgentResult> {
     const t = this.start();
 
-    if (!response) {return this.fail(this.id, 'Empty response', t);}
+    if (!response) {
+      return this.fail(this.id, 'Empty response', t);
+    }
 
     let styled = response;
 
@@ -100,7 +176,9 @@ export class StyleAgent extends BaseAgent {
       const sentences = styled.split(/(?<=[.!?])\s+/);
       let truncated = '';
       for (const s of sentences) {
-        if ((truncated + s).length > 380) {break;}
+        if ((truncated + s).length > 380) {
+          break;
+        }
         truncated += s + ' ';
       }
       styled = truncated.trim() + (styled.length > truncated.length ? '...' : '');

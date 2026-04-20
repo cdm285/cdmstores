@@ -12,45 +12,46 @@
  *   bus.broadcast('pipeline:start', { sessionId: 'xyz' });
  */
 
+import { logger } from '../lib/logger.js';
 import type { AgentMessage } from './types.js';
 
 // ─── Primitive types ──────────────────────────────────────────────────────────
 export type BusMessageType = 'request' | 'response' | 'event' | 'broadcast' | 'error';
-export type BusPriority    = 0 | 1 | 2 | 3; // 0 = critical … 3 = low
+export type BusPriority = 0 | 1 | 2 | 3; // 0 = critical … 3 = low
 
 /** Envelope for every message that flows over the bus. */
 export interface BusMessage<T = unknown> {
-  id       : string;
-  type     : BusMessageType;
-  from     : string;         // source agent id
-  to       : string | '*';   // target agent id OR '*' for broadcast
-  channel  : string;         // logical topic
-  payload  : T;
-  priority : BusPriority;
-  ts       : number;
-  replyTo? : string;         // id of message being replied to
-  ttl?     : number;         // ms before message expires
+  id: string;
+  type: BusMessageType;
+  from: string; // source agent id
+  to: string | '*'; // target agent id OR '*' for broadcast
+  channel: string; // logical topic
+  payload: T;
+  priority: BusPriority;
+  ts: number;
+  replyTo?: string; // id of message being replied to
+  ttl?: number; // ms before message expires
 }
 
 /** A handler registered for a channel. Returns void or a value used in request/response. */
 export type BusHandler<TIn = unknown, TOut = unknown> = (
-  payload : TIn,
-  from    : string,
+  payload: TIn,
+  from: string,
 ) => TOut | Promise<TOut>;
 
 /** Result of a broadcast — collects all handler responses. */
 export interface BroadcastResult<T> {
-  channel  : string;
-  results  : Array<{ handler: number; result: T; error?: string }>;
-  failed   : number;
+  channel: string;
+  results: Array<{ handler: number; result: T; error?: string }>;
+  failed: number;
 }
 
 // ─── AgentBus class ───────────────────────────────────────────────────────────
 export class AgentBus {
   private readonly subscriptions = new Map<string, Array<BusHandler>>();
-  private readonly history       : BusMessage[] = [];
-  private readonly deadLetters   : BusMessage[] = [];
-  private readonly maxHistory    : number;
+  private readonly history: BusMessage[] = [];
+  private readonly deadLetters: BusMessage[] = [];
+  private readonly maxHistory: number;
   private msgCounter = 0;
 
   constructor(maxHistory = 200) {
@@ -64,28 +65,25 @@ export class AgentBus {
    * (first-registered, first-called for request(); all called for broadcast).
    * Returns an unsubscribe function.
    */
-  on<TIn = unknown, TOut = unknown>(
-    channel : string,
-    handler : BusHandler<TIn, TOut>,
-  ): () => void {
+  on<TIn = unknown, TOut = unknown>(channel: string, handler: BusHandler<TIn, TOut>): () => void {
     if (!this.subscriptions.has(channel)) {
       this.subscriptions.set(channel, []);
     }
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
     this.subscriptions.get(channel)!.push(handler as BusHandler);
     return () => {
       const arr = this.subscriptions.get(channel);
       if (arr) {
         const idx = arr.indexOf(handler as BusHandler);
-        if (idx !== -1) {arr.splice(idx, 1);}
+        if (idx !== -1) {
+          arr.splice(idx, 1);
+        }
       }
     };
   }
 
   /** Subscribe once — auto-unsubscribes after first invocation. */
-  once<TIn = unknown, TOut = unknown>(
-    channel : string,
-    handler : BusHandler<TIn, TOut>,
-  ): void {
+  once<TIn = unknown, TOut = unknown>(channel: string, handler: BusHandler<TIn, TOut>): void {
     const unsub = this.on(channel, (...args) => {
       unsub();
       return (handler as BusHandler)(...args);
@@ -95,12 +93,7 @@ export class AgentBus {
   // ── Messaging primitives ──────────────────────────────────────────────────
 
   /** Fire-and-forget event. All handlers on the channel are invoked. */
-  emit<T>(
-    channel  : string,
-    payload  : T,
-    from     = 'system',
-    priority : BusPriority = 2,
-  ): void {
+  emit<T>(channel: string, payload: T, from = 'system', priority: BusPriority = 2): void {
     const msg = this.makeMsg<T>('event', channel, channel, payload, from, priority);
     this.record(msg);
     const handlers = this.subscriptions.get(channel);
@@ -109,8 +102,10 @@ export class AgentBus {
       return;
     }
     for (const h of handlers) {
-      try { h(payload, from); } catch (e) {
-        console.warn(`[AgentBus] Handler error on "${channel}":`, e);
+      try {
+        h(payload, from);
+      } catch (e) {
+        logger.warn(`[AgentBus] Handler error on "${channel}":`, e);
       }
     }
   }
@@ -120,9 +115,9 @@ export class AgentBus {
    * Respects TTL as a timeout.
    */
   async request<TReq, TRes>(
-    channel : string,
-    payload : TReq,
-    from    = 'system',
+    channel: string,
+    payload: TReq,
+    from = 'system',
     timeout = 5000,
   ): Promise<TRes> {
     const handlers = this.subscriptions.get(channel);
@@ -136,16 +131,19 @@ export class AgentBus {
     return Promise.race<TRes>([
       Promise.resolve(handler(payload, from)) as Promise<TRes>,
       new Promise<never>((_, reject) =>
-        setTimeout(() => reject(new Error(`[AgentBus] Timeout (${timeout}ms) on "${channel}"`)), timeout),
+        setTimeout(
+          () => reject(new Error(`[AgentBus] Timeout (${timeout}ms) on "${channel}"`)),
+          timeout,
+        ),
       ),
     ]);
   }
 
   /** Broadcast to ALL handlers on a channel. Collects results. Never throws. */
   async broadcast<T, R = void>(
-    channel : string,
-    payload : T,
-    from    = 'system',
+    channel: string,
+    payload: T,
+    from = 'system',
   ): Promise<BroadcastResult<R>> {
     const msg = this.makeMsg<T>('broadcast', '*', channel, payload, from, 0);
     this.record(msg);
@@ -157,7 +155,7 @@ export class AgentBus {
     await Promise.allSettled(
       handlers.map(async (h, i) => {
         try {
-          const result = await h(payload, from) as R;
+          const result = (await h(payload, from)) as R;
           results.push({ handler: i, result });
         } catch (e) {
           const error = (e as Error).message;
@@ -180,9 +178,13 @@ export class AgentBus {
 
   // ── Introspection ─────────────────────────────────────────────────────────
 
-  getHistory(): Readonly<BusMessage[]> { return this.history; }
+  getHistory(): Readonly<BusMessage[]> {
+    return this.history;
+  }
 
-  getDeadLetters(): Readonly<BusMessage[]> { return this.deadLetters; }
+  getDeadLetters(): Readonly<BusMessage[]> {
+    return this.deadLetters;
+  }
 
   getChannelHistory(channel: string): BusMessage[] {
     return this.history.filter(m => m.channel === channel);
@@ -201,29 +203,41 @@ export class AgentBus {
   /** Convert bus history to the AgentMessage[] format used by AgentContext */
   toAgentMessages(): AgentMessage[] {
     return this.history.map(m => ({
-      from     : m.from,
-      to       : String(m.to),
-      type     : m.type === 'request' || m.type === 'response' ? m.type : 'event' as const,
-      payload  : m.payload as Record<string, unknown>,
-      priority : m.priority === 0 ? 'critical' : m.priority === 1 ? 'high' : m.priority === 3 ? 'low' : 'normal',
-      ts       : m.ts,
+      from: m.from,
+      to: String(m.to),
+      type: m.type === 'request' || m.type === 'response' ? m.type : ('event' as const),
+      payload: m.payload as Record<string, unknown>,
+      priority:
+        m.priority === 0
+          ? 'critical'
+          : m.priority === 1
+            ? 'high'
+            : m.priority === 3
+              ? 'low'
+              : 'normal',
+      ts: m.ts,
     }));
   }
 
   // ── Internal ──────────────────────────────────────────────────────────────
 
   private makeMsg<T>(
-    type     : BusMessageType,
-    to       : string | '*',
-    channel  : string,
-    payload  : T,
-    from     : string,
-    priority : BusPriority,
-    ttl?     : number,
+    type: BusMessageType,
+    to: string | '*',
+    channel: string,
+    payload: T,
+    from: string,
+    priority: BusPriority,
+    ttl?: number,
   ): BusMessage<T> {
     return {
       id: `${++this.msgCounter}-${Date.now()}`,
-      type, from, to, channel, payload, priority,
+      type,
+      from,
+      to,
+      channel,
+      payload,
+      priority,
       ts: Date.now(),
       ...(ttl !== undefined && { ttl }),
     };
@@ -231,7 +245,9 @@ export class AgentBus {
 
   private record(msg: BusMessage): void {
     this.history.push(msg);
-    if (this.history.length > this.maxHistory) {this.history.shift();}
+    if (this.history.length > this.maxHistory) {
+      this.history.shift();
+    }
   }
 }
 

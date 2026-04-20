@@ -19,32 +19,32 @@
 
 import { mainOrchestrator } from '../agents/00-orchestrator.js';
 import type { AgentEnv } from '../core/types.js';
+import { logger } from '../lib/logger.js';
 import { kvRateLimit, recordMetric, withCircuitBreaker } from '../lib/observability.js';
 import type { Env } from '../lib/response.js';
 import { checkRateLimit } from '../lib/security.js';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 const MAX_MSG_LENGTH = 2_000; // characters
-
 const CORS_HEADERS = {
-  'Access-Control-Allow-Origin' : '*',
+  'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
   'Access-Control-Allow-Headers': 'Content-Type, Authorization',
 };
 
 // Rate limits — AI inference is expensive; protect against cost exploitation
-const RATE_LIMIT_IP_MAX        = 20;  // requests
-const RATE_LIMIT_IP_WINDOW     = 60;  // seconds
-const RATE_LIMIT_SESSION_MAX   = 10;  // requests
+const RATE_LIMIT_IP_MAX = 20; // requests
+const RATE_LIMIT_IP_WINDOW = 60; // seconds
+const RATE_LIMIT_SESSION_MAX = 10; // requests
 const RATE_LIMIT_SESSION_WINDOW = 60; // seconds
 
 // ─── Typed request body ───────────────────────────────────────────────────────
 interface ChatRequestBody {
-  message   ?: string;
+  message?: string;
   session_id?: string;
-  language  ?: 'pt' | 'en' | 'es';
-  user_id   ?: string;
-  debug     ?: boolean;
+  language?: 'pt' | 'en' | 'es';
+  user_id?: string;
+  debug?: boolean;
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -64,11 +64,13 @@ function errorResponse(message: string, status = 400, requestId?: string): Respo
 }
 
 function sanitize(text: string): string {
-  return text
-    .trim()
-    .slice(0, MAX_MSG_LENGTH)        // length cap
-    // eslint-disable-next-line no-control-regex
-    .replace(/[\x00-\x08\x0B-\x1F]/g, '');  // strip control chars except \t, \n
+  return (
+    text
+      .trim()
+      .slice(0, MAX_MSG_LENGTH) // length cap
+      // eslint-disable-next-line no-control-regex
+      .replace(/[\x00-\x08\x0B-\x1F]/g, '')
+  ); // strip control chars except \t, \n
 }
 
 // ─── Main handler ─────────────────────────────────────────────────────────────
@@ -79,7 +81,7 @@ export async function handleChatRequest(request: Request, env: AgentEnv): Promis
   // Parse body
   let body: ChatRequestBody;
   try {
-    body = await request.json() as ChatRequestBody;
+    body = (await request.json()) as ChatRequestBody;
   } catch {
     return errorResponse('Invalid JSON body', 400, requestId);
   }
@@ -90,10 +92,11 @@ export async function handleChatRequest(request: Request, env: AgentEnv): Promis
     return errorResponse('O campo "message" é obrigatório', 400, requestId);
   }
 
-  const message   = sanitize(rawMessage);
-  const sessionId = typeof body.session_id === 'string' && body.session_id.trim()
-    ? body.session_id.trim().slice(0, 128)
-    : `anon-${Date.now()}`;
+  const message = sanitize(rawMessage);
+  const sessionId =
+    typeof body.session_id === 'string' && body.session_id.trim()
+      ? body.session_id.trim().slice(0, 128)
+      : `anon-${Date.now()}`;
 
   // ── Rate limiting: KV-first (fast), fallback to D1 ───────────────────────
   // AI inference is expensive — protect against cost exploitation and DoS
@@ -101,16 +104,44 @@ export async function handleChatRequest(request: Request, env: AgentEnv): Promis
   const kvNs = (env as unknown as Env).RATE_LIMIT;
   const [ipRL, sessRL] = await Promise.all([
     kvNs
-      ? kvRateLimit(kvNs, `chat:ip:${ip}`,          RATE_LIMIT_IP_MAX,      RATE_LIMIT_IP_WINDOW)
-      : checkRateLimit(env as unknown as Env, `chat:ip:${ip}`,          RATE_LIMIT_IP_MAX,      RATE_LIMIT_IP_WINDOW),
+      ? kvRateLimit(kvNs, `chat:ip:${ip}`, RATE_LIMIT_IP_MAX, RATE_LIMIT_IP_WINDOW)
+      : checkRateLimit(
+          env as unknown as Env,
+          `chat:ip:${ip}`,
+          RATE_LIMIT_IP_MAX,
+          RATE_LIMIT_IP_WINDOW,
+        ),
     kvNs
-      ? kvRateLimit(kvNs, `chat:sess:${sessionId}`, RATE_LIMIT_SESSION_MAX, RATE_LIMIT_SESSION_WINDOW)
-      : checkRateLimit(env as unknown as Env, `chat:sess:${sessionId}`, RATE_LIMIT_SESSION_MAX, RATE_LIMIT_SESSION_WINDOW),
+      ? kvRateLimit(
+          kvNs,
+          `chat:sess:${sessionId}`,
+          RATE_LIMIT_SESSION_MAX,
+          RATE_LIMIT_SESSION_WINDOW,
+        )
+      : checkRateLimit(
+          env as unknown as Env,
+          `chat:sess:${sessionId}`,
+          RATE_LIMIT_SESSION_MAX,
+          RATE_LIMIT_SESSION_WINDOW,
+        ),
   ]);
   if (!ipRL.allowed || !sessRL.allowed) {
-    void recordMetric((env as unknown as Env).METRICS, { ts: Date.now(), path: '/api/chat', method: 'POST', status: 429, latencyMs: 0, requestId, sessionId, ip });
+    void recordMetric((env as unknown as Env).METRICS, {
+      ts: Date.now(),
+      path: '/api/chat',
+      method: 'POST',
+      status: 429,
+      latencyMs: 0,
+      requestId,
+      sessionId,
+      ip,
+    });
     return jsonResponse(
-      { success: false, response: 'Muitas requisições. Aguarde um momento e tente novamente.', error: 'rate_limited' },
+      {
+        success: false,
+        response: 'Muitas requisições. Aguarde um momento e tente novamente.',
+        error: 'rate_limited',
+      },
       429,
       requestId,
     );
@@ -121,7 +152,7 @@ export async function handleChatRequest(request: Request, env: AgentEnv): Promis
     : 'pt';
 
   // debug only available in development — prevents info disclosure in production
-  const isDev   = (env as unknown as { ENVIRONMENT?: string }).ENVIRONMENT === 'development';
+  const isDev = (env as unknown as { ENVIRONMENT?: string }).ENVIRONMENT === 'development';
   const isDebug = body.debug === true && isDev;
 
   // Build orchestrator input
@@ -129,11 +160,11 @@ export async function handleChatRequest(request: Request, env: AgentEnv): Promis
     message,
     sessionId,
     language,
-    userId   : typeof body.user_id === 'string' ? body.user_id : undefined,
-    flags    : {
-      debug         : isDebug,
-      longMemory    : true,
-      shortMemory   : true,
+    userId: typeof body.user_id === 'string' ? body.user_id : undefined,
+    flags: {
+      debug: isDebug,
+      longMemory: true,
+      shortMemory: true,
       semanticMemory: true,
     },
   };
@@ -143,8 +174,23 @@ export async function handleChatRequest(request: Request, env: AgentEnv): Promis
 
     // Circuit breaker wraps the full orchestrator pipeline
     // Protects against cascading AI failures; falls back to a static response
-    const FALLBACK_RESPONSE = { success: false, response: 'Serviço temporáriamente indisponível. Tente novamente em instantes.', action: null, data: null, coupon_valid: null, discount: null, product_id: null, product_name: null, product_price: null, link: null };
-    const { result: output, circuitState, error: cbError } = await withCircuitBreaker(
+    const FALLBACK_RESPONSE = {
+      success: false,
+      response: 'Serviço temporáriamente indisponível. Tente novamente em instantes.',
+      action: null,
+      data: null,
+      coupon_valid: null,
+      discount: null,
+      product_id: null,
+      product_name: null,
+      product_price: null,
+      link: null,
+    };
+    const {
+      result: output,
+      circuitState,
+      error: cbError,
+    } = await withCircuitBreaker(
       'orchestrator:main',
       () => mainOrchestrator.process(input, env),
       { timeoutMs: 25_000, failureThreshold: 3, openDurationMs: 30_000 },
@@ -152,19 +198,19 @@ export async function handleChatRequest(request: Request, env: AgentEnv): Promis
     );
 
     const latencyMs = Date.now() - reqStart;
-    const status    = output?.success === false && cbError ? 503 : 200;
+    const status = output?.success === false && cbError ? 503 : 200;
 
     // Fire-and-forget metrics — never awaited to keep response latency minimal
     void recordMetric((env as unknown as Env).METRICS, {
-      ts        : Date.now(),
-      path      : '/api/chat',
-      method    : 'POST',
+      ts: Date.now(),
+      path: '/api/chat',
+      method: 'POST',
       status,
       latencyMs,
       requestId,
       sessionId,
       ip,
-      error     : cbError,
+      error: cbError,
     });
 
     if (circuitState === 'OPEN' || !output) {
@@ -173,7 +219,7 @@ export async function handleChatRequest(request: Request, env: AgentEnv): Promis
 
     return jsonResponse(output, status, requestId);
   } catch (err) {
-    console.error('[routes/chat] Unhandled error:', err);
+    logger.error('[routes/chat] Unhandled error:', err);
     return errorResponse('Erro interno do servidor', 500, requestId);
   }
 }

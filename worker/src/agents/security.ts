@@ -6,8 +6,8 @@
  * ContentFilter uses Llama Guard only when explicitly enabled (cost control).
  */
 
-import type { AgentContext, AgentResult} from '../core/types.js';
-import { BaseAgent, type AgentEnv } from '../core/types.js';
+import type { AgentContext, AgentResult } from '../core/types.js';
+import { BaseAgent } from '../core/types.js';
 
 // ─── Agent 27 — SecurityAgent ─────────────────────────────────────────────────
 export class SecurityAgent extends BaseAgent {
@@ -22,7 +22,7 @@ export class SecurityAgent extends BaseAgent {
     /ignore\s+(previous|all|prior)\s+instructions/i,
     /disregard\s+(all|previous|prior)\s+instructions/i,
     /\bjailbreak\b/i,
-    /\bDAN\b/,                                     // "Do Anything Now" jailbreak
+    /\bDAN\b/, // "Do Anything Now" jailbreak
     /\bsystem\s+prompt\b/i,
     // Role override attempts
     /\byou\s+are\s+now\s+(a|an|the)\b/i,
@@ -41,14 +41,14 @@ export class SecurityAgent extends BaseAgent {
     /--\s*$/,
     /'\s*or\s+'1'\s*=\s*'1/i,
     // Template / SSTI injection
-    /\{\{.*\}\}/,                                  // Handlebars / Jinja-style
-    /\$\{.*\}/,                                    // JS template literal in input
+    /\{\{.*\}\}/, // Handlebars / Jinja-style
+    /\$\{.*\}/, // JS template literal in input
     // SSRF probing
     /\bfile:\/\//i,
     /\b(169\.254\.|127\.|10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.)/,
   ];
 
-  async run(ctx: AgentContext, message: string): Promise<AgentResult> {
+  async run(_ctx: AgentContext, message: string): Promise<AgentResult> {
     const t = this.start();
 
     if (typeof message !== 'string' || message.trim().length === 0) {
@@ -56,7 +56,11 @@ export class SecurityAgent extends BaseAgent {
     }
 
     if (message.length > SecurityAgent.MAX_LENGTH) {
-      return this.fail(this.id, `Mensagem muito longa (máx ${SecurityAgent.MAX_LENGTH} caracteres)`, t);
+      return this.fail(
+        this.id,
+        `Mensagem muito longa (máx ${SecurityAgent.MAX_LENGTH} caracteres)`,
+        t,
+      );
     }
 
     for (const pattern of SecurityAgent.INJECTION_PATTERNS) {
@@ -80,9 +84,9 @@ export class ContentFilterAgent extends BaseAgent {
 
     try {
       // Use Llama Guard for explicit content detection
-      const result = await ctx.env.AI.run('@cf/meta/llama-guard-3-8b', {
+      const result = (await ctx.env.AI.run('@cf/meta/llama-guard-3-8b', {
         messages: [{ role: 'user' as const, content: message }],
-      }) as { response: string };
+      })) as { response: string };
 
       const safe = !result.response?.toLowerCase().includes('unsafe');
       if (!safe) {

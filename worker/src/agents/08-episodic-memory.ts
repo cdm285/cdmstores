@@ -20,26 +20,26 @@ const ORDER_LIMIT = 3;
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 export interface OrderSummary {
-  orderId       : string;
-  status        : string;
-  total         : number;
-  currency      : string;
-  createdAt     : string;
-  trackingCode ?: string;
+  orderId: string;
+  status: string;
+  total: number;
+  currency: string;
+  createdAt: string;
+  trackingCode?: string;
 }
 
 interface OrderRow {
-  id           : number;
-  status       : string;
-  total        : number;
-  currency     : string;
-  created_at   : string;
+  id: number;
+  status: string;
+  total: number;
+  currency: string;
+  created_at: string;
   tracking_code: string | null;
 }
 
 // ─── Agent ────────────────────────────────────────────────────────────────────
 export class Agent08EpisodicMemory {
-  readonly id   = '08-episodic-memory';
+  readonly id = '08-episodic-memory';
   readonly name = 'EpisodicMemoryAgent';
   readonly tier = 2;
 
@@ -49,12 +49,24 @@ export class Agent08EpisodicMemory {
     // Only run if we have a customer email
     const email = ctx.entities?.email as string | undefined;
     if (!email) {
-      addTrace(ctx, { agentId: this.id, agentName: this.name, success: true, latencyMs: Date.now() - start, confidence: 100 });
+      addTrace(ctx, {
+        agentId: this.id,
+        agentName: this.name,
+        success: true,
+        latencyMs: Date.now() - start,
+        confidence: 100,
+      });
       return;
     }
 
     if (!ctx.env.DB) {
-      addTrace(ctx, { agentId: this.id, agentName: this.name, success: false, latencyMs: 0, error: 'D1 binding missing' });
+      addTrace(ctx, {
+        agentId: this.id,
+        agentName: this.name,
+        success: false,
+        latencyMs: 0,
+        error: 'D1 binding missing',
+      });
       return;
     }
 
@@ -66,28 +78,36 @@ export class Agent08EpisodicMemory {
          FROM orders o
          WHERE o.customer_email = ?
          ORDER BY o.created_at DESC
-         LIMIT ?`
-      ).bind(email.toLowerCase(), ORDER_LIMIT).all<OrderRow>();
+         LIMIT ?`,
+      )
+        .bind(email.toLowerCase(), ORDER_LIMIT)
+        .all<OrderRow>();
 
       ctx.recentOrders = (results ?? []).map<OrderSummary>(r => ({
-        orderId     : String(r.id),
-        status      : r.status,
-        total       : r.total,
-        currency    : r.currency ?? 'BRL',
-        createdAt   : r.created_at,
+        orderId: String(r.id),
+        status: r.status,
+        total: r.total,
+        currency: r.currency ?? 'BRL',
+        createdAt: r.created_at,
         trackingCode: r.tracking_code ?? undefined,
       }));
 
       addTrace(ctx, {
-        agentId   : this.id,
-        agentName : this.name,
-        success   : true,
-        latencyMs : Date.now() - start,
+        agentId: this.id,
+        agentName: this.name,
+        success: true,
+        latencyMs: Date.now() - start,
         confidence: 100,
       });
     } catch (err) {
       const error = err instanceof Error ? err.message : String(err);
-      addTrace(ctx, { agentId: this.id, agentName: this.name, success: false, latencyMs: Date.now() - start, error });
+      addTrace(ctx, {
+        agentId: this.id,
+        agentName: this.name,
+        success: false,
+        latencyMs: Date.now() - start,
+        error,
+      });
       ctx.recentOrders = [];
     }
   }

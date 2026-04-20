@@ -3,6 +3,8 @@
  * Env interface, CORS headers, response helpers, cookie helpers.
  */
 
+import { logger } from './logger.js';
+
 // ─── Env interface ────────────────────────────────────────────────────────────
 export interface Env {
   DB: D1Database;
@@ -26,21 +28,21 @@ export interface Env {
 
 // ─── Security headers (OWASP ASVS 14.4, PCI-DSS 6.2.4, HSTS RFC 6797) ─────────
 export const SECURITY_HEADERS: Record<string, string> = {
-  'Content-Type'                     : 'application/json',
-  'X-Content-Type-Options'           : 'nosniff',
-  'X-Frame-Options'                  : 'DENY',
-  'Referrer-Policy'                  : 'strict-origin-when-cross-origin',
-  'Permissions-Policy'               : 'camera=(), microphone=(), geolocation=(), payment=(self)',
-  'Cache-Control'                    : 'no-store',
-  'Pragma'                           : 'no-cache',
+  'Content-Type': 'application/json',
+  'X-Content-Type-Options': 'nosniff',
+  'X-Frame-Options': 'DENY',
+  'Referrer-Policy': 'strict-origin-when-cross-origin',
+  'Permissions-Policy': 'camera=(), microphone=(), geolocation=(), payment=(self)',
+  'Cache-Control': 'no-store',
+  Pragma: 'no-cache',
   // HSTS — force HTTPS, 1 year, all subdomains, preload-eligible (RFC 6797)
-  'Strict-Transport-Security'        : 'max-age=31536000; includeSubDomains; preload',
+  'Strict-Transport-Security': 'max-age=31536000; includeSubDomains; preload',
   // CSP — API responses must never be rendered as HTML (OWASP A05)
-  'Content-Security-Policy'          : "default-src 'none'; frame-ancestors 'none'",
+  'Content-Security-Policy': "default-src 'none'; frame-ancestors 'none'",
   // Cross-origin isolation (Spectre mitigation)
-  'Cross-Origin-Opener-Policy'       : 'same-origin',
+  'Cross-Origin-Opener-Policy': 'same-origin',
   // Allow fetch from any origin (REST API), but disallow embedding
-  'Cross-Origin-Resource-Policy'     : 'cross-origin',
+  'Cross-Origin-Resource-Policy': 'cross-origin',
 };
 
 export const ALLOWED_ORIGINS = new Set([
@@ -58,12 +60,12 @@ export function resolveOrigin(request: Request): string {
 
 export const CORS_HEADERS: Record<string, string> = {
   ...SECURITY_HEADERS,
-  'Access-Control-Allow-Origin'     : 'https://cdmstores.com', // overridden dynamically
-  'Access-Control-Allow-Methods'    : 'GET, POST, PUT, DELETE, OPTIONS',
-  'Access-Control-Allow-Headers'    : 'Content-Type, Authorization, X-Turnstile-Token',
+  'Access-Control-Allow-Origin': 'https://cdmstores.com', // overridden dynamically
+  'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+  'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Turnstile-Token',
   'Access-Control-Allow-Credentials': 'true',
-  'Access-Control-Max-Age'          : '86400',
-  'Vary'                            : 'Origin',
+  'Access-Control-Max-Age': '86400',
+  Vary: 'Origin',
 };
 
 // ─── Response helpers ─────────────────────────────────────────────────────────
@@ -75,7 +77,7 @@ export function json(data: unknown, status = 200, extraHeaders?: Record<string, 
 /** Sanitised 500 — never leaks internal error.message to the client (OWASP ASVS 7.4.2). */
 export function internalError(error: unknown, context?: string): Response {
   const msg = error instanceof Error ? error.message : String(error);
-  console.error(`[INTERNAL ERROR]${context ? ' ' + context : ''}:`, msg);
+  logger.error(`[INTERNAL ERROR]${context ? ' ' + context : ''}:`, msg);
   return json({ success: false, error: 'Erro interno do servidor' }, 500);
 }
 
@@ -89,7 +91,7 @@ export function jsonWithCookies(data: unknown, status: number, cookies: string[]
 }
 
 // ─── Cookie helpers (OWASP ASVS 3.4) ─────────────────────────────────────────
-export const ACCESS_TOKEN_TTL_SECONDS  = 15 * 60;
+export const ACCESS_TOKEN_TTL_SECONDS = 15 * 60;
 export const REFRESH_TOKEN_TTL_SECONDS = 7 * 24 * 60 * 60;
 
 export function buildSetCookieHeaders(token: string, refreshToken: string): string[] {

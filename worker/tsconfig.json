@@ -17,9 +17,8 @@
 
     // ─ Strict mode ────────────────────────────────────────────────────────────
     "strict": true,
-    // NOTE: enable these incrementally as unused imports/params are cleaned up:
-    // "noUnusedLocals": true,
-    // "noUnusedParameters": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
     "noImplicitReturns": true,
     "noFallthroughCasesInSwitch": true,
 

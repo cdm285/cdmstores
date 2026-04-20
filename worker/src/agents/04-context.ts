@@ -19,9 +19,9 @@ import { addTrace } from '../core/agent-context.js';
 import type { SessionMessage } from '../core/types.js';
 
 // ─── Tunables ─────────────────────────────────────────────────────────────────
-const MAX_CHARS       = 12_000;   // ≈ 3 000 tokens
-const MAX_AGE_MS      = 90 * 60 * 1000; // 90 minutes
-const TRIM_MARKER     = '[... histórico anterior omitido ...]';
+const MAX_CHARS = 12_000; // ≈ 3 000 tokens
+const MAX_AGE_MS = 90 * 60 * 1000; // 90 minutes
+const TRIM_MARKER = '[... histórico anterior omitido ...]';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 /** Render a SessionMessage to a readable line */
@@ -38,31 +38,35 @@ function estimateTokens(text: string): number {
 /** Build the conversation window from a list of session messages */
 function buildWindow(messages: SessionMessage[], now = Date.now()): SessionMessage[] {
   return messages.filter(m => {
-    if (!m.ts) {return true;}                        // keep if no timestamp
+    if (!m.ts) {
+      return true;
+    } // keep if no timestamp
     return now - m.ts < MAX_AGE_MS;
   });
 }
 
 /** Trim the window from oldest end until it fits within MAX_CHARS */
 function trimToLimit(messages: SessionMessage[]): { lines: string[]; trimmed: boolean } {
-  const all   = messages.map(renderMessage);
-  let   total = all.join('\n').length;
-  let   start = 0;
+  const all = messages.map(renderMessage);
+  let total = all.join('\n').length;
+  let start = 0;
 
   while (total > MAX_CHARS && start < all.length - 1) {
     total -= all[start].length + 1;
     start++;
   }
 
-  const kept    = all.slice(start);
+  const kept = all.slice(start);
   const trimmed = start > 0;
-  if (trimmed) {kept.unshift(TRIM_MARKER);}
+  if (trimmed) {
+    kept.unshift(TRIM_MARKER);
+  }
   return { lines: kept, trimmed };
 }
 
 // ─── Agent ────────────────────────────────────────────────────────────────────
 export class Agent04Context {
-  readonly id   = '04-context';
+  readonly id = '04-context';
   readonly name = 'ContextAgent';
   readonly tier = 1;
 
@@ -75,29 +79,35 @@ export class Agent04Context {
       : [];
 
     if (raw.length === 0) {
-      ctx.meta.contextStr       = '';
+      ctx.meta.contextStr = '';
       ctx.meta.contextTokensEst = 0;
-      ctx.meta.contextMsgCount  = 0;
-      addTrace(ctx, { agentId: this.id, agentName: this.name, success: true, latencyMs: Date.now() - start, confidence: 100 });
+      ctx.meta.contextMsgCount = 0;
+      addTrace(ctx, {
+        agentId: this.id,
+        agentName: this.name,
+        success: true,
+        latencyMs: Date.now() - start,
+        confidence: 100,
+      });
       return;
     }
 
     // Filter by age and trim to budget
-    const window             = buildWindow(raw);
+    const window = buildWindow(raw);
     const { lines, trimmed } = trimToLimit(window);
-    const contextStr         = lines.join('\n');
+    const contextStr = lines.join('\n');
 
     // Write formatted string to meta (session.context stays as SessionMessage[])
-    ctx.meta.contextStr       = contextStr;
+    ctx.meta.contextStr = contextStr;
     ctx.meta.contextTokensEst = estimateTokens(contextStr);
-    ctx.meta.contextMsgCount  = window.length;
-    ctx.meta.contextTrimmed   = trimmed;
+    ctx.meta.contextMsgCount = window.length;
+    ctx.meta.contextTrimmed = trimmed;
 
     addTrace(ctx, {
-      agentId   : this.id,
-      agentName : this.name,
-      success   : true,
-      latencyMs : Date.now() - start,
+      agentId: this.id,
+      agentName: this.name,
+      success: true,
+      latencyMs: Date.now() - start,
       confidence: 100,
     });
   }

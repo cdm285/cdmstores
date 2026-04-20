@@ -6,11 +6,8 @@
  * Agent 04 — ContextAgent        Assembles context window for AI prompt
  */
 
-import type { AgentContext, AgentResult, SessionMessage, SessionState
-} from '../core/types.js';
-import {
-  BaseAgent
-} from '../core/types.js';
+import type { AgentContext, AgentResult, SessionMessage, SessionState } from '../core/types.js';
+import { BaseAgent } from '../core/types.js';
 
 const SESSION_TTL_SECONDS = 1800; // 30 min
 
@@ -19,7 +16,11 @@ export class ShortMemoryAgent extends BaseAgent {
   readonly id = '05-short-memory';
   readonly name = 'ShortMemoryAgent';
 
-  async run(ctx: AgentContext, operation: 'read' | 'write', sessionId: string): Promise<AgentResult> {
+  async run(
+    ctx: AgentContext,
+    operation: 'read' | 'write',
+    sessionId: string,
+  ): Promise<AgentResult> {
     const t = this.start();
     const key = `session:${sessionId}`;
 
@@ -30,21 +31,35 @@ export class ShortMemoryAgent extends BaseAgent {
           const raw = await ctx.env.KV.get(key);
           if (raw) {
             const state = JSON.parse(raw) as Partial<SessionState>;
-            if (state.context) {ctx.session.context = state.context;}
-            if (state.language) {ctx.session.language = state.language;}
-            if (state.turn !== undefined) {ctx.session.turn = state.turn;}
+            if (state.context) {
+              ctx.session.context = state.context;
+            }
+            if (state.language) {
+              ctx.session.language = state.language;
+            }
+            if (state.turn !== undefined) {
+              ctx.session.turn = state.turn;
+            }
             return this.ok(this.id, { data: { source: 'kv', found: true } }, t);
           }
         }
         // D1 fallback — session_cache table
         const row = await ctx.env.DB.prepare(
-          'SELECT context FROM session_cache WHERE session_id = ? AND expires_at > datetime("now") LIMIT 1'
-        ).bind(sessionId).first<{ context: string }>();
+          'SELECT context FROM session_cache WHERE session_id = ? AND expires_at > datetime("now") LIMIT 1',
+        )
+          .bind(sessionId)
+          .first<{ context: string }>();
         if (row?.context) {
           const state = JSON.parse(row.context) as Partial<SessionState>;
-          if (state.context) {ctx.session.context = state.context;}
-          if (state.language) {ctx.session.language = state.language;}
-          if (state.turn !== undefined) {ctx.session.turn = state.turn;}
+          if (state.context) {
+            ctx.session.context = state.context;
+          }
+          if (state.language) {
+            ctx.session.language = state.language;
+          }
+          if (state.turn !== undefined) {
+            ctx.session.turn = state.turn;
+          }
           return this.ok(this.id, { data: { source: 'd1', found: true } }, t);
         }
         return this.ok(this.id, { data: { source: 'none', found: false } }, t);
@@ -63,8 +78,10 @@ export class ShortMemoryAgent extends BaseAgent {
         const expiresAt = new Date(Date.now() + SESSION_TTL_SECONDS * 1000).toISOString();
         await ctx.env.DB.prepare(
           `INSERT OR REPLACE INTO session_cache (session_id, context, expires_at, updated_at)
-           VALUES (?, ?, ?, datetime("now"))`
-        ).bind(sessionId, payload, expiresAt).run();
+           VALUES (?, ?, ?, datetime("now"))`,
+        )
+          .bind(sessionId, payload, expiresAt)
+          .run();
       }
 
       return this.ok(this.id, { data: { written: true } }, t);
@@ -79,20 +96,31 @@ export class LongMemoryAgent extends BaseAgent {
   readonly id = '06-long-memory';
   readonly name = 'LongMemoryAgent';
 
-  async run(ctx: AgentContext, operation: 'read' | 'write', sessionId: string, message?: string, response?: string, model?: string): Promise<AgentResult> {
+  async run(
+    ctx: AgentContext,
+    operation: 'read' | 'write',
+    sessionId: string,
+    message?: string,
+    response?: string,
+    model?: string,
+  ): Promise<AgentResult> {
     const t = this.start();
 
     try {
       if (operation === 'read') {
         // Load or create conversation
         let conv = await ctx.env.DB.prepare(
-          'SELECT id FROM ai_conversations WHERE session_id = ? ORDER BY created_at DESC LIMIT 1'
-        ).bind(sessionId).first<{ id: number }>();
+          'SELECT id FROM ai_conversations WHERE session_id = ? ORDER BY created_at DESC LIMIT 1',
+        )
+          .bind(sessionId)
+          .first<{ id: number }>();
 
         if (!conv) {
           const r = await ctx.env.DB.prepare(
-            'INSERT INTO ai_conversations (session_id, user_id, created_at, updated_at) VALUES (?, ?, datetime("now"), datetime("now"))'
-          ).bind(sessionId, ctx.user?.id ?? null).run();
+            'INSERT INTO ai_conversations (session_id, user_id, created_at, updated_at) VALUES (?, ?, datetime("now"), datetime("now"))',
+          )
+            .bind(sessionId, ctx.user?.id ?? null)
+            .run();
           conv = { id: r.meta.last_row_id as number };
         }
 
@@ -100,8 +128,10 @@ export class LongMemoryAgent extends BaseAgent {
 
         // Load last 10 messages into session context
         const history = await ctx.env.DB.prepare(
-          'SELECT role, content FROM ai_messages WHERE conversation_id = ? ORDER BY created_at DESC LIMIT 10'
-        ).bind(conv.id).all<{ role: string; content: string }>();
+          'SELECT role, content FROM ai_messages WHERE conversation_id = ? ORDER BY created_at DESC LIMIT 10',
+        )
+          .bind(conv.id)
+          .all<{ role: string; content: string }>();
 
         const loaded: SessionMessage[] = history.results.reverse().map(m => ({
           role: m.role as 'user' | 'assistant',
@@ -124,13 +154,13 @@ export class LongMemoryAgent extends BaseAgent {
 
       await ctx.env.DB.batch([
         ctx.env.DB.prepare(
-          'INSERT INTO ai_messages (conversation_id, role, content, model, created_at) VALUES (?, ?, ?, ?, datetime("now"))'
+          'INSERT INTO ai_messages (conversation_id, role, content, model, created_at) VALUES (?, ?, ?, ?, datetime("now"))',
         ).bind(convId, 'user', message, model ?? 'orchestrator'),
         ctx.env.DB.prepare(
-          'INSERT INTO ai_messages (conversation_id, role, content, model, created_at) VALUES (?, ?, ?, ?, datetime("now"))'
+          'INSERT INTO ai_messages (conversation_id, role, content, model, created_at) VALUES (?, ?, ?, ?, datetime("now"))',
         ).bind(convId, 'assistant', response, model ?? 'orchestrator'),
         ctx.env.DB.prepare(
-          'UPDATE ai_conversations SET updated_at = datetime("now") WHERE id = ?'
+          'UPDATE ai_conversations SET updated_at = datetime("now") WHERE id = ?',
         ).bind(convId),
       ]);
 
@@ -149,13 +179,22 @@ export class SemanticMemoryAgent extends BaseAgent {
   readonly id = '07-semantic-memory';
   readonly name = 'SemanticMemoryAgent';
 
-  async run(ctx: AgentContext, operation: 'read' | 'write', query?: string, content?: string): Promise<AgentResult> {
+  async run(
+    ctx: AgentContext,
+    operation: 'read' | 'write',
+    query?: string,
+    content?: string,
+  ): Promise<AgentResult> {
     const t = this.start();
 
     try {
       if (operation === 'read' && query) {
-        const embedding = await ctx.env.AI.run('@cf/baai/bge-m3', { text: [query] }) as { data: number[][] };
-        if (!embedding.data?.[0]) {return this.ok(this.id, { data: { results: [] } }, t);}
+        const embedding = (await ctx.env.AI.run('@cf/baai/bge-m3', { text: [query] })) as {
+          data: number[][];
+        };
+        if (!embedding.data?.[0]) {
+          return this.ok(this.id, { data: { results: [] } }, t);
+        }
 
         const matches = await ctx.env.VECTORIZE.query(embedding.data[0], {
           topK: 3,
@@ -163,7 +202,7 @@ export class SemanticMemoryAgent extends BaseAgent {
         });
 
         const results = matches.matches
-          .filter(m => m.score > 0.70)
+          .filter(m => m.score > 0.7)
           .map(m => m.metadata?.content as string)
           .filter(Boolean);
 
@@ -172,15 +211,21 @@ export class SemanticMemoryAgent extends BaseAgent {
       }
 
       if (operation === 'write' && content) {
-        const embedding = await ctx.env.AI.run('@cf/baai/bge-m3', { text: [content] }) as { data: number[][] };
-        if (!embedding.data?.[0]) {return this.ok(this.id, { data: { stored: false } }, t);}
+        const embedding = (await ctx.env.AI.run('@cf/baai/bge-m3', { text: [content] })) as {
+          data: number[][];
+        };
+        if (!embedding.data?.[0]) {
+          return this.ok(this.id, { data: { stored: false } }, t);
+        }
 
         const vectorId = `conv-${ctx.meta.conversation_id ?? 'anon'}-${Date.now()}`;
-        await ctx.env.VECTORIZE.upsert([{
-          id: vectorId,
-          values: embedding.data[0],
-          metadata: { content, type: 'conversation' },
-        }]);
+        await ctx.env.VECTORIZE.upsert([
+          {
+            id: vectorId,
+            values: embedding.data[0],
+            metadata: { content, type: 'conversation' },
+          },
+        ]);
 
         return this.ok(this.id, { data: { stored: true, vectorId } }, t);
       }
@@ -203,12 +248,16 @@ export class EpisodicMemoryAgent extends BaseAgent {
       return this.ok(this.id, { data: { episodes: [] } }, t);
     }
 
+    // emailwas validated above via `if (!email && !ctx.user?.email)`
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
     const targetEmail = email ?? ctx.user!.email;
 
     try {
       const orders = await ctx.env.DB.prepare(
-        'SELECT id, total, status, created_at FROM orders WHERE customer_email = ? ORDER BY created_at DESC LIMIT 3'
-      ).bind(targetEmail).all<{ id: number; total: number; status: string; created_at: string }>();
+        'SELECT id, total, status, created_at FROM orders WHERE customer_email = ? ORDER BY created_at DESC LIMIT 3',
+      )
+        .bind(targetEmail)
+        .all<{ id: number; total: number; status: string; created_at: string }>();
 
       const episodes = orders.results.map(o => ({
         type: 'order',
@@ -245,14 +294,25 @@ export class ContextAgent extends BaseAgent {
     for (let i = ctx.session.context.length - 1; i >= 0; i--) {
       const msg = ctx.session.context[i];
       totalChars += msg.content.length;
-      if (totalChars / ContextAgent.CHARS_PER_TOKEN > ContextAgent.MAX_TOKENS_APPROX) {break;}
+      if (totalChars / ContextAgent.CHARS_PER_TOKEN > ContextAgent.MAX_TOKENS_APPROX) {
+        break;
+      }
       trimmed.unshift(msg);
     }
 
     ctx.session.context = trimmed;
     ctx.meta.context_trimmed = ctx.session.context.length !== trimmed.length;
 
-    return this.ok(this.id, { data: { messages: trimmed.length, estimatedTokens: Math.round(totalChars / ContextAgent.CHARS_PER_TOKEN) } }, t);
+    return this.ok(
+      this.id,
+      {
+        data: {
+          messages: trimmed.length,
+          estimatedTokens: Math.round(totalChars / ContextAgent.CHARS_PER_TOKEN),
+        },
+      },
+      t,
+    );
   }
 }
 

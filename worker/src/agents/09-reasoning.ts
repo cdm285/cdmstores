@@ -43,8 +43,12 @@ Nunca inventes información sobre precios, stock o pedidos que no estén en el c
 Sé directo. Máximo 3 oraciones por respuesta, a menos que el usuario pida detalles.`;
 
 function getPersona(lang: string): string {
-  if (lang === 'en') {return PERSONA_EN;}
-  if (lang === 'es') {return PERSONA_ES;}
+  if (lang === 'en') {
+    return PERSONA_EN;
+  }
+  if (lang === 'es') {
+    return PERSONA_ES;
+  }
   return PERSONA_PT;
 }
 
@@ -57,7 +61,7 @@ type PromptMessage = { role: 'system' | 'user' | 'assistant'; content: string };
 // ─── Prompt builder ───────────────────────────────────────────────────────────
 function buildPrompt(ctx: ExtendedAgentContext, userMessage: string): PromptMessage[] {
   const lang = ctx.session.language ?? 'pt';
-  let system  = getPersona(lang);
+  let system = getPersona(lang);
 
   // Append semantic RAG context
   if (ctx.semanticCtx) {
@@ -68,9 +72,9 @@ function buildPrompt(ctx: ExtendedAgentContext, userMessage: string): PromptMess
   if (ctx.recentOrders?.length) {
     const ordersText = ctx.recentOrders
       .map(o => {
-        const id      = (o as Record<string, unknown>).orderId ?? (o as Record<string, unknown>).id;
-        const status  = (o as Record<string, unknown>).status;
-        const total   = (o as Record<string, unknown>).total;
+        const id = (o as Record<string, unknown>).orderId ?? (o as Record<string, unknown>).id;
+        const status = (o as Record<string, unknown>).status;
+        const total = (o as Record<string, unknown>).total;
         return `Pedido #${id}: ${status} (R$ ${total})`;
       })
       .join(', ');
@@ -79,7 +83,7 @@ function buildPrompt(ctx: ExtendedAgentContext, userMessage: string): PromptMess
 
   // Build messages array from conversation history
   const history: PromptMessage[] = ctx.session.context.map(m => ({
-    role   : m.role as 'user' | 'assistant',
+    role: m.role as 'user' | 'assistant',
     content: m.content,
   }));
 
@@ -105,21 +109,27 @@ function isGoodResponse(response: string): boolean {
 
 // ─── Agent ────────────────────────────────────────────────────────────────────
 export class Agent09Reasoning {
-  readonly id   = '09-reasoning';
+  readonly id = '09-reasoning';
   readonly name = 'ReasoningAgent';
   readonly tier = 3;
 
   async execute(ctx: ExtendedAgentContext, userMessage: string): Promise<void> {
     const start = Date.now();
-    const env   = ctx.env as AgentEnv;
+    const env = ctx.env as AgentEnv;
 
     if (!env.AI) {
-      addTrace(ctx, { agentId: this.id, agentName: this.name, success: false, latencyMs: 0, error: 'AI binding missing' });
+      addTrace(ctx, {
+        agentId: this.id,
+        agentName: this.name,
+        success: false,
+        latencyMs: 0,
+        error: 'AI binding missing',
+      });
       return;
     }
 
     const useLarge = ctx.flags.useLargeModel;
-    const model    = useLarge ? MODEL_LARGE : MODEL_SMALL;
+    const model = useLarge ? MODEL_LARGE : MODEL_SMALL;
 
     try {
       // 1. Build prompt
@@ -139,23 +149,35 @@ export class Agent09Reasoning {
       }
 
       if (!response) {
-        addTrace(ctx, { agentId: this.id, agentName: this.name, success: false, latencyMs: Date.now() - start, error: 'Empty AI response after retry' });
+        addTrace(ctx, {
+          agentId: this.id,
+          agentName: this.name,
+          success: false,
+          latencyMs: Date.now() - start,
+          error: 'Empty AI response after retry',
+        });
         return;
       }
 
-      ctx.aiResponse    = response;
-      ctx.meta.aiModel  = model;
+      ctx.aiResponse = response;
+      ctx.meta.aiModel = model;
 
       addTrace(ctx, {
-        agentId   : this.id,
-        agentName : this.name,
-        success   : true,
-        latencyMs : Date.now() - start,
+        agentId: this.id,
+        agentName: this.name,
+        success: true,
+        latencyMs: Date.now() - start,
         confidence: isGoodResponse(response) ? 85 : 55,
       });
     } catch (err) {
       const error = err instanceof Error ? err.message : String(err);
-      addTrace(ctx, { agentId: this.id, agentName: this.name, success: false, latencyMs: Date.now() - start, error });
+      addTrace(ctx, {
+        agentId: this.id,
+        agentName: this.name,
+        success: false,
+        latencyMs: Date.now() - start,
+        error,
+      });
     }
   }
 }

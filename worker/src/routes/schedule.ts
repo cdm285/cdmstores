@@ -9,10 +9,13 @@ import { EMAIL_REGEX } from '../lib/security.js';
 
 export async function handleSchedule(req: Request, env: Env): Promise<Response> {
   try {
-    const body = await req.json() as Record<string, unknown>;
+    const body = (await req.json()) as Record<string, unknown>;
     const { customer_email, customer_name, customer_phone, scheduled_date, reason } = body as {
-      customer_email?: string; customer_name?: string; customer_phone?: string;
-      scheduled_date?: string; reason?: string;
+      customer_email?: string;
+      customer_name?: string;
+      customer_phone?: string;
+      scheduled_date?: string;
+      reason?: string;
     };
 
     if (!customer_email || !customer_name || !scheduled_date) {
@@ -23,10 +26,22 @@ export async function handleSchedule(req: Request, env: Env): Promise<Response> 
     }
 
     const result = await env.DB.prepare(
-      'INSERT INTO appointments (customer_email, customer_name, customer_phone, scheduled_date, reason, status, created_at, updated_at) VALUES (?, ?, ?, ?, ?, "scheduled", datetime("now"), datetime("now"))'
-    ).bind(customer_email, customer_name, customer_phone ?? null, scheduled_date, reason || 'support').run();
+      'INSERT INTO appointments (customer_email, customer_name, customer_phone, scheduled_date, reason, status, created_at, updated_at) VALUES (?, ?, ?, ?, ?, "scheduled", datetime("now"), datetime("now"))',
+    )
+      .bind(
+        customer_email,
+        customer_name,
+        customer_phone ?? null,
+        scheduled_date,
+        reason || 'support',
+      )
+      .run();
 
-    return json({ success: true, appointment_id: result.meta.last_row_id, message: 'Agendamento realizado com sucesso!' });
+    return json({
+      success: true,
+      appointment_id: result.meta.last_row_id,
+      message: 'Agendamento realizado com sucesso!',
+    });
   } catch (error) {
     return internalError(error, 'schedule');
   }

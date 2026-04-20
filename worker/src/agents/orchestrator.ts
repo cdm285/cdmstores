@@ -17,7 +17,13 @@
  */
 
 import type {
-    AgentContext, AgentEnv, AgentResult, IntentCategory, OrchestratorOutput, SessionMessage, SessionState,
+    AgentContext,
+    AgentEnv,
+    AgentResult,
+    IntentCategory,
+    OrchestratorOutput,
+    SessionMessage,
+    SessionState,
 } from '../core/types.js';
 
 // ── Agents: Security ──────────────────────────────────────────────────────────
@@ -30,16 +36,13 @@ import { intentAgent, languageAgent, nlpAgent } from './nlp.js';
 import {
     contextAgent,
     episodicMemoryAgent,
-    longMemoryAgent, semanticMemoryAgent,
+    longMemoryAgent,
+    semanticMemoryAgent,
     shortMemoryAgent,
 } from './memory.js';
 
 // ── Agents: Reasoning ─────────────────────────────────────────────────────────
-import {
-    planningAgent,
-    promptingAgent, reasoningAgent,
-    summarizationAgent,
-} from './reasoning.js';
+import { planningAgent, promptingAgent, reasoningAgent, summarizationAgent } from './reasoning.js';
 
 // ── Agents: Personality ───────────────────────────────────────────────────────
 import { emotionAgent, personalityAgent, styleAgent } from './personality.js';
@@ -53,7 +56,8 @@ import {
     notificationAgent,
     orderAgent,
     paymentAgent,
-    productAgent, schedulingAgent,
+    productAgent,
+    schedulingAgent,
     trackingAgent,
     whatsAppAgent,
 } from './actions.js';
@@ -70,7 +74,8 @@ import {
 
 // ── Agents: Monitoring ────────────────────────────────────────────────────────
 import {
-    logAgent, monitoringAgent,
+    logAgent,
+    monitoringAgent,
     responseCheckAgent,
     securityCheckAgent,
     selfOptimizationAgent,
@@ -116,41 +121,67 @@ async function routeFastPath(
   switch (intent) {
     case 'tracking': {
       const code = (entities.tracking_code as string | undefined) ?? '';
-      if (code) {return trackingAgent.run(ctx, code);}
+      if (code) {
+        return trackingAgent.run(ctx, code);
+      }
       // No code found → ask user
       const msgs: Record<string, string> = {
         pt: '🔍 Por favor, informe seu código de rastreio para que eu possa verificar o status do pedido.',
         en: '🔍 Please provide your tracking code so I can check your order status.',
         es: '🔍 Por favor, proporciona tu código de seguimiento para que pueda verificar el estado de tu pedido.',
       };
-      return { agentId: '19-tracking', success: true, response: msgs[ctx.session.language] ?? msgs.pt, confidence: 80, latencyMs: 0 };
+      return {
+        agentId: '19-tracking',
+        success: true,
+        response: msgs[ctx.session.language] ?? msgs.pt,
+        confidence: 80,
+        latencyMs: 0,
+      };
     }
 
     case 'coupon': {
       const code = (entities.coupon as string | undefined) ?? '';
-      if (code) {return couponAgent.run(ctx, code);}
+      if (code) {
+        return couponAgent.run(ctx, code);
+      }
       const msgs: Record<string, string> = {
         pt: '🎟️ Qual é o código do cupom? Temos cupons disponíveis: NEWYEAR, PROMO, DESCONTO10, SAVE20, CDM10.',
         en: '🎟️ What is the coupon code? Available coupons: NEWYEAR, PROMO, DESCONTO10, SAVE20, CDM10.',
         es: '🎟️ ¿Cuál es el código del cupón? Cupones disponibles: NEWYEAR, PROMO, DESCONTO10, SAVE20, CDM10.',
       };
-      return { agentId: '20-coupon', success: true, response: msgs[ctx.session.language] ?? msgs.pt, confidence: 70, latencyMs: 0 };
+      return {
+        agentId: '20-coupon',
+        success: true,
+        response: msgs[ctx.session.language] ?? msgs.pt,
+        confidence: 70,
+        latencyMs: 0,
+      };
     }
 
     case 'order_history': {
       const email = (entities.email as string | undefined) ?? userEmail;
-      if (email) {return orderAgent.run(ctx, email);}
+      if (email) {
+        return orderAgent.run(ctx, email);
+      }
       const msgs: Record<string, string> = {
         pt: '📋 Por favor, informe seu email para que eu possa buscar seus pedidos.',
         en: '📋 Please provide your email so I can look up your orders.',
         es: '📋 Por favor, proporciona tu email para que pueda buscar tus pedidos.',
       };
-      return { agentId: '18-order', success: true, response: msgs[ctx.session.language] ?? msgs.pt, confidence: 70, latencyMs: 0 };
+      return {
+        agentId: '18-order',
+        success: true,
+        response: msgs[ctx.session.language] ?? msgs.pt,
+        confidence: 70,
+        latencyMs: 0,
+      };
     }
 
     case 'cart_action': {
       const productId = entities.product_id as number | undefined;
-      if (productId) {return cartAgent.run(ctx, productId);}
+      if (productId) {
+        return cartAgent.run(ctx, productId);
+      }
       return productAgent.run(ctx); // show catalog if no specific product
     }
 
@@ -178,7 +209,7 @@ async function routeFastPath(
 // Runs personality → style → quality_gate with optional self-repair.
 async function finalizeResponse(
   initialResponse: string,
-  actionResult: AgentResult,
+  _actionResult: AgentResult,
   ctx: AgentContext,
   trace: PipelineTrace,
   isMobile: boolean,
@@ -188,12 +219,16 @@ async function finalizeResponse(
   // Personality adjustment
   const personalResult = await personalityAgent.run(ctx, response);
   trace.record(personalResult);
-  if (personalResult.success && personalResult.response) {response = personalResult.response;}
+  if (personalResult.success && personalResult.response) {
+    response = personalResult.response;
+  }
 
   // Style formatting
   const styleResult = await styleAgent.run(ctx, response, isMobile ? 'mobile' : 'web');
   trace.record(styleResult);
-  if (styleResult.success && styleResult.response) {response = styleResult.response;}
+  if (styleResult.success && styleResult.response) {
+    response = styleResult.response;
+  }
 
   // Quality score
   const qualityResult = await qualityAgent.run(ctx, response);
@@ -215,12 +250,16 @@ async function finalizeResponse(
   // Error correction (broken markdown, debug artifacts)
   const corrResult = await errorCorrectionAgent.run(ctx, response);
   trace.record(corrResult);
-  if (corrResult.success && corrResult.response) {response = corrResult.response;}
+  if (corrResult.success && corrResult.response) {
+    response = corrResult.response;
+  }
 
   // Language self-correction
   const selfCorrResult = await selfCorrectionAgent.run(ctx, response);
   trace.record(selfCorrResult);
-  if (selfCorrResult.success && selfCorrResult.response) {response = selfCorrResult.response;}
+  if (selfCorrResult.success && selfCorrResult.response) {
+    response = selfCorrResult.response;
+  }
 
   // Quality gate check
   const gateResult = await qualityCheckAgent.run(ctx, response);
@@ -243,11 +282,12 @@ async function finalizeResponse(
   const secCheckResult = await securityCheckAgent.run(ctx, response);
   trace.record(secCheckResult);
   if (!secCheckResult.success) {
-    response = ctx.session.language === 'en'
-      ? 'Sorry, I encountered an error. Please try again.'
-      : ctx.session.language === 'es'
-        ? 'Lo siento, encontré un error. Por favor, inténtalo de nuevo.'
-        : 'Desculpe, encontrei um erro. Por favor, tente novamente.';
+    response =
+      ctx.session.language === 'en'
+        ? 'Sorry, I encountered an error. Please try again.'
+        : ctx.session.language === 'es'
+          ? 'Lo siento, encontré un error. Por favor, inténtalo de nuevo.'
+          : 'Desculpe, encontrei um erro. Por favor, tente novamente.';
   }
 
   // Response format check
@@ -287,11 +327,12 @@ export class Orchestrator {
     if (!secResult.success) {
       return {
         success: false,
-        response: ctx.session.language === 'en'
-          ? 'Your message could not be processed due to security restrictions.'
-          : ctx.session.language === 'es'
-            ? 'Tu mensaje no pudo procesarse por restricciones de seguridad.'
-            : 'Sua mensagem não pôde ser processada por restrições de segurança.',
+        response:
+          ctx.session.language === 'en'
+            ? 'Your message could not be processed due to security restrictions.'
+            : ctx.session.language === 'es'
+              ? 'Tu mensaje no pudo procesarse por restricciones de seguridad.'
+              : 'Sua mensagem não pôde ser processada por restrições de segurança.',
         pipeline: trace.pipeline,
       };
     }
@@ -311,7 +352,11 @@ export class Orchestrator {
     // ── 3. Intent classification ──────────────────────────────────────────────
     const intentResult = await intentAgent.run(ctx, message, entities);
     trace.record(intentResult);
-    const intent = (intentResult.data?.intent as { category: IntentCategory; route: 'fast' | 'full'; confidence: number }) ?? {
+    const intent = (intentResult.data?.intent as {
+      category: IntentCategory;
+      route: 'fast' | 'full';
+      confidence: number;
+    }) ?? {
       category: 'unknown' as IntentCategory,
       route: 'full',
       confidence: 40,
@@ -324,7 +369,8 @@ export class Orchestrator {
       const response = escResult.response ?? '';
 
       // Async logging
-      logAgent.run(ctx, 'escalation_triggered', { message_preview: message.slice(0, 50) })
+      logAgent
+        .run(ctx, 'escalation_triggered', { message_preview: message.slice(0, 50) })
         .catch(() => {});
 
       return {
@@ -379,7 +425,9 @@ export class Orchestrator {
       try {
         const semResult = await semanticMemoryAgent.run(ctx, 'read', message);
         trace.record(semResult);
-      } catch { /* RAG is optional */ }
+      } catch {
+        /* RAG is optional */
+      }
 
       // Planning (pure function — no AI cost)
       const planResult = await planningAgent.run(ctx, intent.category);
@@ -407,7 +455,15 @@ export class Orchestrator {
     }
 
     // ── 7–9. Finalize response (personality → style → quality gate) ───────────
-    const finalResponse = await finalizeResponse(rawResponse, finalActionResult!, ctx, trace, isMobile);
+    // finalActionResult is guaranteed non-null: both fast-path and full-path branches assign it
+    const finalResponse = await finalizeResponse(
+      rawResponse,
+      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+      finalActionResult!,
+      ctx,
+      trace,
+      isMobile,
+    );
 
     // ── 10. Add message to session context ────────────────────────────────────
     const userMsg: SessionMessage = { role: 'user', content: message, ts: Date.now() };
@@ -427,12 +483,20 @@ export class Orchestrator {
         pipeline_length: trace.pipeline.length,
       }),
       // Learn from high-confidence successful interactions
-      selfOptimizationAgent.run(ctx, finalResponse).then(r => {
-        if (intent.confidence > 85 && r.success) {
-          return semanticMemoryAgent.run(ctx, 'write', undefined, `Q: ${message}\nA: ${r.response ?? finalResponse}`);
-        }
-        return undefined;
-      }).catch(() => {}),
+      selfOptimizationAgent
+        .run(ctx, finalResponse)
+        .then(r => {
+          if (intent.confidence > 85 && r.success) {
+            return semanticMemoryAgent.run(
+              ctx,
+              'write',
+              undefined,
+              `Q: ${message}\nA: ${r.response ?? finalResponse}`,
+            );
+          }
+          return undefined;
+        })
+        .catch(() => {}),
     ]).catch(() => {});
 
     // ── 12. Build and return output ───────────────────────────────────────────

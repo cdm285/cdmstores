@@ -5,8 +5,8 @@
  * Agent 16 — PromptingAgent     Build optimal system prompt
  */
 
-import type { AgentContext, AgentResult} from '../core/types.js';
-import { BaseAgent, SessionMessage } from '../core/types.js';
+import type { AgentContext, AgentResult } from '../core/types.js';
+import { BaseAgent } from '../core/types.js';
 
 const SYSTEM_PROMPT_BASE = `Você é o assistente da CDM STORES, uma loja online premium de eletrônicos.
 Seja prestativo, conciso e focado em ajudar o cliente.
@@ -31,7 +31,9 @@ export class PromptingAgent extends BaseAgent {
     }
 
     // Append episodic context if available
-    const orders = ctx.meta.recent_orders as Array<{ id: number; status: string; total: number }> | undefined;
+    const orders = ctx.meta.recent_orders as
+      | Array<{ id: number; status: string; total: number }>
+      | undefined;
     if (orders?.length) {
       const ordersText = orders.map(o => `Pedido #${o.id}: ${o.status} (R$ ${o.total})`).join(', ');
       systemContent += `\n\nHistórico recente do cliente: ${ordersText}`;
@@ -64,7 +66,11 @@ export class PromptingAgent extends BaseAgent {
 
     ctx.meta.prompt_messages = messages;
 
-    return this.ok(this.id, { data: { messages: messages.length, systemLength: systemContent.length } }, t);
+    return this.ok(
+      this.id,
+      { data: { messages: messages.length, systemLength: systemContent.length } },
+      t,
+    );
   }
 }
 
@@ -76,7 +82,10 @@ export class ReasoningAgent extends BaseAgent {
   async run(ctx: AgentContext, useLargeModel = false): Promise<AgentResult> {
     const t = this.start();
 
-    const messages = ctx.meta.prompt_messages as Array<{ role: 'system' | 'user' | 'assistant'; content: string }>;
+    const messages = ctx.meta.prompt_messages as Array<{
+      role: 'system' | 'user' | 'assistant';
+      content: string;
+    }>;
     if (!messages?.length) {
       return this.fail(this.id, 'No prompt prepared — run PromptingAgent first', t);
     }
@@ -91,12 +100,18 @@ export class ReasoningAgent extends BaseAgent {
       const result = await (ctx.env.AI as unknown as AiFlex).run(model, { messages });
       const response = result.response?.trim() ?? '';
 
-      if (!response) {return this.fail(this.id, 'Empty AI response', t);}
+      if (!response) {
+        return this.fail(this.id, 'Empty AI response', t);
+      }
 
       ctx.meta.ai_response = response;
       ctx.meta.ai_model = model;
 
-      return this.ok(this.id, { response, data: { model, chars: response.length }, confidence: 80 }, t);
+      return this.ok(
+        this.id,
+        { response, data: { model, chars: response.length }, confidence: 80 },
+        t,
+      );
     } catch (error) {
       return this.fail(this.id, `AI call failed: ${(error as Error).message}`, t);
     }
@@ -141,18 +156,24 @@ export class SummarizationAgent extends BaseAgent {
     const t = this.start();
 
     if (ctx.session.context.length <= maxMessages) {
-      return this.ok(this.id, { data: { compressed: false, count: ctx.session.context.length } }, t);
+      return this.ok(
+        this.id,
+        { data: { compressed: false, count: ctx.session.context.length } },
+        t,
+      );
     }
 
     // Keep system messages and last N turns
     const system = ctx.session.context.filter(m => m.role === 'system');
-    const recent = ctx.session.context
-      .filter(m => m.role !== 'system')
-      .slice(-maxMessages);
+    const recent = ctx.session.context.filter(m => m.role !== 'system').slice(-maxMessages);
 
     ctx.session.context = [...system, ...recent];
 
-    return this.ok(this.id, { data: { compressed: true, reduced_to: ctx.session.context.length } }, t);
+    return this.ok(
+      this.id,
+      { data: { compressed: true, reduced_to: ctx.session.context.length } },
+      t,
+    );
   }
 }
 
