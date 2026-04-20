@@ -10,7 +10,8 @@
  *   • Order data is never logged in detail
  */
 
-import { addTrace, ExtendedAgentContext }   from '../core/agent-context.js';
+import type { ExtendedAgentContext } from '../core/agent-context.js';
+import { addTrace }   from '../core/agent-context.js';
 import type { ActionRequest, ActionResult } from '../core/action-schema.js';
 import { failedResult }                     from '../core/action-schema.js';
 import type { AgentEnv }                    from '../core/types.js';

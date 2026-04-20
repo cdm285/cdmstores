@@ -26,7 +26,8 @@
  *   const report = await pipeline.run(ctx);
  */
 
-import { addTrace, ExtendedAgentContext } from './agent-context.js';
+import type { ExtendedAgentContext } from './agent-context.js';
+import { addTrace } from './agent-context.js';
 import type { ActionRequest, ActionResult }          from './action-schema.js';
 
 // ─── Step types ───────────────────────────────────────────────────────────────
@@ -162,7 +163,7 @@ export class Pipeline<T extends ExtendedAgentContext = ExtendedAgentContext> {
             const branchName = takeThen ? (step.thenName ?? 'then') : (step.elseName ?? 'else');
             if (branchFns?.length) {
               await this.runParallel(branchFns, ctx, step.timeoutMs);
-              if (ctx.flags.debug) console.log(`[Pipeline:${this.name}] branch → ${branchName}`);
+              if (ctx.flags.debug) {console.log(`[Pipeline:${this.name}] branch → ${branchName}`);}
             }
             break;
           }
@@ -180,9 +181,9 @@ export class Pipeline<T extends ExtendedAgentContext = ExtendedAgentContext> {
           confidence : 0,
           error,
         });
-        if (ctx.flags.debug) console.error(`[Pipeline:${this.name}] STEP FAILED: ${step.name}`, e);
+        if (ctx.flags.debug) {console.error(`[Pipeline:${this.name}] STEP FAILED: ${step.name}`, e);}
         // Critical steps (no error handler) halt the pipeline
-        if (step.kind === 'sequential') break;
+        if (step.kind === 'sequential') {break;}
       }
 
       steps.push({
@@ -209,7 +210,7 @@ export class Pipeline<T extends ExtendedAgentContext = ExtendedAgentContext> {
   // ── Internal helpers ──────────────────────────────────────────────────────
 
   private async runWithTimeout(fn: StepFn<T>, ctx: T, ms?: number): Promise<void> {
-    if (!ms) return Promise.resolve(fn(ctx));
+    if (!ms) {return Promise.resolve(fn(ctx));}
     return Promise.race([
       Promise.resolve(fn(ctx)) as Promise<void>,
       new Promise<never>((_, rej) =>
@@ -224,7 +225,7 @@ export class Pipeline<T extends ExtendedAgentContext = ExtendedAgentContext> {
     for (const r of results) {
       if (r.status === 'rejected') {
         // Log but don't halt — parallel steps are treated as best-effort
-        if (ctx.flags.debug) console.warn(`[Pipeline] Parallel step rejected:`, r.reason);
+        if (ctx.flags.debug) {console.warn(`[Pipeline] Parallel step rejected:`, r.reason);}
       }
     }
   }
@@ -287,7 +288,7 @@ export async function runTier4(
   );
 
   const reports: Tier4ActionReport[] = settled.map((r, i) => {
-    if (r.status === 'fulfilled') return r.value;
+    if (r.status === 'fulfilled') {return r.value;}
     return {
       actionType : requests[i].payload.type,
       success    : false,

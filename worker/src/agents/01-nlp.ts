@@ -15,7 +15,8 @@
  *   ctx.meta.normalizedMsg  — lowercased, trimmed message
  */
 
-import { addTrace, ExtendedAgentContext } from '../core/agent-context.js';
+import type { ExtendedAgentContext } from '../core/agent-context.js';
+import { addTrace } from '../core/agent-context.js';
 
 // ─── Product dictionary for entity resolution ─────────────────────────────────
 const PRODUCT_MAP: Array<{
@@ -31,7 +32,7 @@ const PRODUCT_MAP: Array<{
 
 // ─── Patterns ─────────────────────────────────────────────────────────────────
 const PATTERNS = {
-  email       : /([a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,})/,
+  email       : /([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})/,
   tracking    : /\b([A-Z]{2}\d{8,}\w{2}|CDM[A-Z0-9]{4,})\b/i,
   coupon      : /\b([A-Z]{2,}[A-Z0-9]{2,12})\b/,
   phone       : /\(?\d{2}\)?\s*\d{4,5}[-\s]?\d{4}/,
@@ -72,11 +73,11 @@ export class Agent01NLP {
 
     // Email (before coupon so we don't pick up domain as coupon)
     const emailM = normalized.match(PATTERNS.email);
-    if (emailM) entities.email = emailM[1].toLowerCase();
+    if (emailM) {entities.email = emailM[1].toLowerCase();}
 
     // Tracking code
     const trackM = normalized.match(PATTERNS.tracking);
-    if (trackM) entities.tracking_code = trackM[1].toUpperCase();
+    if (trackM) {entities.tracking_code = trackM[1].toUpperCase();}
 
     // Coupon — only if no email detected (avoid false positives)
     if (!entities.email) {
@@ -89,24 +90,24 @@ export class Agent01NLP {
 
     // Phone
     const phoneM = normalized.match(PATTERNS.phone);
-    if (phoneM) entities.phone = phoneM[0].replace(/\D/g, '');
+    if (phoneM) {entities.phone = phoneM[0].replace(/\D/g, '');}
 
     // Order ID (#1234 or standalone number 4-8 digits)
     const orderM = lower.match(PATTERNS.orderId);
-    if (orderM) entities.order_id = Number(orderM[1]);
+    if (orderM) {entities.order_id = Number(orderM[1]);}
 
     // Postal code (CEP)
     const cepM = normalized.match(PATTERNS.postalBR);
-    if (cepM) entities.cep = cepM[0].replace('-', '');
+    if (cepM) {entities.cep = cepM[0].replace('-', '');}
 
     // Product (longest match wins)
-    let bestProduct: { id: number; name: string } | null = null;
+    const bestProduct: { id: number; name: string } | null = null;
     for (const product of PRODUCT_MAP) {
       for (const trigger of product.triggers) {
         if (lower.includes(trigger)) {
           // Prefer longer trigger match (more specific)
           if (!bestProduct || trigger.length > (bestProduct as { id: number; name: string; _trigLen?: number })._trigLen!) {
-            (bestProduct as unknown as { id: number; name: string; _trigLen: number }) 
+            (bestProduct as unknown as { id: number; name: string; _trigLen: number })
               = { id: product.id, name: product.name, _trigLen: trigger.length };
           }
         }
@@ -119,7 +120,7 @@ export class Agent01NLP {
 
     // Quantity hint ("2 fones", "três cabos")
     const qtyM = lower.match(/\b([2-9]|[1-9]\d)\s+(?:fone|carregador|cabo|caixa)/);
-    if (qtyM) entities.quantity = Number(qtyM[1]);
+    if (qtyM) {entities.quantity = Number(qtyM[1]);}
 
     // ── Commit to context ──────────────────────────────────────────────────
     ctx.entities = entities;

@@ -38,7 +38,7 @@ export interface AuthContext {
 // ─── Encoding helpers ─────────────────────────────────────────────────────────
 function base64UrlEncodeBytes(bytes: Uint8Array): string {
   let binary = '';
-  for (const byte of bytes) binary += String.fromCharCode(byte);
+  for (const byte of bytes) {binary += String.fromCharCode(byte);}
   return btoa(binary).replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_');
 }
 
@@ -51,7 +51,7 @@ function base64UrlDecodeToBytes(value: string): Uint8Array {
   const padded     = normalized + '='.repeat((4 - (normalized.length % 4)) % 4);
   const decoded    = atob(padded);
   const bytes      = new Uint8Array(decoded.length);
-  for (let i = 0; i < decoded.length; i++) bytes[i] = decoded.charCodeAt(i);
+  for (let i = 0; i < decoded.length; i++) {bytes[i] = decoded.charCodeAt(i);}
   return bytes;
 }
 
@@ -65,7 +65,7 @@ export function base32Encode(bytes: Uint8Array): string {
     bits += 8;
     while (bits >= 5) { output += B32_ALPHABET[(value >>> (bits - 5)) & 31]; bits -= 5; }
   }
-  if (bits > 0) output += B32_ALPHABET[(value << (5 - bits)) & 31];
+  if (bits > 0) {output += B32_ALPHABET[(value << (5 - bits)) & 31];}
   return output;
 }
 
@@ -75,7 +75,7 @@ export function base32Decode(secret: string): Uint8Array {
   const out: number[] = [];
   for (const ch of clean) {
     const idx = B32_ALPHABET.indexOf(ch);
-    if (idx === -1) throw new Error('TOTP secret inválido (base32)');
+    if (idx === -1) {throw new Error('TOTP secret inválido (base32)');}
     value = (value << 5) | idx;
     bits += 5;
     if (bits >= 8) { out.push((value >>> (bits - 8)) & 0xff); bits -= 8; }
@@ -122,23 +122,23 @@ export function generateJWT(
 export function verifyJWT(token: string, env: Env, expectedType?: TokenType): JWTVerifyResult {
   try {
     const parts = token.split('.');
-    if (parts.length !== 3) return { valid: false };
+    if (parts.length !== 3) {return { valid: false };}
     const [headerB64, payloadB64, signature] = parts;
     const header = JSON.parse(new TextDecoder().decode(base64UrlDecodeToBytes(headerB64)));
-    if (header?.alg !== 'HS256' || header?.typ !== 'JWT') return { valid: false };
+    if (header?.alg !== 'HS256' || header?.typ !== 'JWT') {return { valid: false };}
 
     const expected = hmacSha256Base64Url(getJwtSecret(env), `${headerB64}.${payloadB64}`);
     const sigA = Buffer.from(signature), sigB = Buffer.from(expected);
-    if (sigA.length !== sigB.length || !timingSafeEqual(sigA, sigB)) return { valid: false };
+    if (sigA.length !== sigB.length || !timingSafeEqual(sigA, sigB)) {return { valid: false };}
 
     const payload = JSON.parse(
       new TextDecoder().decode(base64UrlDecodeToBytes(payloadB64))
     ) as JWTPayload;
     const now = Math.floor(Date.now() / 1000);
 
-    if (!payload.sub || !payload.email || !payload.exp || !payload.iat || !payload.type || !payload.jti) return { valid: false };
-    if (payload.exp <= now || payload.iat > now + 60) return { valid: false };
-    if (expectedType && payload.type !== expectedType) return { valid: false };
+    if (!payload.sub || !payload.email || !payload.exp || !payload.iat || !payload.type || !payload.jti) {return { valid: false };}
+    if (payload.exp <= now || payload.iat > now + 60) {return { valid: false };}
+    if (expectedType && payload.type !== expectedType) {return { valid: false };}
 
     return { valid: true, payload, userId: payload.sub, email: payload.email };
   } catch {
@@ -187,7 +187,7 @@ export async function requireAuth(
   let token: string | null = null;
 
   const authHeader = request.headers.get('Authorization');
-  if (authHeader?.startsWith('Bearer ')) token = authHeader.substring(7);
+  if (authHeader?.startsWith('Bearer ')) {token = authHeader.substring(7);}
 
   if (!token) {
     const cookieHeader = request.headers.get('Cookie');
@@ -199,7 +199,7 @@ export async function requireAuth(
     }
   }
 
-  if (!token) return { ok: false, response: json({ success: false, error: 'Token não fornecido' }, 401) };
+  if (!token) {return { ok: false, response: json({ success: false, error: 'Token não fornecido' }, 401) };}
 
   const verified = verifyJWT(token, env, 'access');
   if (!verified.valid || !verified.payload) {
@@ -240,26 +240,26 @@ export async function verifyPassword(password: string, storedHash: string): Prom
   try {
     if (storedHash.startsWith('pbkdf2$')) {
       const parts = storedHash.split('$');
-      if (parts.length !== 4) return false;
+      if (parts.length !== 4) {return false;}
       const iterations = Number(parts[1]);
-      if (!Number.isInteger(iterations) || iterations < 100_000) return false;
+      if (!Number.isInteger(iterations) || iterations < 100_000) {return false;}
       const salt         = Uint8Array.from(atob(parts[2]), c => c.charCodeAt(0));
       const expectedHash = Uint8Array.from(atob(parts[3]), c => c.charCodeAt(0));
       const key = await crypto.subtle.importKey('raw', new TextEncoder().encode(password), 'PBKDF2', false, ['deriveBits']);
       const buf = await crypto.subtle.deriveBits({ name: 'PBKDF2', hash: 'SHA-256', salt, iterations }, key, 256);
       const candidate = new Uint8Array(buf);
-      if (candidate.length !== expectedHash.length) return false;
+      if (candidate.length !== expectedHash.length) {return false;}
       return timingSafeEqual(candidate, expectedHash);
     }
 
     if (storedHash.startsWith('scrypt$')) {
       const parts = storedHash.split('$');
-      if (parts.length !== 6) return false;
+      if (parts.length !== 6) {return false;}
       const N = Number(parts[1]), r = Number(parts[2]), p = Number(parts[3]);
       const salt     = Buffer.from(parts[4], 'hex');
       const expected = Buffer.from(parts[5], 'hex');
       const candidate = Buffer.from(scryptSync(password, salt, expected.length, { N, r, p, maxmem: 64 * 1024 * 1024 }));
-      if (candidate.length !== expected.length) return false;
+      if (candidate.length !== expected.length) {return false;}
       return timingSafeEqual(candidate, expected);
     }
 
@@ -279,7 +279,7 @@ export function generateBackupCodes(count = 10): string[] {
 }
 
 export function verifyTOTPCode(secret: string, code: string, timeWindow = 1): boolean {
-  if (!code || code.length !== 6 || !/^\d+$/.test(code)) return false;
+  if (!code || code.length !== 6 || !/^\d+$/.test(code)) {return false;}
   try {
     const key    = base32Decode(secret);
     const now    = Math.floor(Date.now() / 1000);
@@ -296,7 +296,7 @@ export function verifyTOTPCode(secret: string, code: string, timeWindow = 1): bo
         ((hmac[offsetNibble + 2] & 0xff) <<  8) |
         ( hmac[offsetNibble + 3] & 0xff);
       const otp = (binaryCode % 1_000_000).toString().padStart(6, '0');
-      if (timingSafeEqual(Buffer.from(otp), Buffer.from(code))) return true;
+      if (timingSafeEqual(Buffer.from(otp), Buffer.from(code))) {return true;}
     }
     return false;
   } catch {

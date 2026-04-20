@@ -76,7 +76,7 @@ export class AgentBus {
       const arr = this.subscriptions.get(channel);
       if (arr) {
         const idx = arr.indexOf(handler as BusHandler);
-        if (idx !== -1) arr.splice(idx, 1);
+        if (idx !== -1) {arr.splice(idx, 1);}
       }
     };
   }
@@ -231,7 +231,7 @@ export class AgentBus {
 
   private record(msg: BusMessage): void {
     this.history.push(msg);
-    if (this.history.length > this.maxHistory) this.history.shift();
+    if (this.history.length > this.maxHistory) {this.history.shift();}
   }
 }
 

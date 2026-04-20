@@ -17,11 +17,11 @@
  *   if (path === '/api/chat') return handleChatRequest(request, env);
  */
 
-import { mainOrchestrator }   from '../agents/00-orchestrator.js';
-import type { AgentEnv }      from '../core/types.js';
-import { checkRateLimit }     from '../lib/security.js';
-import type { Env }           from '../lib/response.js';
-import { kvRateLimit, withCircuitBreaker, recordMetric } from '../lib/observability.js';
+import { mainOrchestrator } from '../agents/00-orchestrator.js';
+import type { AgentEnv } from '../core/types.js';
+import { kvRateLimit, recordMetric, withCircuitBreaker } from '../lib/observability.js';
+import type { Env } from '../lib/response.js';
+import { checkRateLimit } from '../lib/security.js';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 const MAX_MSG_LENGTH = 2_000; // characters
@@ -67,6 +67,7 @@ function sanitize(text: string): string {
   return text
     .trim()
     .slice(0, MAX_MSG_LENGTH)        // length cap
+    // eslint-disable-next-line no-control-regex
     .replace(/[\x00-\x08\x0B-\x1F]/g, '');  // strip control chars except \t, \n
 }
 

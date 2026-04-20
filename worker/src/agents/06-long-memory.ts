@@ -12,7 +12,8 @@
  *            updates the conversation's updated_at timestamp
  */
 
-import { addTrace, ExtendedAgentContext } from '../core/agent-context.js';
+import type { ExtendedAgentContext } from '../core/agent-context.js';
+import { addTrace } from '../core/agent-context.js';
 import type { AgentEnv, SessionMessage } from '../core/types.js';
 
 // ─── Tunables ─────────────────────────────────────────────────────────────────
@@ -43,7 +44,7 @@ async function getOrCreateConversation(env: AgentEnv, sessionId: string, languag
     'SELECT id FROM ai_conversations WHERE session_id = ? ORDER BY updated_at DESC LIMIT 1'
   ).bind(sessionId).first<ConversationRow>();
 
-  if (existing) return existing.id;
+  if (existing) {return existing.id;}
 
   // Create new one
   const result = await env.DB.prepare(
@@ -120,7 +121,7 @@ export class Agent06LongMemory {
         ctx.session.context = msgs;
         ctx.flags.longMemory = true;
       } else if (op === 'save') {
-        if (!ctx.conversationId) return; // nothing to save to
+        if (!ctx.conversationId) {return;} // nothing to save to
         const convId = ctx.conversationId; // already a number
         if (convId > 0 && userMsg && assistantMsg) {
           await saveMessages(env, convId, userMsg, assistantMsg);

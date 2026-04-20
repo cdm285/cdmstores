@@ -18,7 +18,7 @@ import { auditLog } from '../lib/security.js';
 export async function handleUpdateProfile(req: Request, env: Env): Promise<Response> {
   try {
     const authResult = await requireAuth(req, env);
-    if (!authResult.ok) return authResult.response;
+    if (!authResult.ok) {return authResult.response;}
 
     const body = await req.json() as Record<string, unknown>;
     const { name, phone, avatar_url } = body as { name?: string; phone?: string; avatar_url?: string };
@@ -35,7 +35,7 @@ export async function handleUpdateProfile(req: Request, env: Env): Promise<Respo
       }
       try {
         const parsed = new URL(avatar_url);
-        if (parsed.protocol !== 'https:') throw new Error();
+        if (parsed.protocol !== 'https:') {throw new Error();}
       } catch {
         return json({ success: false, error: 'avatar_url deve ser uma URL HTTPS válida' }, 400);
       }
@@ -60,7 +60,7 @@ export async function handleUpdateProfile(req: Request, env: Env): Promise<Respo
 export async function handleGetAddresses(req: Request, env: Env): Promise<Response> {
   try {
     const authResult = await requireAuth(req, env);
-    if (!authResult.ok) return authResult.response;
+    if (!authResult.ok) {return authResult.response;}
 
     const addresses = await env.DB.prepare(
       'SELECT id, label, name, phone, street, number, complement, city, state, zip, country, is_default, created_at FROM user_addresses WHERE user_id = ? ORDER BY is_default DESC, created_at DESC'
@@ -75,7 +75,7 @@ export async function handleGetAddresses(req: Request, env: Env): Promise<Respon
 export async function handleCreateAddress(req: Request, env: Env): Promise<Response> {
   try {
     const authResult = await requireAuth(req, env);
-    if (!authResult.ok) return authResult.response;
+    if (!authResult.ok) {return authResult.response;}
 
     const body = await req.json() as Record<string, unknown>;
     const { label, name, phone, street, number, complement, city, state, zip, country, is_default } = body as {
@@ -109,7 +109,7 @@ export async function handleCreateAddress(req: Request, env: Env): Promise<Respo
 export async function handleUpdateAddress(req: Request, env: Env, addressId: string): Promise<Response> {
   try {
     const authResult = await requireAuth(req, env);
-    if (!authResult.ok) return authResult.response;
+    if (!authResult.ok) {return authResult.response;}
 
     const address = await env.DB.prepare('SELECT user_id FROM user_addresses WHERE id = ?')
       .bind(addressId).first<{ user_id: number }>();
@@ -145,7 +145,7 @@ export async function handleUpdateAddress(req: Request, env: Env, addressId: str
 export async function handleDeleteAddress(req: Request, env: Env, addressId: string): Promise<Response> {
   try {
     const authResult = await requireAuth(req, env);
-    if (!authResult.ok) return authResult.response;
+    if (!authResult.ok) {return authResult.response;}
 
     const address = await env.DB.prepare('SELECT user_id FROM user_addresses WHERE id = ?')
       .bind(addressId).first<{ user_id: number }>();
@@ -164,7 +164,7 @@ export async function handleDeleteAddress(req: Request, env: Env, addressId: str
 export async function handleSetDefaultAddress(req: Request, env: Env, addressId: string): Promise<Response> {
   try {
     const authResult = await requireAuth(req, env);
-    if (!authResult.ok) return authResult.response;
+    if (!authResult.ok) {return authResult.response;}
 
     const address = await env.DB.prepare('SELECT user_id FROM user_addresses WHERE id = ?')
       .bind(addressId).first<{ user_id: number }>();
@@ -184,7 +184,7 @@ export async function handleSetDefaultAddress(req: Request, env: Env, addressId:
 export async function handleUserOrders(req: Request, env: Env): Promise<Response> {
   try {
     const authResult = await requireAuth(req, env);
-    if (!authResult.ok) return authResult.response;
+    if (!authResult.ok) {return authResult.response;}
 
     const orders = await env.DB.prepare(
       'SELECT id, customer_name, customer_email, total, status, shipping_cost, tracking_code, created_at, updated_at FROM orders WHERE user_id = ? ORDER BY created_at DESC'

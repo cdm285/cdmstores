@@ -16,7 +16,8 @@
  * Free shipping threshold: R$ 200,00+
  */
 
-import { addTrace, ExtendedAgentContext }   from '../core/agent-context.js';
+import type { ExtendedAgentContext } from '../core/agent-context.js';
+import { addTrace }   from '../core/agent-context.js';
 import type { ActionRequest, ActionResult } from '../core/action-schema.js';
 import { failedResult }                     from '../core/action-schema.js';
 

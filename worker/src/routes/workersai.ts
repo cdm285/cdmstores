@@ -18,7 +18,7 @@ export async function handleWorkersAI(req: Request, env: Env, path: string): Pro
       const { message, session_id, user_id, use_large_model } = await req.json() as {
         message: string; session_id: string; user_id?: number; use_large_model?: boolean;
       };
-      if (!message || !session_id) return json({ success: false, error: 'message e session_id obrigatórios' }, 400);
+      if (!message || !session_id) {return json({ success: false, error: 'message e session_id obrigatórios' }, 400);}
 
       const model = use_large_model
         ? '@cf/meta/llama-3.3-70b-instruct-fp8-fast'
@@ -49,7 +49,7 @@ export async function handleWorkersAI(req: Request, env: Env, path: string): Pro
         if (qEmbed.data?.[0]) {
           const matches = await env.VECTORIZE.query(qEmbed.data[0], { topK: 3, returnMetadata: 'all' });
           const ctx = matches.matches.filter(m => m.score > 0.7).map(m => m.metadata?.content as string).filter(Boolean).join('\n');
-          if (ctx) messages[0].content += `\n\nContexto relevante:\n${ctx}`;
+          if (ctx) {messages[0].content += `\n\nContexto relevante:\n${ctx}`;}
         }
       } catch { /* Vectorize failed, continue without context */ }
 
@@ -75,7 +75,7 @@ export async function handleWorkersAI(req: Request, env: Env, path: string): Pro
     // POST /api/ai/embed — BGE-M3 embeddings into Vectorize
     if (path === '/api/ai/embed' && req.method === 'POST') {
       const { texts, content_type, ref_id } = await req.json() as { texts: string[]; content_type: string; ref_id?: string };
-      if (!texts?.length) return json({ success: false, error: 'texts obrigatório' }, 400);
+      if (!texts?.length) {return json({ success: false, error: 'texts obrigatório' }, 400);}
       const result = await env.AI.run('@cf/baai/bge-m3', { text: texts }) as { data: number[][] };
       const vectors = result.data.map((values, i) => ({ id: `${content_type ?? 'doc'}-${ref_id ?? i}-${Date.now()}`, values, metadata: { content: texts[i], content_type: content_type ?? 'document', ref_id: ref_id ?? '' } }));
       await env.VECTORIZE.upsert(vectors);
@@ -85,7 +85,7 @@ export async function handleWorkersAI(req: Request, env: Env, path: string): Pro
     // POST /api/ai/search — semantic search via Vectorize
     if (path === '/api/ai/search' && req.method === 'POST') {
       const { query, top_k = 5, min_score = 0.6 } = await req.json() as { query: string; top_k?: number; min_score?: number };
-      if (!query) return json({ success: false, error: 'query obrigatória' }, 400);
+      if (!query) {return json({ success: false, error: 'query obrigatória' }, 400);}
       const embedding = await env.AI.run('@cf/baai/bge-m3', { text: [query] }) as { data: number[][] };
       const matches = await env.VECTORIZE.query(embedding.data[0], { topK: top_k, returnMetadata: 'all' });
       return json({ success: true, results: matches.matches.filter(m => m.score >= min_score).map(m => ({ id: m.id, score: m.score, metadata: m.metadata })) });
@@ -94,7 +94,7 @@ export async function handleWorkersAI(req: Request, env: Env, path: string): Pro
     // POST /api/ai/classify — DistilBERT sentiment
     if (path === '/api/ai/classify' && req.method === 'POST') {
       const { text } = await req.json() as { text: string };
-      if (!text) return json({ success: false, error: 'text obrigatório' }, 400);
+      if (!text) {return json({ success: false, error: 'text obrigatório' }, 400);}
       const result = await env.AI.run('@cf/huggingface/distilbert-sst-2-int8', { text }) as unknown as Array<{ label: string; score: number }>;
       const top = result[0] ?? { label: 'UNKNOWN', score: 0 };
       return json({ success: true, label: top.label, score: top.score });
@@ -103,7 +103,7 @@ export async function handleWorkersAI(req: Request, env: Env, path: string): Pro
     // POST /api/ai/image — Flux image generation
     if (path === '/api/ai/image' && req.method === 'POST') {
       const { prompt, steps = 4 } = await req.json() as { prompt: string; steps?: number };
-      if (!prompt) return json({ success: false, error: 'prompt obrigatório' }, 400);
+      if (!prompt) {return json({ success: false, error: 'prompt obrigatório' }, 400);}
       const result = await env.AI.run('@cf/black-forest-labs/flux-1-schnell', { prompt, num_steps: Math.min(steps, 8) }) as { image: string };
       return new Response(result.image, { headers: { 'Content-Type': 'image/jpeg' } });
     }
@@ -114,7 +114,7 @@ export async function handleWorkersAI(req: Request, env: Env, path: string): Pro
       const conv = await env.DB.prepare(
         'SELECT id, created_at, updated_at, title FROM ai_conversations WHERE session_id = ? ORDER BY created_at DESC LIMIT 1'
       ).bind(session_id).first<{ id: number; created_at: string; updated_at: string; title: string | null }>();
-      if (!conv) return json({ success: true, messages: [], conversation: null });
+      if (!conv) {return json({ success: true, messages: [], conversation: null });}
       const msgs = await env.DB.prepare(
         'SELECT role, content, model, created_at, version FROM ai_messages WHERE conversation_id = ? ORDER BY created_at ASC'
       ).bind(conv.id).all();

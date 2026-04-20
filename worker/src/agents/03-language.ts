@@ -12,7 +12,8 @@
  *   ctx.session.language      — same value, persisted in session
  */
 
-import { addTrace, ExtendedAgentContext } from '../core/agent-context.js';
+import type { ExtendedAgentContext } from '../core/agent-context.js';
+import { addTrace } from '../core/agent-context.js';
 
 // ─── Word banks ───────────────────────────────────────────────────────────────
 const WORDS_PT = new Set([
@@ -48,9 +49,9 @@ function scoreText(text: string): Record<LangCode, number> {
 
   const scores: Record<LangCode, number> = { pt: 0, en: 0, es: 0 };
   for (const token of tokens) {
-    if (WORDS_PT.has(token)) scores.pt++;
-    if (WORDS_EN.has(token)) scores.en++;
-    if (WORDS_ES.has(token)) scores.es++;
+    if (WORDS_PT.has(token)) {scores.pt++;}
+    if (WORDS_EN.has(token)) {scores.en++;}
+    if (WORDS_ES.has(token)) {scores.es++;}
   }
   return scores;
 }

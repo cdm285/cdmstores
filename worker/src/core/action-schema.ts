@@ -152,51 +152,51 @@ export interface ActionResult {
  * @returns An error message string, or `null` if the request is valid.
  */
 export function validateActionRequest(req: ActionRequest): string | null {
-  if (!req.id || typeof req.id !== 'string') return 'Missing request id';
-  if (!req.sessionId)                         return 'Missing sessionId';
-  if (!req.payload?.type)                     return 'Missing payload.type';
+  if (!req.id || typeof req.id !== 'string') {return 'Missing request id';}
+  if (!req.sessionId)                         {return 'Missing sessionId';}
+  if (!req.payload?.type)                     {return 'Missing payload.type';}
 
   switch (req.payload.type) {
     case 'product_lookup': {
       const p = req.payload.params;
-      if (!p.product_id && !p.query && !p.full_catalog) return 'product_lookup: product_id, query, or full_catalog required';
+      if (!p.product_id && !p.query && !p.full_catalog) {return 'product_lookup: product_id, query, or full_catalog required';}
       break;
     }
     case 'coupon_validate': {
       const p = req.payload.params;
-      if (!p.code || typeof p.code !== 'string') return 'coupon_validate: code required';
-      if (p.code.length > 32)                    return 'coupon_validate: code too long';
+      if (!p.code || typeof p.code !== 'string') {return 'coupon_validate: code required';}
+      if (p.code.length > 32)                    {return 'coupon_validate: code too long';}
       break;
     }
     case 'order_track': {
       const p = req.payload.params;
-      if (!p.tracking_code && !p.order_id && !p.email) return 'order_track: tracking_code, order_id, or email required';
+      if (!p.tracking_code && !p.order_id && !p.email) {return 'order_track: tracking_code, order_id, or email required';}
       break;
     }
     case 'shipping_estimate': {
       const p = req.payload.params;
-      if (!p.postal_code || !/^\d{8}$/.test(p.postal_code)) return 'shipping_estimate: valid 8-digit postal_code required';
+      if (!p.postal_code || !/^\d{8}$/.test(p.postal_code)) {return 'shipping_estimate: valid 8-digit postal_code required';}
       break;
     }
     case 'support_escalate': {
       const p = req.payload.params;
-      if (!p.reason)     return 'support_escalate: reason required';
-      if (!p.session_id) return 'support_escalate: session_id required';
+      if (!p.reason)     {return 'support_escalate: reason required';}
+      if (!p.session_id) {return 'support_escalate: session_id required';}
       break;
     }
     case 'db_write': {
       const p = req.payload.params;
-      if (!isAllowedTable(p.table)) return `db_write: table "${p.table}" not allowed`;
-      if (!p.data || typeof p.data !== 'object') return 'db_write: data object required';
-      if (p.operation !== 'insert' && p.operation !== 'update') return 'db_write: operation must be insert or update';
-      if (p.operation === 'update' && (!p.where || Object.keys(p.where).length === 0)) return 'db_write: update requires where clause';
+      if (!isAllowedTable(p.table)) {return `db_write: table "${p.table}" not allowed`;}
+      if (!p.data || typeof p.data !== 'object') {return 'db_write: data object required';}
+      if (p.operation !== 'insert' && p.operation !== 'update') {return 'db_write: operation must be insert or update';}
+      if (p.operation === 'update' && (!p.where || Object.keys(p.where).length === 0)) {return 'db_write: update requires where clause';}
       break;
     }
     case 'notification_send': {
       const p = req.payload.params;
-      if (!p.recipient) return 'notification_send: recipient required';
-      if (!p.template)  return 'notification_send: template required';
-      if (!p.channel)   return 'notification_send: channel required';
+      if (!p.recipient) {return 'notification_send: recipient required';}
+      if (!p.template)  {return 'notification_send: template required';}
+      if (!p.channel)   {return 'notification_send: channel required';}
       break;
     }
     default:

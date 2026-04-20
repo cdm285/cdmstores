@@ -5,7 +5,8 @@
  * Agent 16 — PromptingAgent     Build optimal system prompt
  */
 
-import { BaseAgent, AgentContext, AgentResult, SessionMessage } from '../core/types.js';
+import type { AgentContext, AgentResult} from '../core/types.js';
+import { BaseAgent, SessionMessage } from '../core/types.js';
 
 const SYSTEM_PROMPT_BASE = `Você é o assistente da CDM STORES, uma loja online premium de eletrônicos.
 Seja prestativo, conciso e focado em ajudar o cliente.
@@ -90,7 +91,7 @@ export class ReasoningAgent extends BaseAgent {
       const result = await (ctx.env.AI as unknown as AiFlex).run(model, { messages });
       const response = result.response?.trim() ?? '';
 
-      if (!response) return this.fail(this.id, 'Empty AI response', t);
+      if (!response) {return this.fail(this.id, 'Empty AI response', t);}
 
       ctx.meta.ai_response = response;
       ctx.meta.ai_model = model;

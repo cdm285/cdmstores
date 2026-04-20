@@ -79,16 +79,17 @@ function json(body: unknown, status = 200): Response {
 }
 
 function sanitize(text: string, maxLen = 500): string {
+  // eslint-disable-next-line no-control-regex
   return text.trim().slice(0, maxLen).replace(/[\x00-\x08\x0B-\x1F]/g, '');
 }
 
 /** Parse AI text response — graceful degradation if run() returns non-standard shape. */
 function extractText(raw: unknown): string {
-  if (typeof raw === 'string') return raw;
+  if (typeof raw === 'string') {return raw;}
   if (raw && typeof raw === 'object') {
     const r = raw as Record<string, unknown>;
-    if (typeof r.response === 'string') return r.response;
-    if (typeof r.result === 'string') return r.result;
+    if (typeof r.response === 'string') {return r.response;}
+    if (typeof r.result === 'string') {return r.result;}
   }
   return '';
 }
@@ -96,14 +97,14 @@ function extractText(raw: unknown): string {
 /** Verify the shared secret sent as X-Organic-Key header. */
 async function adminGuard(request: Request, env: AgentEnv): Promise<boolean> {
   // If no JWT_SECRET is configured, reject all POST requests in production.
-  if (!env.JWT_SECRET) return false;
+  if (!env.JWT_SECRET) {return false;}
   const key = request.headers.get('X-Organic-Key') ?? '';
   // Constant-time comparison using subtle — avoids timing attacks.
   const keyBytes     = new TextEncoder().encode(key);
   const secretBytes  = new TextEncoder().encode(env.JWT_SECRET);
-  if (keyBytes.length !== secretBytes.length) return false;
+  if (keyBytes.length !== secretBytes.length) {return false;}
   let diff = 0;
-  for (let i = 0; i < keyBytes.length; i++) diff |= keyBytes[i] ^ secretBytes[i];
+  for (let i = 0; i < keyBytes.length; i++) {diff |= keyBytes[i] ^ secretBytes[i];}
   return diff === 0;
 }
 
@@ -172,7 +173,7 @@ Responda APENAS com JSON válido, sem texto adicional.`;
 // ─── SEOAgent ─────────────────────────────────────────────────────────────────
 async function seoOptimize(article: Article, env: AgentEnv): Promise<SeoData> {
   const safeTitle = sanitize(article.title, 120);
-  const prompt = `Você é um especialista em SEO para e-commerce. 
+  const prompt = `Você é um especialista em SEO para e-commerce.
 Dado o título de artigo: "${safeTitle}"
 Responda APENAS com JSON válido contendo:
 - "title": título SEO otimizado (máx 60 caracteres)
@@ -248,7 +249,7 @@ export async function handleOrganicRequest(request: Request, env: AgentEnv): Pro
   const { pathname }    = new URL(url);
 
   // ── OPTIONS preflight ──────────────────────────────────────────────────────
-  if (method === 'OPTIONS') return new Response(null, { status: 204, headers: CORS_HEADERS });
+  if (method === 'OPTIONS') {return new Response(null, { status: 204, headers: CORS_HEADERS });}
 
   // ── GET /api/organic/logs ──────────────────────────────────────────────────
   if (method === 'GET' && pathname === '/api/organic/logs') {

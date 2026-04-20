@@ -17,7 +17,8 @@
  *   • Resend API called only when env.RESEND_API_KEY is set
  */
 
-import { addTrace, ExtendedAgentContext }   from '../core/agent-context.js';
+import type { ExtendedAgentContext } from '../core/agent-context.js';
+import { addTrace }   from '../core/agent-context.js';
 import type { ActionRequest, ActionResult } from '../core/action-schema.js';
 import { failedResult }                     from '../core/action-schema.js';
 import type { AgentEnv }                    from '../core/types.js';
@@ -34,27 +35,27 @@ const TEMPLATES: Record<string, (vars: Record<string, string>, lang: string) => 
   order_shipped: (vars, lang) => {
     const ord = vars.order_id ?? '—';
     const trk = vars.tracking_code ?? '—';
-    if (lang === 'en') return { subject: `Your order #${ord} has been shipped!`, html: `<p>Great news! Your order <b>#${ord}</b> is on its way.<br>Tracking code: <b>${trk}</b></p>` };
-    if (lang === 'es') return { subject: `¡Tu pedido #${ord} fue enviado!`, html: `<p>¡Buenas noticias! Tu pedido <b>#${ord}</b> está en camino.<br>Código de seguimiento: <b>${trk}</b></p>` };
+    if (lang === 'en') {return { subject: `Your order #${ord} has been shipped!`, html: `<p>Great news! Your order <b>#${ord}</b> is on its way.<br>Tracking code: <b>${trk}</b></p>` };}
+    if (lang === 'es') {return { subject: `¡Tu pedido #${ord} fue enviado!`, html: `<p>¡Buenas noticias! Tu pedido <b>#${ord}</b> está en camino.<br>Código de seguimiento: <b>${trk}</b></p>` };}
     return { subject: `Seu pedido #${ord} foi enviado!`, html: `<p>Ótimas notícias! Seu pedido <b>#${ord}</b> está a caminho.<br>Código de rastreio: <b>${trk}</b></p>` };
   },
   coupon_applied: (vars, lang) => {
     const code = vars.code ?? '—';
     const disc = vars.discount ?? '0';
-    if (lang === 'en') return { subject: `Coupon ${code} applied!`, html: `<p>Your coupon <b>${code}</b> was applied. You saved <b>R$ ${disc}</b> 🎉</p>` };
-    if (lang === 'es') return { subject: `¡Cupón ${code} aplicado!`, html: `<p>Tu cupón <b>${code}</b> fue aplicado. ¡Ahorraste <b>R$ ${disc}</b> 🎉</p>` };
+    if (lang === 'en') {return { subject: `Coupon ${code} applied!`, html: `<p>Your coupon <b>${code}</b> was applied. You saved <b>R$ ${disc}</b> 🎉</p>` };}
+    if (lang === 'es') {return { subject: `¡Cupón ${code} aplicado!`, html: `<p>Tu cupón <b>${code}</b> fue aplicado. ¡Ahorraste <b>R$ ${disc}</b> 🎉</p>` };}
     return { subject: `Cupom ${code} aplicado!`, html: `<p>Seu cupom <b>${code}</b> foi aplicado. Você economizou <b>R$ ${disc}</b> 🎉</p>` };
   },
   support_reply: (vars, lang) => {
     const msg = vars.message ?? '';
-    if (lang === 'en') return { subject: 'Our support team has replied', html: `<p>Our team responded to your request:<br><br><em>${msg}</em></p>` };
-    if (lang === 'es') return { subject: 'Nuestro equipo de soporte respondió', html: `<p>Nuestro equipo respondió a tu solicitud:<br><br><em>${msg}</em></p>` };
+    if (lang === 'en') {return { subject: 'Our support team has replied', html: `<p>Our team responded to your request:<br><br><em>${msg}</em></p>` };}
+    if (lang === 'es') {return { subject: 'Nuestro equipo de soporte respondió', html: `<p>Nuestro equipo respondió a tu solicitud:<br><br><em>${msg}</em></p>` };}
     return { subject: 'Nossa equipe de suporte respondeu', html: `<p>Nossa equipe respondeu à sua solicitação:<br><br><em>${msg}</em></p>` };
   },
   generic: (vars, lang) => {
     const msg = vars.message ?? (lang === 'en' ? 'You have a new notification.' : lang === 'es' ? 'Tienes una nueva notificación.' : 'Você tem uma nova notificação.');
-    if (lang === 'en') return { subject: 'CDM STORES Notification', html: `<p>${msg}</p>` };
-    if (lang === 'es') return { subject: 'Notificación CDM STORES', html: `<p>${msg}</p>` };
+    if (lang === 'en') {return { subject: 'CDM STORES Notification', html: `<p>${msg}</p>` };}
+    if (lang === 'es') {return { subject: 'Notificación CDM STORES', html: `<p>${msg}</p>` };}
     return { subject: 'Notificação CDM STORES', html: `<p>${msg}</p>` };
   },
 };
@@ -64,7 +65,7 @@ function sanitizeVar(v: string): string {
 }
 
 function sanitizeVars(vars?: Record<string, string>): Record<string, string> {
-  if (!vars) return {};
+  if (!vars) {return {};}
   return Object.fromEntries(Object.entries(vars).map(([k, v]) => [k, sanitizeVar(v)]));
 }
 

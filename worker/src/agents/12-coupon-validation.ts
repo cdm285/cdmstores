@@ -10,7 +10,8 @@
  *   • No user-supplied data interpolated into SQL without binding
  */
 
-import { addTrace, ExtendedAgentContext }   from '../core/agent-context.js';
+import type { ExtendedAgentContext } from '../core/agent-context.js';
+import { addTrace }   from '../core/agent-context.js';
 import type { ActionRequest, ActionResult } from '../core/action-schema.js';
 import { failedResult }                     from '../core/action-schema.js';
 import type { AgentEnv }                    from '../core/types.js';
@@ -27,8 +28,8 @@ const COUPONS: Record<string, { discount: number; minOrder?: number; maxUses?: n
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 function couponListMsg(lang: string): string {
   const list = '• NEWYEAR – R$ 10\n• PROMO – R$ 5\n• DESCONTO10 – R$ 10 (pedido mín. R$50)\n• SAVE20 – R$ 20 (pedido mín. R$100)\n• CDM10 – R$ 10';
-  if (lang === 'en') return `🎟️ Available coupons:\n${list.replace('pedido mín.', 'min. order')}`;
-  if (lang === 'es') return `🎟️ Cupones disponibles:\n${list.replace('pedido mín.', 'pedido mín.')}`;
+  if (lang === 'en') {return `🎟️ Available coupons:\n${list.replace('pedido mín.', 'min. order')}`;}
+  if (lang === 'es') {return `🎟️ Cupones disponibles:\n${list.replace('pedido mín.', 'pedido mín.')}`;}
   return `🎟️ Cupons disponíveis:\n${list}`;
 }
 

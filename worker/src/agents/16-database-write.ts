@@ -12,7 +12,8 @@
  *   6. Max value length: 4096 chars per string column
  */
 
-import { addTrace, ExtendedAgentContext }    from '../core/agent-context.js';
+import type { ExtendedAgentContext } from '../core/agent-context.js';
+import { addTrace }    from '../core/agent-context.js';
 import type { ActionRequest, ActionResult }  from '../core/action-schema.js';
 import { failedResult, isAllowedTable }      from '../core/action-schema.js';
 import type { AgentEnv }                     from '../core/types.js';
@@ -24,12 +25,12 @@ const MAX_STR_LEN  = 4096;
 
 function validateColumns(data: Record<string, unknown>): string | null {
   const cols = Object.keys(data);
-  if (cols.length === 0)        return 'data must have at least one column';
-  if (cols.length > MAX_COLS)   return `too many columns (max ${MAX_COLS})`;
+  if (cols.length === 0)        {return 'data must have at least one column';}
+  if (cols.length > MAX_COLS)   {return `too many columns (max ${MAX_COLS})`;}
   for (const col of cols) {
-    if (!COL_SAFE_RE.test(col)) return `invalid column name: "${col}"`;
+    if (!COL_SAFE_RE.test(col)) {return `invalid column name: "${col}"`;}
     const v = data[col];
-    if (typeof v === 'string' && v.length > MAX_STR_LEN) return `value for "${col}" exceeds max length`;
+    if (typeof v === 'string' && v.length > MAX_STR_LEN) {return `value for "${col}" exceeds max length`;}
   }
   return null;
 }

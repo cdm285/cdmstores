@@ -12,11 +12,11 @@ async function calculateOrderTotal(
   let subtotal = 0;
   const enrichedItems: Array<{ product_id: number; quantity: number; price: number; name: string }> = [];
   for (const item of items) {
-    if (!item.product_id || !item.quantity || item.quantity < 1 || item.quantity > 100) return null;
+    if (!item.product_id || !item.quantity || item.quantity < 1 || item.quantity > 100) {return null;}
     const product = await env.DB.prepare(
       'SELECT id, name, price, stock FROM products WHERE id = ? AND active = 1'
     ).bind(item.product_id).first<{ id: number; name: string; price: number; stock: number }>();
-    if (!product || product.stock < item.quantity) return null;
+    if (!product || product.stock < item.quantity) {return null;}
     subtotal += product.price * item.quantity;
     enrichedItems.push({ product_id: product.id, quantity: item.quantity, price: product.price, name: product.name });
   }
@@ -29,11 +29,11 @@ export { calculateOrderTotal };
 export async function handleOrderGet(req: Request, env: Env, id: string): Promise<Response> {
   try {
     const authResult = await requireAuth(req, env);
-    if (!authResult.ok) return authResult.response;
+    if (!authResult.ok) {return authResult.response;}
     const order = await env.DB.prepare(
       'SELECT id, total, status, created_at, updated_at, stripe_payment_id, tracking_code FROM orders WHERE id = ? AND user_id = ?'
     ).bind(Number(id), authResult.auth.userId).first();
-    if (!order) return json({ success: false, error: 'Pedido não encontrado' }, 404);
+    if (!order) {return json({ success: false, error: 'Pedido não encontrado' }, 404);}
     return json({ success: true, data: order });
   } catch (error) {
     return internalError(error, 'orders/get');
@@ -44,7 +44,7 @@ export async function handleOrderGet(req: Request, env: Env, id: string): Promis
 export async function handleOrderCreate(req: Request, env: Env): Promise<Response> {
   try {
     const authResult = await requireAuth(req, env);
-    if (!authResult.ok) return authResult.response;
+    if (!authResult.ok) {return authResult.response;}
 
     const body = await req.json() as Record<string, unknown>;
     const { customer_name, customer_email, items } = body as {
@@ -61,7 +61,7 @@ export async function handleOrderCreate(req: Request, env: Env): Promise<Respons
     }
 
     const calculated = await calculateOrderTotal(env, items);
-    if (!calculated) return json({ success: false, error: 'Produto inválido ou sem estoque' }, 400);
+    if (!calculated) {return json({ success: false, error: 'Produto inválido ou sem estoque' }, 400);}
 
     const result = await env.DB.prepare(
       'INSERT INTO orders (user_id, customer_name, customer_email, total, shipping_cost, status, created_at, updated_at) VALUES (?, ?, ?, ?, ?, "pending", datetime("now"), datetime("now"))'

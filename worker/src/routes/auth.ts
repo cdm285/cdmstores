@@ -31,7 +31,7 @@ export async function handleRegister(req: Request, env: Env): Promise<Response> 
   try {
     const ip = req.headers.get('CF-Connecting-IP') || 'unknown';
     const rl = await checkRateLimit(env, `register:${ip}`, 5, 3600);
-    if (!rl.allowed) return json({ success: false, error: 'Muitas tentativas. Aguarde e tente novamente.' }, 429);
+    if (!rl.allowed) {return json({ success: false, error: 'Muitas tentativas. Aguarde e tente novamente.' }, 429);}
 
     const body = await req.json() as Record<string, unknown>;
     const { email, password, name, turnstileToken } = body as {
@@ -51,13 +51,13 @@ export async function handleRegister(req: Request, env: Env): Promise<Response> 
     if (typeof email !== 'string' || email.length > 254 || !EMAIL_REGEX.test(email)) {
       return json({ success: false, error: 'Email inválido' }, 400);
     }
-    if (typeof password !== 'string') return json({ success: false, error: 'Senha inválida' }, 400);
+    if (typeof password !== 'string') {return json({ success: false, error: 'Senha inválida' }, 400);}
     const passError = validatePasswordStrength(password);
-    if (passError) return json({ success: false, error: passError }, 400);
+    if (passError) {return json({ success: false, error: passError }, 400);}
 
     const existing = await env.DB.prepare('SELECT id FROM users WHERE email = ? LIMIT 1')
       .bind(email.toLowerCase()).first();
-    if (existing) return json({ success: false, error: 'Email já cadastrado' }, 409);
+    if (existing) {return json({ success: false, error: 'Email já cadastrado' }, 409);}
 
     const passwordHash = await hashPassword(password);
     const result = await env.DB.prepare(
@@ -99,12 +99,12 @@ export async function handleLogin(req: Request, env: Env): Promise<Response> {
   try {
     const ip = req.headers.get('CF-Connecting-IP') || 'unknown';
     const rl = await checkRateLimit(env, `login:${ip}`, 10, 300);
-    if (!rl.allowed) return json({ success: false, error: 'Muitas tentativas de login. Aguarde 5 minutos.' }, 429);
+    if (!rl.allowed) {return json({ success: false, error: 'Muitas tentativas de login. Aguarde 5 minutos.' }, 429);}
 
     const body = await req.json() as Record<string, unknown>;
     const { email, password, turnstileToken } = body as { email?: string; password?: string; turnstileToken?: string };
 
-    if (!email || !password) return json({ success: false, error: 'Email e senha obrigatórios' }, 400);
+    if (!email || !password) {return json({ success: false, error: 'Email e senha obrigatórios' }, 400);}
 
     if (env.TURNSTILE_SECRET_KEY && !await verifyTurnstile(env, turnstileToken, ip)) {
       return json({ success: false, error: 'Verificação de bot falhou' }, 403);
@@ -168,13 +168,13 @@ export async function handleLogin(req: Request, env: Env): Promise<Response> {
 export async function handleMe(req: Request, env: Env): Promise<Response> {
   try {
     const authResult = await requireAuth(req, env);
-    if (!authResult.ok) return authResult.response;
+    if (!authResult.ok) {return authResult.response;}
 
     const user = await env.DB.prepare(
       'SELECT id, email, name, phone, avatar_url, status, email_verified, created_at, last_login FROM users WHERE id = ? LIMIT 1'
     ).bind(authResult.auth.userId).first();
 
-    if (!user) return json({ success: false, error: 'Usuário não encontrado' }, 404);
+    if (!user) {return json({ success: false, error: 'Usuário não encontrado' }, 404);}
     return json({ success: true, user });
   } catch (error) {
     return internalError(error, 'auth/me');
@@ -185,7 +185,7 @@ export async function handleMe(req: Request, env: Env): Promise<Response> {
 export async function handleLogout(req: Request, env: Env): Promise<Response> {
   try {
     const authResult = await requireAuth(req, env);
-    if (!authResult.ok) return authResult.response;
+    if (!authResult.ok) {return authResult.response;}
     await revokeSessionByAccessToken(env, authResult.auth.token);
     return jsonWithCookies({ success: true, message: 'Logout realizado com sucesso' }, 200, buildClearCookieHeaders());
   } catch (error) {
@@ -198,16 +198,16 @@ export async function handleRefresh(req: Request, env: Env): Promise<Response> {
   try {
     const body = await req.json() as Record<string, unknown>;
     const { refreshToken } = body as { refreshToken?: string };
-    if (!refreshToken) return json({ success: false, error: 'Refresh token obrigatório' }, 400);
+    if (!refreshToken) {return json({ success: false, error: 'Refresh token obrigatório' }, 400);}
 
     const verified = verifyJWT(refreshToken, env, 'refresh');
-    if (!verified.valid || !verified.payload) return json({ success: false, error: 'Refresh token inválido' }, 401);
+    if (!verified.valid || !verified.payload) {return json({ success: false, error: 'Refresh token inválido' }, 401);}
 
     const session = await env.DB.prepare(
       'SELECT user_id, refresh_expires_at FROM sessions WHERE refresh_token = ? LIMIT 1'
     ).bind(hashToken(refreshToken)).first<{ user_id: number; refresh_expires_at: string }>();
 
-    if (!session) return json({ success: false, error: 'Sessão não encontrada' }, 401);
+    if (!session) {return json({ success: false, error: 'Sessão não encontrada' }, 401);}
 
     if (session.user_id !== verified.payload.sub || session.refresh_expires_at <= new Date().toISOString()) {
       return json({ success: false, error: 'Refresh token expirado ou inválido' }, 401);
@@ -230,7 +230,7 @@ export async function handleForgotPassword(req: Request, env: Env): Promise<Resp
   try {
     const ip = req.headers.get('CF-Connecting-IP') || 'unknown';
     const rl = await checkRateLimit(env, `forgot-password:${ip}`, 3, 3600);
-    if (!rl.allowed) return json({ success: false, error: 'Muitas tentativas. Aguarde e tente novamente.' }, 429);
+    if (!rl.allowed) {return json({ success: false, error: 'Muitas tentativas. Aguarde e tente novamente.' }, 429);}
 
     const body = await req.json() as Record<string, unknown>;
     const { email } = body as { email?: string };
@@ -241,7 +241,7 @@ export async function handleForgotPassword(req: Request, env: Env): Promise<Resp
 
     const user = await env.DB.prepare('SELECT id FROM users WHERE email = ? LIMIT 1')
       .bind(email.toLowerCase()).first<{ id: number }>();
-    if (!user) return json({ success: true, message: 'Se o email existe, receberá um link de reset' });
+    if (!user) {return json({ success: true, message: 'Se o email existe, receberá um link de reset' });}
 
     await env.DB.prepare('DELETE FROM password_resets WHERE user_id = ?').bind(user.id).run();
 
@@ -271,21 +271,21 @@ export async function handleResetPassword(req: Request, env: Env): Promise<Respo
   try {
     const body = await req.json() as Record<string, unknown>;
     const { token, newPassword } = body as { token?: string; newPassword?: string };
-    if (!token || !newPassword) return json({ success: false, error: 'Token e nova senha obrigatórios' }, 400);
+    if (!token || !newPassword) {return json({ success: false, error: 'Token e nova senha obrigatórios' }, 400);}
 
     const passError = validatePasswordStrength(newPassword);
-    if (passError) return json({ success: false, error: passError }, 400);
+    if (passError) {return json({ success: false, error: passError }, 400);}
 
     const jwtCheck = verifyJWT(token, env, 'password_reset');
-    if (!jwtCheck.valid || !jwtCheck.payload) return json({ success: false, error: 'Token inválido ou expirado' }, 401);
+    if (!jwtCheck.valid || !jwtCheck.payload) {return json({ success: false, error: 'Token inválido ou expirado' }, 401);}
 
     const resetRecord = await env.DB.prepare(
       'SELECT user_id, expires_at, used FROM password_resets WHERE token = ? LIMIT 1'
     ).bind(hashToken(token)).first<{ user_id: number; expires_at: string; used: number }>();
 
-    if (!resetRecord || resetRecord.used)                        return json({ success: false, error: 'Token inválido' }, 401);
-    if (resetRecord.expires_at < new Date().toISOString())       return json({ success: false, error: 'Token expirado' }, 401);
-    if (resetRecord.user_id !== jwtCheck.payload.sub)            return json({ success: false, error: 'Token inválido para este usuário' }, 401);
+    if (!resetRecord || resetRecord.used)                        {return json({ success: false, error: 'Token inválido' }, 401);}
+    if (resetRecord.expires_at < new Date().toISOString())       {return json({ success: false, error: 'Token expirado' }, 401);}
+    if (resetRecord.user_id !== jwtCheck.payload.sub)            {return json({ success: false, error: 'Token inválido para este usuário' }, 401);}
 
     const passwordHash = await hashPassword(newPassword);
     await env.DB.prepare(
@@ -305,18 +305,18 @@ export async function handleResetPassword(req: Request, env: Env): Promise<Respo
 export async function handleSendVerificationEmail(req: Request, env: Env): Promise<Response> {
   try {
     const authResult = await requireAuth(req, env);
-    if (!authResult.ok) return authResult.response;
+    if (!authResult.ok) {return authResult.response;}
 
     const ip = req.headers.get('CF-Connecting-IP') || 'unknown';
     const rl = await checkRateLimit(env, `verify-email:${authResult.auth.userId}`, 3, 3600);
-    if (!rl.allowed) return json({ success: false, error: 'Muitas tentativas. Aguarde e tente novamente.' }, 429);
+    if (!rl.allowed) {return json({ success: false, error: 'Muitas tentativas. Aguarde e tente novamente.' }, 429);}
 
     const user = await env.DB.prepare(
       'SELECT id, email, email_verified FROM users WHERE id = ? LIMIT 1'
     ).bind(authResult.auth.userId).first<{ id: number; email: string; email_verified: number }>();
 
-    if (!user)              return json({ success: false, error: 'Usuário não encontrado' }, 404);
-    if (user.email_verified) return json({ success: false, error: 'Email já verificado' }, 400);
+    if (!user)              {return json({ success: false, error: 'Usuário não encontrado' }, 404);}
+    if (user.email_verified) {return json({ success: false, error: 'Email já verificado' }, 400);}
 
     const verificationToken = generateJWT(env, user.id, user.email, 86400, 'email_verify');
     await env.DB.prepare(
@@ -341,17 +341,17 @@ export async function handleVerifyEmail(req: Request, env: Env): Promise<Respons
   try {
     const body = await req.json() as Record<string, unknown>;
     const { token } = body as { token?: string };
-    if (!token) return json({ success: false, error: 'Token obrigatório' }, 400);
+    if (!token) {return json({ success: false, error: 'Token obrigatório' }, 400);}
 
     const verified = verifyJWT(token, env, 'email_verify');
-    if (!verified.valid || !verified.userId) return json({ success: false, error: 'Token inválido ou expirado' }, 401);
+    if (!verified.valid || !verified.userId) {return json({ success: false, error: 'Token inválido ou expirado' }, 401);}
 
     const resetRecord = await env.DB.prepare(
       'SELECT expires_at FROM password_resets WHERE token = ? AND user_id = ? LIMIT 1'
     ).bind(hashToken(token), verified.userId).first<{ expires_at: string }>();
 
-    if (!resetRecord)                                        return json({ success: false, error: 'Token não encontrado' }, 401);
-    if (resetRecord.expires_at < new Date().toISOString())  return json({ success: false, error: 'Token expirado' }, 401);
+    if (!resetRecord)                                        {return json({ success: false, error: 'Token não encontrado' }, 401);}
+    if (resetRecord.expires_at < new Date().toISOString())  {return json({ success: false, error: 'Token expirado' }, 401);}
 
     await env.DB.prepare(
       'UPDATE users SET email_verified = 1, updated_at = datetime("now") WHERE id = ?'
@@ -368,19 +368,19 @@ export async function handleVerifyEmail(req: Request, env: Env): Promise<Respons
 export async function handleChangePassword(req: Request, env: Env): Promise<Response> {
   try {
     const authResult = await requireAuth(req, env);
-    if (!authResult.ok) return authResult.response;
+    if (!authResult.ok) {return authResult.response;}
 
     const body = await req.json() as Record<string, unknown>;
     const { current_password, new_password } = body as { current_password?: string; new_password?: string };
-    if (!current_password || !new_password) return json({ success: false, error: 'Senhas obrigatórias' }, 400);
+    if (!current_password || !new_password) {return json({ success: false, error: 'Senhas obrigatórias' }, 400);}
 
     const passError = validatePasswordStrength(new_password);
-    if (passError) return json({ success: false, error: passError }, 400);
+    if (passError) {return json({ success: false, error: passError }, 400);}
 
     const user = await env.DB.prepare(
       'SELECT password_hash FROM users WHERE id = ? LIMIT 1'
     ).bind(authResult.auth.userId).first<{ password_hash: string }>();
-    if (!user) return json({ success: false, error: 'Usuário não encontrado' }, 404);
+    if (!user) {return json({ success: false, error: 'Usuário não encontrado' }, 404);}
 
     const passwordMatch = await verifyPassword(current_password, user.password_hash);
     if (!passwordMatch) {
@@ -408,14 +408,14 @@ export async function handleGoogleAuth(req: Request, env: Env): Promise<Response
   try {
     const body = await req.json() as Record<string, unknown>;
     const { idToken, accessToken } = body as { idToken?: string; accessToken?: string };
-    if (!idToken && !accessToken) return json({ success: false, error: 'ID token ou Access token obrigatório' }, 400);
+    if (!idToken && !accessToken) {return json({ success: false, error: 'ID token ou Access token obrigatório' }, 400);}
 
     let googleUser: { email: string; name: string; picture?: string };
     try {
       if (idToken) {
         const infoResp = await fetch(`https://oauth2.googleapis.com/tokeninfo?id_token=${idToken}`);
         const info = await infoResp.json() as Record<string, string>;
-        if (!infoResp.ok || !info.email) return json({ success: false, error: 'ID token Google inválido' }, 401);
+        if (!infoResp.ok || !info.email) {return json({ success: false, error: 'ID token Google inválido' }, 401);}
         if (env.GOOGLE_CLIENT_ID && info.aud !== env.GOOGLE_CLIENT_ID) {
           return json({ success: false, error: 'Token não pertence a este aplicativo' }, 401);
         }
@@ -423,13 +423,13 @@ export async function handleGoogleAuth(req: Request, env: Env): Promise<Response
       } else {
         const infoResp = await fetch(`https://www.googleapis.com/oauth2/v1/tokeninfo?access_token=${accessToken}`);
         const info = await infoResp.json() as Record<string, string>;
-        if (!infoResp.ok) return json({ success: false, error: 'Access token Google inválido' }, 401);
+        if (!infoResp.ok) {return json({ success: false, error: 'Access token Google inválido' }, 401);}
         if (env.GOOGLE_CLIENT_ID && info.issued_to !== env.GOOGLE_CLIENT_ID && info.audience !== env.GOOGLE_CLIENT_ID) {
           return json({ success: false, error: 'Token não pertence a este aplicativo' }, 401);
         }
         const userResp = await fetch(`https://www.googleapis.com/oauth2/v1/userinfo?access_token=${accessToken}`);
         const ud = await userResp.json() as Record<string, string>;
-        if (!ud.email) return json({ success: false, error: 'Email não encontrado no token Google' }, 400);
+        if (!ud.email) {return json({ success: false, error: 'Email não encontrado no token Google' }, 400);}
         googleUser = { email: ud.email, name: ud.name || 'Google User', picture: ud.picture };
       }
     } catch (err) {
@@ -472,7 +472,7 @@ export async function handleFacebookAuth(req: Request, env: Env): Promise<Respon
   try {
     const body = await req.json() as Record<string, unknown>;
     const { accessToken, userID } = body as { accessToken?: string; userID?: string };
-    if (!accessToken) return json({ success: false, error: 'Access token obrigatório' }, 400);
+    if (!accessToken) {return json({ success: false, error: 'Access token obrigatório' }, 400);}
 
     let fbUser: { email: string; name: string; picture?: string };
     try {
@@ -491,8 +491,8 @@ export async function handleFacebookAuth(req: Request, env: Env): Promise<Respon
         `https://graph.facebook.com/v18.0/${userID}?fields=id,email,name,picture&access_token=${encodeURIComponent(accessToken)}`
       );
       const fbData = await userResponse.json() as Record<string, unknown>;
-      if (!userResponse.ok || !fbData.id) return json({ success: false, error: 'Token Facebook inválido' }, 401);
-      if (!fbData.email)                   return json({ success: false, error: 'Email não fornecido pelo Facebook' }, 400);
+      if (!userResponse.ok || !fbData.id) {return json({ success: false, error: 'Token Facebook inválido' }, 401);}
+      if (!fbData.email)                   {return json({ success: false, error: 'Email não fornecido pelo Facebook' }, 400);}
       const picData = (fbData.picture as Record<string, unknown>)?.data as Record<string, unknown> | undefined;
       fbUser = { email: String(fbData.email), name: String(fbData.name || 'Facebook User'), picture: picData?.url as string | undefined };
     } catch (err) {

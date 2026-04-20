@@ -19,7 +19,7 @@ export async function handleProductGet(_req: Request, env: Env, id: string): Pro
     const product = await env.DB.prepare(
       'SELECT id, name, description, price, image_url, stock FROM products WHERE id = ? AND active = 1'
     ).bind(id).first();
-    if (!product) return json({ success: false, error: 'Produto não encontrado' }, 404);
+    if (!product) {return json({ success: false, error: 'Produto não encontrado' }, 404);}
     return json({ success: true, data: product });
   } catch (error) {
     return internalError(error, 'products/get');

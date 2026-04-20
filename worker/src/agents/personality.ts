@@ -4,7 +4,8 @@
  * Agent 15 — EmotionAgent      Detects sentiment, adjusts tone
  */
 
-import { BaseAgent, AgentContext, AgentResult, SentimentResult } from '../core/types.js';
+import type { AgentContext, AgentResult, SentimentResult } from '../core/types.js';
+import { BaseAgent } from '../core/types.js';
 
 // ─── Agent 15 — EmotionAgent ──────────────────────────────────────────────────
 export class EmotionAgent extends BaseAgent {
@@ -44,7 +45,7 @@ export class PersonalityAgent extends BaseAgent {
   async run(ctx: AgentContext, response: string): Promise<AgentResult> {
     const t = this.start();
 
-    if (!response) return this.fail(this.id, 'Empty response', t);
+    if (!response) {return this.fail(this.id, 'Empty response', t);}
 
     let adjusted = response;
 
@@ -89,7 +90,7 @@ export class StyleAgent extends BaseAgent {
   async run(ctx: AgentContext, response: string, channel: 'web' | 'mobile' = 'web'): Promise<AgentResult> {
     const t = this.start();
 
-    if (!response) return this.fail(this.id, 'Empty response', t);
+    if (!response) {return this.fail(this.id, 'Empty response', t);}
 
     let styled = response;
 
@@ -99,7 +100,7 @@ export class StyleAgent extends BaseAgent {
       const sentences = styled.split(/(?<=[.!?])\s+/);
       let truncated = '';
       for (const s of sentences) {
-        if ((truncated + s).length > 380) break;
+        if ((truncated + s).length > 380) {break;}
         truncated += s + ' ';
       }
       styled = truncated.trim() + (styled.length > truncated.length ? '...' : '');

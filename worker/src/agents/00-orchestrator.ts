@@ -21,7 +21,8 @@
  * Returns OrchestratorOutput — same shape as the existing orchestrator.ts.
  */
 
-import { createContext, contextToOutput, addTrace, ContextInput, ExtendedAgentContext } from '../core/agent-context.js';
+import type { ContextInput, ExtendedAgentContext } from '../core/agent-context.js';
+import { createContext, contextToOutput, addTrace } from '../core/agent-context.js';
 import { createPipeline }                    from '../core/pipeline.js';
 import type { AgentEnv, OrchestratorOutput } from '../core/types.js';
 
@@ -47,8 +48,8 @@ import { securityAgent, contentFilterAgent }                                    
 
 // ─── Helper: apply ActionResult fields to context ─────────────────────────────
 function applyActionResult(ctx: ExtendedAgentContext, r: { action?: string; actionPayload?: Record<string, unknown>; response?: string }): void {
-  if (r.action)        ctx.lastAction        = r.action;
-  if (r.actionPayload) ctx.lastActionPayload = r.actionPayload ?? {};
+  if (r.action)        {ctx.lastAction        = r.action;}
+  if (r.actionPayload) {ctx.lastActionPayload = r.actionPayload ?? {};}
 }
 
 // ─── Fallback responses ───────────────────────────────────────────────────────
@@ -167,7 +168,7 @@ export class MainOrchestrator {
       const personResult    = await personalityAgent.run(ctx, finalResponse);
       const styleResult     = await styleAgent.run(ctx, personResult.response ?? finalResponse);
       const styled          = styleResult.response ?? personResult.response ?? finalResponse;
-      if (styled) finalResponse = styled;
+      if (styled) {finalResponse = styled;}
     }
 
     if (finalResponse) {
@@ -177,11 +178,11 @@ export class MainOrchestrator {
 
       if (!qualResult.data?.passed && !ctx.flags.skipSelfRepair) {
         const repairResult = await selfRepairAgent.run(ctx, finalResponse);
-        if (repairResult.response) finalResponse = repairResult.response;
+        if (repairResult.response) {finalResponse = repairResult.response;}
       }
 
       const valResult = await validationAgent.run(ctx, finalResponse ?? '');
-      if (valResult.response) finalResponse = valResult.response;
+      if (valResult.response) {finalResponse = valResult.response;}
     }
 
     finalResponse ??= FALLBACK[ctx.detectedLang] ?? FALLBACK.pt;

@@ -14,7 +14,7 @@ import { calculateOrderTotal } from './orders.js';
 export async function handleStripeCreatePayment(req: Request, env: Env): Promise<Response> {
   try {
     const authResult = await requireAuth(req, env);
-    if (!authResult.ok) return authResult.response;
+    if (!authResult.ok) {return authResult.response;}
 
     if (!env.STRIPE_SECRET_KEY) {
       return json({ success: false, error: 'Stripe não configurado' }, 500);

@@ -4,9 +4,11 @@
  * Agent 03 — LanguageAgent   Detecta e sincroniza idioma
  */
 
-import {
-  BaseAgent, AgentContext, AgentResult,
+import type { AgentContext, AgentResult,
   Intent, IntentCategory
+} from '../core/types.js';
+import {
+  BaseAgent
 } from '../core/types.js';
 
 // ─── Agent 01 — NLPAgent ──────────────────────────────────────────────────────
@@ -20,15 +22,15 @@ export class NLPAgent extends BaseAgent {
 
     // Email
     const emailMatch = message.match(/([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})/);
-    if (emailMatch) entities.email = emailMatch[1];
+    if (emailMatch) {entities.email = emailMatch[1];}
 
     // Tracking code (BR postal / custom CDM)
     const trackMatch = message.match(/\b([A-Z]{2}\d{8,}\w{2}|CDM[A-Z0-9]{6,})\b/i);
-    if (trackMatch) entities.tracking_code = trackMatch[1].toUpperCase();
+    if (trackMatch) {entities.tracking_code = trackMatch[1].toUpperCase();}
 
     // Coupon (all-caps word 4–12 chars)
     const couponMatch = message.match(/\b([A-Z]{2,}[A-Z0-9]{2,12})\b/);
-    if (couponMatch && !entities.email) entities.coupon = couponMatch[1];
+    if (couponMatch && !entities.email) {entities.coupon = couponMatch[1];}
 
     // Product mentions
     const msg = message.toLowerCase();
@@ -48,7 +50,7 @@ export class NLPAgent extends BaseAgent {
 
     // Phone number
     const phoneMatch = message.match(/\(?\d{2}\)?\s*\d{4,5}[-\s]?\d{4}/);
-    if (phoneMatch) entities.phone = phoneMatch[0].replace(/\D/g, '');
+    if (phoneMatch) {entities.phone = phoneMatch[0].replace(/\D/g, '');}
 
     return this.ok(this.id, { data: { entities }, confidence: 90 }, t);
   }
@@ -180,8 +182,8 @@ export class LanguageAgent extends BaseAgent {
     const esScore = (message.match(LanguageAgent.ES) || []).length;
 
     let detected: 'pt' | 'en' | 'es' = 'pt';
-    if (enScore > ptScore && enScore > esScore) detected = 'en';
-    else if (esScore > ptScore && esScore > enScore) detected = 'es';
+    if (enScore > ptScore && enScore > esScore) {detected = 'en';}
+    else if (esScore > ptScore && esScore > enScore) {detected = 'es';}
 
     // Respect session language if already set (user preference wins)
     const finalLang = ctx.session.language || detected;

@@ -11,7 +11,8 @@
  *   ctx.recentOrders  — array of order summary objects (up to 3)
  */
 
-import { addTrace, ExtendedAgentContext } from '../core/agent-context.js';
+import type { ExtendedAgentContext } from '../core/agent-context.js';
+import { addTrace } from '../core/agent-context.js';
 import type { AgentEnv } from '../core/types.js';
 
 // ─── Tunables ─────────────────────────────────────────────────────────────────

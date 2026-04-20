@@ -12,14 +12,15 @@
  * without a round-trip through the bus for every value.
  */
 
-import {
+import type {
   AgentEnv,
   AgentMessage,
   IntentCategory,
   OrchestratorOutput,
-  SessionMessage,
   SessionState,
-  UserProfile,
+  UserProfile} from './types.js';
+import {
+  SessionMessage
 } from './types.js';
 
 import type { AgentBus } from './agent-bus.js';

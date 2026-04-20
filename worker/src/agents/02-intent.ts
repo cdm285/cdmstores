@@ -15,7 +15,8 @@
  *   ctx.session.intent, ctx.session.confidence
  */
 
-import { addTrace, ExtendedAgentContext } from '../core/agent-context.js';
+import type { ExtendedAgentContext } from '../core/agent-context.js';
+import { addTrace } from '../core/agent-context.js';
 import type { IntentCategory } from '../core/types.js';
 
 // ─── Rule definition ──────────────────────────────────────────────────────────

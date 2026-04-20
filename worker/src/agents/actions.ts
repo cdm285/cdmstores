@@ -12,7 +12,8 @@
  * Agent 42 — EscalationAgent  Escalate to human
  */
 
-import { BaseAgent, AgentContext, AgentResult } from '../core/types.js';
+import type { AgentContext, AgentResult } from '../core/types.js';
+import { BaseAgent } from '../core/types.js';
 
 // ─── Shared Data ─────────────────────────────────────────────────────────────
 const COUPONS: Record<string, number> = {
@@ -38,7 +39,7 @@ export class CartAgent extends BaseAgent {
   async run(ctx: AgentContext, productId: number): Promise<AgentResult> {
     const t = this.start();
     const product = PRODUCTS.find(p => p.id === productId);
-    if (!product) return this.fail(this.id, 'Produto não encontrado', t);
+    if (!product) {return this.fail(this.id, 'Produto não encontrado', t);}
     if (product.stock === 0) {
       const msgs: Record<string, string> = {
         pt: `❌ ${product.name} está esgotado no momento. Posso te avisar quando chegar?`,
@@ -198,7 +199,7 @@ export class ProductAgent extends BaseAgent {
 
     if (productId) {
       const p = PRODUCTS.find(pr => pr.id === productId);
-      if (!p) return this.fail(this.id, 'Product not found', t);
+      if (!p) {return this.fail(this.id, 'Product not found', t);}
       const stockText: Record<string, string> = {
         pt: p.stock > 0 ? `✅ Em estoque (${p.stock} unidades)` : '❌ Esgotado',
         en: p.stock > 0 ? `✅ In stock (${p.stock} units)` : '❌ Out of stock',

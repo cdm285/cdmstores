@@ -9,7 +9,8 @@
  * Computationally heavy self-checks are no-ops if they would exceed CPU budget.
  */
 
-import { BaseAgent, AgentContext, AgentResult } from '../core/types.js';
+import type { AgentContext, AgentResult } from '../core/types.js';
+import { BaseAgent } from '../core/types.js';
 
 // ─── Agent 43 — LogAgent ──────────────────────────────────────────────────────
 export class LogAgent extends BaseAgent {
@@ -45,7 +46,7 @@ export class MonitoringAgent extends BaseAgent {
 
     // Log slow agents (>100ms) as warnings
     for (const [agent, ms] of Object.entries(metrics)) {
-      if (ms > 100) console.warn(`[SLOW AGENT] ${agent}: ${ms}ms`);
+      if (ms > 100) {console.warn(`[SLOW AGENT] ${agent}: ${ms}ms`);}
     }
 
     return this.ok(this.id, { data: { recorded: Object.keys(metrics).length } }, t);
@@ -159,7 +160,7 @@ export class SecurityCheckAgent extends BaseAgent {
     const t = this.start();
     // Ensure no system prompt leakage in response
     const hasLeak = /you are a helpful|system prompt|jwt_secret|api_key/i.test(response);
-    if (hasLeak) return this.fail(this.id, 'Potential system prompt leakage in response', t);
+    if (hasLeak) {return this.fail(this.id, 'Potential system prompt leakage in response', t);}
     return this.ok(this.id, { data: { secure: true } }, t);
   }
 }
@@ -171,7 +172,7 @@ export class PerformanceCheckAgent extends BaseAgent {
     const t = this.start();
     const sla = 3000; // 3s SLA
     const ok = totalMs < sla;
-    if (!ok) console.warn(`[PERF] Pipeline exceeded SLA: ${totalMs}ms (SLA: ${sla}ms)`);
+    if (!ok) {console.warn(`[PERF] Pipeline exceeded SLA: ${totalMs}ms (SLA: ${sla}ms)`);}
     return this.ok(this.id, { data: { within_sla: ok, totalMs, sla } }, t);
   }
 }

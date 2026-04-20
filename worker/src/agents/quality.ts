@@ -8,7 +8,8 @@
  * Agent 79 — QualityCheckAgent   Gate: block if score < THRESHOLD
  */
 
-import { BaseAgent, AgentContext, AgentResult, QualityReport, QUALITY_THRESHOLD } from '../core/types.js';
+import type { AgentContext, AgentResult, QualityReport} from '../core/types.js';
+import { BaseAgent, QUALITY_THRESHOLD } from '../core/types.js';
 
 // ─── Agent 32 — QualityAgent ──────────────────────────────────────────────────
 export class QualityAgent extends BaseAgent {
@@ -147,7 +148,7 @@ export class ErrorCorrectionAgent extends BaseAgent {
     // Fix broken markdown
     if (ctx.meta.fix_markdown) {
       const boldCount = (corrected.match(/\*\*/g) ?? []).length;
-      if (boldCount % 2 !== 0) corrected += '**';
+      if (boldCount % 2 !== 0) {corrected += '**';}
     }
 
     // Remove debug artifacts
@@ -203,7 +204,7 @@ export class SelfCorrectionAgent extends BaseAgent {
 
     // Final pass: ensure correct language
     const lang = ctx.session.language;
-    let corrected = response;
+    const corrected = response;
 
     // If EN session but response has Portuguese keywords (AI hallucination)
     if (lang === 'en') {

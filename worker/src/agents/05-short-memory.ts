@@ -16,7 +16,8 @@
  *   ctx.conversationId        — if stored in cache
  */
 
-import { addTrace, ExtendedAgentContext } from '../core/agent-context.js';
+import type { ExtendedAgentContext } from '../core/agent-context.js';
+import { addTrace } from '../core/agent-context.js';
 import type { AgentEnv } from '../core/types.js';
 
 // ─── TTL ──────────────────────────────────────────────────────────────────────
@@ -38,7 +39,7 @@ async function dbRead(env: AgentEnv, sessionId: string): Promise<Record<string, 
       'SELECT data, expires_at FROM session_cache WHERE session_id = ? LIMIT 1'
     ).bind(sessionId).first<CacheRow>();
 
-    if (!row) return null;
+    if (!row) {return null;}
 
     const nowS = Math.floor(Date.now() / 1000);
     if (row.expires_at < nowS) {
@@ -89,13 +90,13 @@ export class Agent05ShortMemory {
           if (cached) {
             // Merge cached data into session (cached data wins for persistent fields)
             const { conversationId, language, ...rest } = cached;
-            if (typeof conversationId === 'number') ctx.conversationId = conversationId;
+            if (typeof conversationId === 'number') {ctx.conversationId = conversationId;}
             if (typeof language === 'string' && ['pt','en','es'].includes(language)) {
               ctx.session.language = language as 'pt' | 'en' | 'es';
             }
             // Merge any additional safe meta keys
             for (const [k, v] of Object.entries(rest)) {
-              if (k !== 'updatedAt') (ctx.meta as Record<string, unknown>)[k] = v;
+              if (k !== 'updatedAt') {(ctx.meta as Record<string, unknown>)[k] = v;}
             }
             ctx.flags.shortMemory = true;
           }

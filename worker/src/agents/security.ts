@@ -6,7 +6,8 @@
  * ContentFilter uses Llama Guard only when explicitly enabled (cost control).
  */
 
-import { BaseAgent, AgentContext, AgentResult, type AgentEnv } from '../core/types.js';
+import type { AgentContext, AgentResult} from '../core/types.js';
+import { BaseAgent, type AgentEnv } from '../core/types.js';
 
 // ─── Agent 27 — SecurityAgent ─────────────────────────────────────────────────
 export class SecurityAgent extends BaseAgent {

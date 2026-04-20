@@ -14,8 +14,8 @@ export const EMAIL_REGEX = /^[^\s@]{1,64}@[^\s@]{1,255}\.[^\s@]{2,}$/;
 
 /** Returns an error string on failure, null on success. */
 export function validatePasswordStrength(password: string): string | null {
-  if (password.length < 8)   return 'Senha deve ter no mínimo 8 caracteres';
-  if (password.length > 128) return 'Senha muito longa (máx. 128 caracteres)';
+  if (password.length < 8)   {return 'Senha deve ter no mínimo 8 caracteres';}
+  if (password.length > 128) {return 'Senha muito longa (máx. 128 caracteres)';}
   if (!/[0-9!@#$%^&*()\-_=+[\]{}|;:,.<>?]/.test(password)) {
     return 'Senha deve conter pelo menos um número ou caractere especial';
   }
@@ -36,7 +36,7 @@ export async function checkRateLimit(
     ).bind(key, windowStart).first<{ count: number }>();
 
     const count = result?.count ?? 0;
-    if (count >= maxRequests) return { allowed: false, remaining: 0 };
+    if (count >= maxRequests) {return { allowed: false, remaining: 0 };}
 
     await env.DB.prepare(
       'INSERT INTO rate_limit_attempts (key, created_at) VALUES (?, datetime("now"))'
@@ -110,7 +110,7 @@ export async function auditLog(
  * Rejects events older than 5 minutes to prevent replay attacks.
  */
 export function verifyStripeWebhookSignature(body: string, sigHeader: string | null, secret: string): boolean {
-  if (!sigHeader || !body || !secret) return false;
+  if (!sigHeader || !body || !secret) {return false;}
   try {
     const parts: Record<string, string> = {};
     for (const part of sigHeader.split(',')) {
@@ -118,14 +118,14 @@ export function verifyStripeWebhookSignature(body: string, sigHeader: string | n
       parts[k.trim()] = v.join('=').trim();
     }
     const { t: timestamp, v1: signature } = parts;
-    if (!timestamp || !signature) return false;
+    if (!timestamp || !signature) {return false;}
 
-    if (Math.abs(Date.now() / 1000 - Number(timestamp)) > 300) return false;
+    if (Math.abs(Date.now() / 1000 - Number(timestamp)) > 300) {return false;}
 
     const expected = createHmac('sha256', secret).update(`${timestamp}.${body}`).digest('hex');
     const sigA = Buffer.from(signature, 'hex');
     const sigB = Buffer.from(expected,  'hex');
-    if (sigA.length !== sigB.length || sigA.length === 0) return false;
+    if (sigA.length !== sigB.length || sigA.length === 0) {return false;}
     return timingSafeEqual(sigA, sigB);
   } catch {
     return false;
@@ -134,8 +134,8 @@ export function verifyStripeWebhookSignature(body: string, sigHeader: string | n
 
 // ─── Cloudflare Turnstile ─────────────────────────────────────────────────────
 export async function verifyTurnstile(env: Env, token: string | undefined, ip?: string): Promise<boolean> {
-  if (!env.TURNSTILE_SECRET_KEY) return true; // dev mode — not configured
-  if (!token) return false;
+  if (!env.TURNSTILE_SECRET_KEY) {return true;} // dev mode — not configured
+  if (!token) {return false;}
   try {
     const resp = await fetch('https://challenges.cloudflare.com/turnstile/v0/siteverify', {
       method : 'POST',

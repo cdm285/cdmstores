@@ -26,11 +26,13 @@
  *   shipping      → shipping_estimate
  */
 
-import { addTrace, ExtendedAgentContext } from '../core/agent-context.js';
-import {
+import type { ExtendedAgentContext } from '../core/agent-context.js';
+import { addTrace } from '../core/agent-context.js';
+import type {
   ActionRequest,
   ActionResult,
-  ActionType,
+  ActionType} from '../core/action-schema.js';
+import {
   validateActionRequest,
   failedResult,
   buildActionRequest,
@@ -61,7 +63,7 @@ const INTENT_TO_ACTION: Partial<Record<IntentCategory, ActionType>> = {
 
 /** Maps an intent to the Tier 4 ActionType, or null if not actionable. */
 export function intentToActionType(intent: IntentCategory | null): ActionType | null {
-  if (!intent) return null;
+  if (!intent) {return null;}
   return INTENT_TO_ACTION[intent] ?? null;
 }
 
@@ -119,8 +121,8 @@ export class Agent10ActionRouter {
 
     // 3. Write result to context for downstream agents
     ctx.meta.lastActionResult = result;
-    if (result.action)        ctx.lastAction        = result.action;
-    if (result.actionPayload) ctx.lastActionPayload = result.actionPayload;
+    if (result.action)        {ctx.lastAction        = result.action;}
+    if (result.actionPayload) {ctx.lastActionPayload = result.actionPayload;}
 
     // 4. Trace
     addTrace(ctx, {
@@ -143,7 +145,7 @@ export class Agent10ActionRouter {
 export function buildRequestFromContext(ctx: ExtendedAgentContext): ActionRequest | null {
   const intent     = ctx.intent;
   const actionType = intentToActionType(intent);
-  if (!actionType) return null;
+  if (!actionType) {return null;}
 
   const lang      = ctx.session.language ?? 'pt';
   const sessionId = ctx.session.sessionId;
@@ -184,7 +186,7 @@ export function buildRequestFromContext(ctx: ExtendedAgentContext): ActionReques
         order_id     : entities.order_id       ? Number(entities.order_id)      : undefined,
         email        : entities.email          ? String(entities.email)          : undefined,
       };
-      if (!params.tracking_code && !params.order_id && !params.email) return null;
+      if (!params.tracking_code && !params.order_id && !params.email) {return null;}
       return buildActionRequest('order_track', { type: 'order_track', params }, sessionId, lang, userId);
     }
 

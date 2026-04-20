@@ -17,7 +17,7 @@ import { checkRateLimit, auditLog } from '../lib/security.js';
 export async function handle2FASetup(req: Request, env: Env): Promise<Response> {
   try {
     const authResult = await requireAuth(req, env);
-    if (!authResult.ok) return authResult.response;
+    if (!authResult.ok) {return authResult.response;}
 
     const secret      = generateTOTPSecret();
     const backupCodes = generateBackupCodes(10);
@@ -34,13 +34,13 @@ export async function handle2FASetup(req: Request, env: Env): Promise<Response> 
 export async function handle2FAVerifySetup(req: Request, env: Env): Promise<Response> {
   try {
     const authResult = await requireAuth(req, env);
-    if (!authResult.ok) return authResult.response;
+    if (!authResult.ok) {return authResult.response;}
 
     const body = await req.json() as Record<string, unknown>;
     const { code, secret, backupCodes } = body as { code?: string; secret?: string; backupCodes?: string[] };
-    if (!code || !secret) return json({ success: false, error: 'Código e secret obrigatórios' }, 400);
+    if (!code || !secret) {return json({ success: false, error: 'Código e secret obrigatórios' }, 400);}
 
-    if (!verifyTOTPCode(secret, code)) return json({ success: false, error: 'Código incorreto. Tente novamente.' }, 400);
+    if (!verifyTOTPCode(secret, code)) {return json({ success: false, error: 'Código incorreto. Tente novamente.' }, 400);}
 
     const safeBackupCodes = Array.isArray(backupCodes) && backupCodes.length > 0
       ? backupCodes
@@ -57,15 +57,15 @@ export async function handle2FAVerifySetup(req: Request, env: Env): Promise<Resp
 export async function handle2FADisable(req: Request, env: Env): Promise<Response> {
   try {
     const authResult = await requireAuth(req, env);
-    if (!authResult.ok) return authResult.response;
+    if (!authResult.ok) {return authResult.response;}
 
     const body = await req.json() as Record<string, unknown>;
     const { password } = body as { password?: string };
-    if (!password) return json({ success: false, error: 'Senha obrigatória para desativar 2FA' }, 400);
+    if (!password) {return json({ success: false, error: 'Senha obrigatória para desativar 2FA' }, 400);}
 
     const user = await env.DB.prepare('SELECT password_hash FROM users WHERE id = ? LIMIT 1')
       .bind(authResult.auth.userId).first<{ password_hash: string }>();
-    if (!user) return json({ success: false, error: 'Usuário não encontrado' }, 404);
+    if (!user) {return json({ success: false, error: 'Usuário não encontrado' }, 404);}
 
     if (!await verifyPassword(password, user.password_hash)) {
       return json({ success: false, error: 'Senha incorreta' }, 401);
@@ -85,22 +85,22 @@ export async function handle2FAVerify(req: Request, env: Env): Promise<Response>
     const body = await req.json() as Record<string, unknown>;
     const { challengeToken, code, backupCode } = body as { challengeToken?: string; code?: string; backupCode?: string };
 
-    if (!challengeToken)        return json({ success: false, error: 'challengeToken obrigatório' }, 400);
-    if (!code && !backupCode)   return json({ success: false, error: 'Código de autenticação obrigatório' }, 400);
+    if (!challengeToken)        {return json({ success: false, error: 'challengeToken obrigatório' }, 400);}
+    if (!code && !backupCode)   {return json({ success: false, error: 'Código de autenticação obrigatório' }, 400);}
 
     const challenge = verifyJWT(challengeToken, env, '2fa_challenge');
-    if (!challenge.valid || !challenge.payload) return json({ success: false, error: 'Challenge inválido ou expirado' }, 401);
+    if (!challenge.valid || !challenge.payload) {return json({ success: false, error: 'Challenge inválido ou expirado' }, 401);}
 
     const userId = challenge.payload.sub;
 
     const rl = await checkRateLimit(env, `2fa:${userId}`, 5, 600);
-    if (!rl.allowed) return json({ success: false, error: 'Muitas tentativas de 2FA. Aguarde 10 minutos.' }, 429);
+    if (!rl.allowed) {return json({ success: false, error: 'Muitas tentativas de 2FA. Aguarde 10 minutos.' }, 429);}
 
     const user = await env.DB.prepare(
       'SELECT email, two_factor_enabled, two_factor_secret, two_factor_backup_codes FROM users WHERE id = ? LIMIT 1'
     ).bind(userId).first<{ email: string; two_factor_enabled: number; two_factor_secret: string; two_factor_backup_codes: string }>();
 
-    if (!user || !user.two_factor_enabled) return json({ success: false, error: '2FA não ativado' }, 400);
+    if (!user || !user.two_factor_enabled) {return json({ success: false, error: '2FA não ativado' }, 400);}
 
     let isValid = false;
 
@@ -109,7 +109,7 @@ export async function handle2FAVerify(req: Request, env: Env): Promise<Response>
       const recentlyUsed = await env.DB.prepare(
         "SELECT id FROM two_factor_attempts WHERE user_id = ? AND code = ? AND created_at > datetime('now', '-30 seconds')"
       ).bind(userId, code).first();
-      if (recentlyUsed) return json({ success: false, error: 'Código já utilizado. Aguarde o próximo código.' }, 401);
+      if (recentlyUsed) {return json({ success: false, error: 'Código já utilizado. Aguarde o próximo código.' }, 401);}
 
       isValid = verifyTOTPCode(user.two_factor_secret, code);
       if (isValid) {
@@ -130,7 +130,7 @@ export async function handle2FAVerify(req: Request, env: Env): Promise<Response>
           const b = Buffer.alloc(20);
           Buffer.from(codes[i].padEnd(20)).copy(a);
           Buffer.from(normalizedInput.padEnd(20)).copy(b);
-          if (timingSafeEqual(a, b)) matchIndex = i;
+          if (timingSafeEqual(a, b)) {matchIndex = i;}
         }
 
         if (matchIndex !== -1) {

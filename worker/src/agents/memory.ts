@@ -6,8 +6,10 @@
  * Agent 04 — ContextAgent        Assembles context window for AI prompt
  */
 
+import type { AgentContext, AgentResult, SessionMessage, SessionState
+} from '../core/types.js';
 import {
-  BaseAgent, AgentContext, AgentResult, SessionMessage, SessionState
+  BaseAgent
 } from '../core/types.js';
 
 const SESSION_TTL_SECONDS = 1800; // 30 min
@@ -28,9 +30,9 @@ export class ShortMemoryAgent extends BaseAgent {
           const raw = await ctx.env.KV.get(key);
           if (raw) {
             const state = JSON.parse(raw) as Partial<SessionState>;
-            if (state.context) ctx.session.context = state.context;
-            if (state.language) ctx.session.language = state.language;
-            if (state.turn !== undefined) ctx.session.turn = state.turn;
+            if (state.context) {ctx.session.context = state.context;}
+            if (state.language) {ctx.session.language = state.language;}
+            if (state.turn !== undefined) {ctx.session.turn = state.turn;}
             return this.ok(this.id, { data: { source: 'kv', found: true } }, t);
           }
         }
@@ -40,9 +42,9 @@ export class ShortMemoryAgent extends BaseAgent {
         ).bind(sessionId).first<{ context: string }>();
         if (row?.context) {
           const state = JSON.parse(row.context) as Partial<SessionState>;
-          if (state.context) ctx.session.context = state.context;
-          if (state.language) ctx.session.language = state.language;
-          if (state.turn !== undefined) ctx.session.turn = state.turn;
+          if (state.context) {ctx.session.context = state.context;}
+          if (state.language) {ctx.session.language = state.language;}
+          if (state.turn !== undefined) {ctx.session.turn = state.turn;}
           return this.ok(this.id, { data: { source: 'd1', found: true } }, t);
         }
         return this.ok(this.id, { data: { source: 'none', found: false } }, t);
@@ -153,7 +155,7 @@ export class SemanticMemoryAgent extends BaseAgent {
     try {
       if (operation === 'read' && query) {
         const embedding = await ctx.env.AI.run('@cf/baai/bge-m3', { text: [query] }) as { data: number[][] };
-        if (!embedding.data?.[0]) return this.ok(this.id, { data: { results: [] } }, t);
+        if (!embedding.data?.[0]) {return this.ok(this.id, { data: { results: [] } }, t);}
 
         const matches = await ctx.env.VECTORIZE.query(embedding.data[0], {
           topK: 3,
@@ -171,7 +173,7 @@ export class SemanticMemoryAgent extends BaseAgent {
 
       if (operation === 'write' && content) {
         const embedding = await ctx.env.AI.run('@cf/baai/bge-m3', { text: [content] }) as { data: number[][] };
-        if (!embedding.data?.[0]) return this.ok(this.id, { data: { stored: false } }, t);
+        if (!embedding.data?.[0]) {return this.ok(this.id, { data: { stored: false } }, t);}
 
         const vectorId = `conv-${ctx.meta.conversation_id ?? 'anon'}-${Date.now()}`;
         await ctx.env.VECTORIZE.upsert([{
@@ -243,7 +245,7 @@ export class ContextAgent extends BaseAgent {
     for (let i = ctx.session.context.length - 1; i >= 0; i--) {
       const msg = ctx.session.context[i];
       totalChars += msg.content.length;
-      if (totalChars / ContextAgent.CHARS_PER_TOKEN > ContextAgent.MAX_TOKENS_APPROX) break;
+      if (totalChars / ContextAgent.CHARS_PER_TOKEN > ContextAgent.MAX_TOKENS_APPROX) {break;}
       trimmed.unshift(msg);
     }
 

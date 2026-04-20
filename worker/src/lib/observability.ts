@@ -83,7 +83,7 @@ export async function recordMetric(
   metricsKv : KVNamespace | undefined,
   metric    : RequestMetric,
 ): Promise<void> {
-  if (!metricsKv) return;
+  if (!metricsKv) {return;}
   try {
     const hour      = Math.floor(Date.now() / 3600_000);
     const bucketKey = `metrics:hour:${hour}`;
@@ -115,7 +115,7 @@ export async function getAggregatedMetrics(
   rateLimitHits : number;
 }> {
   const empty = { totalRequests: 0, errorRate: 0, avgLatencyMs: 0, p99LatencyMs: 0, topPaths: [], rateLimitHits: 0 };
-  if (!metricsKv) return empty;
+  if (!metricsKv) {return empty;}
 
   try {
     const now     = Math.floor(Date.now() / 3600_000);
@@ -127,7 +127,7 @@ export async function getAggregatedMetrics(
       .filter(Boolean)
       .flatMap(b => { try { return JSON.parse(b!) as RequestMetric[]; } catch { return []; } });
 
-    if (all.length === 0) return empty;
+    if (all.length === 0) {return empty;}
 
     const latencies   = all.map(m => m.latencyMs).sort((a, b) => a - b);
     const errors      = all.filter(m => m.status >= 500 || m.error).length;
@@ -245,7 +245,7 @@ export async function withCircuitBreaker<T>(
       }
     } else {
       // Gradually reset failure count on success
-      if (circuit.failures > 0) circuit.failures = Math.max(0, circuit.failures - 1);
+      if (circuit.failures > 0) {circuit.failures = Math.max(0, circuit.failures - 1);}
     }
 
     return { result, circuitState: circuit.state, timedOut: false };

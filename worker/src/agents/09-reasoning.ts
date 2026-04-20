@@ -18,7 +18,8 @@
  *   ctx.session.language — preferred language (03-language)
  */
 
-import { addTrace, ExtendedAgentContext } from '../core/agent-context.js';
+import type { ExtendedAgentContext } from '../core/agent-context.js';
+import { addTrace } from '../core/agent-context.js';
 import type { AgentEnv } from '../core/types.js';
 
 // ─── Model IDs ────────────────────────────────────────────────────────────────
@@ -42,8 +43,8 @@ Nunca inventes información sobre precios, stock o pedidos que no estén en el c
 Sé directo. Máximo 3 oraciones por respuesta, a menos que el usuario pida detalles.`;
 
 function getPersona(lang: string): string {
-  if (lang === 'en') return PERSONA_EN;
-  if (lang === 'es') return PERSONA_ES;
+  if (lang === 'en') {return PERSONA_EN;}
+  if (lang === 'es') {return PERSONA_ES;}
   return PERSONA_PT;
 }
 

@@ -83,17 +83,17 @@ function computeGrade(
   const openCircuits = Object.values(circuits).filter(c => c.state === 'OPEN').length;
 
   // D1 down = INCIDENT
-  if (!d1Ok) return 'INCIDENT';
+  if (!d1Ok) {return 'INCIDENT';}
 
   // Multiple open circuits = INCIDENT
-  if (openCircuits >= 2) return 'INCIDENT';
+  if (openCircuits >= 2) {return 'INCIDENT';}
 
   // High error rate or any open circuit = DEGRADED
-  if (metrics && metrics.errorRate > 0.1) return 'DEGRADED';
-  if (openCircuits >= 1) return 'DEGRADED';
+  if (metrics && metrics.errorRate > 0.1) {return 'DEGRADED';}
+  if (openCircuits >= 1) {return 'DEGRADED';}
 
   // p99 > 10s = DEGRADED (AI can be slow, so threshold is generous)
-  if (metrics && metrics.avgLatencyMs > 10_000) return 'DEGRADED';
+  if (metrics && metrics.avgLatencyMs > 10_000) {return 'DEGRADED';}
 
   return 'OPERATIONAL';
 }
@@ -241,19 +241,19 @@ export async function handleGuardianStatus(
 
   // 5. Alerts — derive from live data
   const alerts: string[] = [];
-  if (!d1Ok) alerts.push('D1 database unreachable — persistence layer is down');
-  if (!bindings.ai) alerts.push('Workers AI binding unavailable — chatbot responses degraded');
-  if (!bindings.kvRateLimit) alerts.push('KV rate limiter unbound — falling back to D1 rate limiting');
-  if (!bindings.kvMetrics) alerts.push('KV metrics store unbound — observability data unavailable');
+  if (!d1Ok) {alerts.push('D1 database unreachable — persistence layer is down');}
+  if (!bindings.ai) {alerts.push('Workers AI binding unavailable — chatbot responses degraded');}
+  if (!bindings.kvRateLimit) {alerts.push('KV rate limiter unbound — falling back to D1 rate limiting');}
+  if (!bindings.kvMetrics) {alerts.push('KV metrics store unbound — observability data unavailable');}
   if (metrics1h && metrics1h.errorRate > 0.1)
-    alerts.push(`High error rate in last hour: ${(metrics1h.errorRate * 100).toFixed(1)}%`);
+    {alerts.push(`High error rate in last hour: ${(metrics1h.errorRate * 100).toFixed(1)}%`);}
   if (metrics1h && metrics1h.rateLimitHits > 50)
-    alerts.push(`Rate limit spike: ${metrics1h.rateLimitHits} blocked requests in last hour`);
+    {alerts.push(`Rate limit spike: ${metrics1h.rateLimitHits} blocked requests in last hour`);}
   for (const [name, circuit] of Object.entries(circuits)) {
     if (circuit.state === 'OPEN')
-      alerts.push(`Circuit breaker OPEN: ${name} — fallback response active`);
+      {alerts.push(`Circuit breaker OPEN: ${name} — fallback response active`);}
     else if (circuit.state === 'HALF_OPEN')
-      alerts.push(`Circuit breaker HALF_OPEN: ${name} — recovering, probing`);
+      {alerts.push(`Circuit breaker HALF_OPEN: ${name} — recovering, probing`);}
   }
 
   const responseMs = Date.now() - ts;

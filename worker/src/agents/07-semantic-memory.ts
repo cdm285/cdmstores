@@ -13,7 +13,8 @@
  *   ctx.flags.semanticMemory — true if results found
  */
 
-import { addTrace, ExtendedAgentContext } from '../core/agent-context.js';
+import type { ExtendedAgentContext } from '../core/agent-context.js';
+import { addTrace } from '../core/agent-context.js';
 import type { AgentEnv } from '../core/types.js';
 
 // ─── Constants ────────────────────────────────────────────────────────────────

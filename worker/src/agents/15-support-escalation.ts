@@ -11,7 +11,8 @@
  *   'user_request'      — generic "I want to talk to someone"
  */
 
-import { addTrace, ExtendedAgentContext }   from '../core/agent-context.js';
+import type { ExtendedAgentContext } from '../core/agent-context.js';
+import { addTrace }   from '../core/agent-context.js';
 import type { ActionRequest, ActionResult } from '../core/action-schema.js';
 import { failedResult }                     from '../core/action-schema.js';
 
@@ -26,8 +27,8 @@ function waLink(message: string): string {
 }
 
 function whatsappMsg(lang: string): string {
-  if (lang === 'en') return 'Hello! I need help with my CDM STORES order.';
-  if (lang === 'es') return '¡Hola! Necesito ayuda con mi pedido de CDM STORES.';
+  if (lang === 'en') {return 'Hello! I need help with my CDM STORES order.';}
+  if (lang === 'es') {return '¡Hola! Necesito ayuda con mi pedido de CDM STORES.';}
   return 'Olá! Preciso de ajuda com meu pedido na CDM STORES.';
 }
 
@@ -35,20 +36,20 @@ function buildEscalationResponse(reason: string, lang: string): string {
   const link = waLink(whatsappMsg(lang));
 
   if (reason === 'schedule_request') {
-    if (lang === 'en') return `📅 **Book Support**\n\n⏰ Available: Mon–Fri 9am–6pm · Sat 9am–1pm\n\n👉 [Book online](${SCHEDULE_URL})\n💬 [Chat on WhatsApp](${link})\n📧 ${SUPPORT_EMAIL}`;
-    if (lang === 'es') return `📅 **Agendar Atención**\n\n⏰ Horario: Lun–Vie 9h–18h · Sáb 9h–13h\n\n👉 [Reservar en línea](${SCHEDULE_URL})\n💬 [Chat en WhatsApp](${link})\n📧 ${SUPPORT_EMAIL}`;
+    if (lang === 'en') {return `📅 **Book Support**\n\n⏰ Available: Mon–Fri 9am–6pm · Sat 9am–1pm\n\n👉 [Book online](${SCHEDULE_URL})\n💬 [Chat on WhatsApp](${link})\n📧 ${SUPPORT_EMAIL}`;}
+    if (lang === 'es') {return `📅 **Agendar Atención**\n\n⏰ Horario: Lun–Vie 9h–18h · Sáb 9h–13h\n\n👉 [Reservar en línea](${SCHEDULE_URL})\n💬 [Chat en WhatsApp](${link})\n📧 ${SUPPORT_EMAIL}`;}
     return `📅 **Agendar Atendimento**\n\n⏰ Horários: Seg–Sex 9h–18h · Sáb 9h–13h\n\n👉 [Agendar online](${SCHEDULE_URL})\n💬 [Chat no WhatsApp](${link})\n📧 ${SUPPORT_EMAIL}`;
   }
 
   if (reason === 'negative_sentiment') {
-    if (lang === 'en') return `😔 I can see you're having trouble. Let me connect you to our support team.\n\n💬 [Chat on WhatsApp](${link})\n📧 ${SUPPORT_EMAIL}\n\nWe respond within 2 business hours.`;
-    if (lang === 'es') return `😔 Veo que estás teniendo dificultades. Te conecto con nuestro equipo de soporte.\n\n💬 [Chat en WhatsApp](${link})\n📧 ${SUPPORT_EMAIL}\n\nRespondemos en 2 horas hábiles.`;
+    if (lang === 'en') {return `😔 I can see you're having trouble. Let me connect you to our support team.\n\n💬 [Chat on WhatsApp](${link})\n📧 ${SUPPORT_EMAIL}\n\nWe respond within 2 business hours.`;}
+    if (lang === 'es') {return `😔 Veo que estás teniendo dificultades. Te conecto con nuestro equipo de soporte.\n\n💬 [Chat en WhatsApp](${link})\n📧 ${SUPPORT_EMAIL}\n\nRespondemos en 2 horas hábiles.`;}
     return `😔 Vejo que está tendo dificuldades. Vou te conectar com nossa equipe de suporte.\n\n💬 [Chat no WhatsApp](${link})\n📧 ${SUPPORT_EMAIL}\n\nRespondemos em até 2 horas úteis.`;
   }
 
   // whatsapp_request or generic
-  if (lang === 'en') return `💬 **Chat with Us on WhatsApp**\n\n[Click here to start the chat](${link})\n\n📧 Or email us: ${SUPPORT_EMAIL}\n\n⏰ Support hours: Mon–Fri 9am–6pm`;
-  if (lang === 'es') return `💬 **Chatea con Nosotros en WhatsApp**\n\n[Haz clic aquí para chatear](${link})\n\n📧 O escríbenos a: ${SUPPORT_EMAIL}\n\n⏰ Horario: Lun–Vie 9h–18h`;
+  if (lang === 'en') {return `💬 **Chat with Us on WhatsApp**\n\n[Click here to start the chat](${link})\n\n📧 Or email us: ${SUPPORT_EMAIL}\n\n⏰ Support hours: Mon–Fri 9am–6pm`;}
+  if (lang === 'es') {return `💬 **Chatea con Nosotros en WhatsApp**\n\n[Haz clic aquí para chatear](${link})\n\n📧 O escríbenos a: ${SUPPORT_EMAIL}\n\n⏰ Horario: Lun–Vie 9h–18h`;}
   return `💬 **Fale Conosco no WhatsApp**\n\n[Clique aqui para iniciar o chat](${link})\n\n📧 Ou envie um email: ${SUPPORT_EMAIL}\n\n⏰ Suporte: Seg–Sex 9h–18h`;
 }
 

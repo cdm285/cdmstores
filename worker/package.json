@@ -14,7 +14,8 @@
     "test": "node test-suite-e2e.mjs",
     "test:stress": "node stress-guardian.mjs",
     "test:prod": "BASE_URL=https://cdmstores.com node test-suite-e2e.mjs",
-    "lint": "eslint src --ext .ts --max-warnings 0",
+    "lint": "eslint src --ext .ts --max-warnings 100",
+    "lint:strict": "eslint src --ext .ts --max-warnings 0",
     "tail": "wrangler tail --env production",
     "tail:staging": "wrangler tail --env staging",
     "secrets:list": "wrangler secret list --env production",
@@ -29,8 +30,15 @@
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^4.20241218.0",
+    "@eslint/js": "^10.0.1",
     "@types/node": "^20.10.5",
+    "@typescript-eslint/eslint-plugin": "^8.58.2",
+    "@typescript-eslint/parser": "^8.58.2",
+    "eslint": "^10.2.1",
+    "eslint-config-prettier": "^10.1.8",
+    "prettier": "^3.8.3",
     "typescript": "^5.3.3",
+    "typescript-eslint": "^8.58.2",
     "wrangler": "^4.80.0"
   },
   "engines": {

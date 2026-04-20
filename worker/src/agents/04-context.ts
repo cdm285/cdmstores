@@ -14,7 +14,8 @@
  *   ctx.meta.contextMsgCount     — number of messages kept
  */
 
-import { addTrace, ExtendedAgentContext } from '../core/agent-context.js';
+import type { ExtendedAgentContext } from '../core/agent-context.js';
+import { addTrace } from '../core/agent-context.js';
 import type { SessionMessage } from '../core/types.js';
 
 // ─── Tunables ─────────────────────────────────────────────────────────────────
@@ -37,7 +38,7 @@ function estimateTokens(text: string): number {
 /** Build the conversation window from a list of session messages */
 function buildWindow(messages: SessionMessage[], now = Date.now()): SessionMessage[] {
   return messages.filter(m => {
-    if (!m.ts) return true;                        // keep if no timestamp
+    if (!m.ts) {return true;}                        // keep if no timestamp
     return now - m.ts < MAX_AGE_MS;
   });
 }
@@ -55,7 +56,7 @@ function trimToLimit(messages: SessionMessage[]): { lines: string[]; trimmed: bo
 
   const kept    = all.slice(start);
   const trimmed = start > 0;
-  if (trimmed) kept.unshift(TRIM_MARKER);
+  if (trimmed) {kept.unshift(TRIM_MARKER);}
   return { lines: kept, trimmed };
 }
 
