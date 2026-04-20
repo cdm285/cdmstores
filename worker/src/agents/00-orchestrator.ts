@@ -149,7 +149,8 @@ export class MainOrchestrator {
       if (actionReq) {
         const actionResult = await agent10ActionRouter.execute(ctx, actionReq);
         applyActionResult(ctx, actionResult);
-        if (actionResult.success && actionResult.response) {
+        if (actionResult.response) {
+          // Use response even when success=false (e.g. "order not found" is a valid user-facing message)
           finalResponse = actionResult.response;
           ctx.flags.skipSelfRepair = true; // Tier 4 responses are authoritative — don't let selfRepairAgent overwrite them
         }

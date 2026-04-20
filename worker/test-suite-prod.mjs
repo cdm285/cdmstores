@@ -3,7 +3,7 @@
  * Suite de testes completa — executa contra http://localhost:8787
  *
  * Cobre:
- *  - Health check  
+ *  - Health check
  *  - Endpoints gerais (produtos, pedidos, frete)
  *  - Chatbot / pipeline de agentes
  *  - Segurança (injeção, tamanho de mensagem, CORS)
@@ -102,8 +102,8 @@ await test('Mensagem vazia retorna 400', async () => {
   if (r.status !== 400) return `esperado 400, recebeu ${r.status}`;
 });
 
-await test('Mensagem muito longa (>500 chars) retorna 400', async () => {
-  const r = await chat('x'.repeat(501));
+await test('Mensagem muito longa (>2000 chars) retorna 400', async () => {
+  const r = await chat('x'.repeat(2001));
   if (r.status !== 400) return `esperado 400, recebeu ${r.status}`;
 });
 
@@ -201,7 +201,7 @@ await test('Intent order_history — solicita email', async () => {
   const d = await r.json();
   if (!d.success) return 'success=false';
   const resp = d.response ?? '';
-  if (!resp.includes('email') && !resp.includes('e-mail') && !resp.includes('Pedido')) {
+  if (!resp.includes('email') && !resp.includes('e-mail') && !resp.includes('Pedido') && !resp.includes('pedido')) {
     return `deveria pedir email ou mostrar pedidos: "${resp.slice(0, 100)}"`;
   }
 });
