@@ -109,7 +109,9 @@
   "eslint.enable": true,
   "eslint.validate": ["javascript", "typescript"],
   "eslint.run": "onSave",
-  "eslint.workingDirectories": [{"directory": "worker", "changeProcessCWD": true}],
+  "eslint.workingDirectories": [
+    { "directory": "worker", "changeProcessCWD": true }
+  ],
 
   // ── GIT + GITLENS ────────────────────────────────────────────
   "git.autofetch": true,
@@ -219,5 +221,7 @@
   "emmet.triggerExpansionOnTab": true,
   "emmet.includeLanguages": {
     "javascript": "javascriptreact"
-  }
+  },
+  "workbench.editor.tabActionLocation": "right",
+  "snyk.advanced.autoSelectOrganization": true
 }

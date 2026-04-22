@@ -1,246 +1,475 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="description" content="Secure checkout — CDM STORES">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="Secure checkout — CDM STORES" />
     <title>Checkout · CDM STORES</title>
 
-    <link rel="stylesheet" href="../css/global.css">
-    <link rel="stylesheet" href="../css/mobile.css">
+    <link rel="stylesheet" href="../css/global.css" />
+    <link rel="stylesheet" href="../css/mobile.css" />
     <script src="https://js.stripe.com/v3/" defer></script>
-</head>
+  </head>
 
-<body>
-
+  <body>
     <div class="promo-bar">
-        <p>🔒 100% Secure Payment · SSL 256-bit · PCI-DSS</p>
+      <p>🔒 100% Secure Payment · SSL 256-bit · PCI-DSS</p>
     </div>
 
     <header class="header" id="site-header">
+      <!-- LOGO -->
+      <div class="header-logo">
+        <a href="../index.html" aria-label="CDM STORES">
+          <img
+            src="../assets/logo-premium.png"
+            class="premium-logo-img"
+            alt="CDM STORES"
+            fetchpriority="high"
+          />
+        </a>
+      </div>
 
-        <!-- LOGO -->
-        <div class="header-logo">
-            <a href="../index.html" aria-label="CDM STORES">
-                <img src="../assets/logo-premium.png" class="premium-logo-img" alt="CDM STORES" fetchpriority="high">
-            </a>
+      <!-- NAV DESKTOP -->
+      <div class="header-nav-container">
+        <nav class="header-nav" aria-label="Main navigation">
+          <a href="../index.html" class="nav-link" data-i18n="nav.home">Home</a>
+          <a
+            href="../index.html#produtos"
+            class="nav-link"
+            data-i18n="nav.products"
+            >Products</a
+          >
+          <a href="rastreio.html" class="nav-link" data-i18n="nav.track"
+            >Track Order</a
+          >
+          <a
+            href="#"
+            class="nav-link"
+            onclick="
+              event.preventDefault();
+              window.openAuthModal && window.openAuthModal('login');
+            "
+            data-i18n="nav.login"
+            >Login</a
+          >
+          <a
+            href="#"
+            class="nav-link"
+            onclick="
+              event.preventDefault();
+              window.openAuthModal && window.openAuthModal('register');
+            "
+            data-i18n="nav.signup"
+            >Sign Up</a
+          >
+        </nav>
+        <div class="desktop-lang" role="group" aria-label="Language">
+          <button class="desktop-lang-btn" data-lang="pt" aria-pressed="false">
+            PT
+          </button>
+          <span class="desktop-lang-sep">|</span>
+          <button
+            class="desktop-lang-btn active"
+            data-lang="en"
+            aria-pressed="true"
+          >
+            EN
+          </button>
+          <span class="desktop-lang-sep">|</span>
+          <button class="desktop-lang-btn" data-lang="es" aria-pressed="false">
+            ES
+          </button>
         </div>
+      </div>
 
-        <!-- NAV DESKTOP -->
-        <div class="header-nav-container">
-            <nav class="header-nav" aria-label="Main navigation">
-                <a href="../index.html" class="nav-link" data-i18n="nav.home">Home</a>
-                <a href="../index.html#produtos" class="nav-link" data-i18n="nav.products">Products</a>
-                <a href="rastreio.html" class="nav-link" data-i18n="nav.track">Track Order</a>
-            </nav>
-            <div class="desktop-lang" role="group" aria-label="Language">
-                <button class="desktop-lang-btn" data-lang="pt" aria-pressed="false">PT</button>
-                <span class="desktop-lang-sep">|</span>
-                <button class="desktop-lang-btn active" data-lang="en" aria-pressed="true">EN</button>
-                <span class="desktop-lang-sep">|</span>
-                <button class="desktop-lang-btn" data-lang="es" aria-pressed="false">ES</button>
-            </div>
-        </div>
+      <!-- ACTIONS DESKTOP -->
+      <div class="header-actions">
+        <a href="../index.html" class="header-cta" data-i18n="nav.home">Back</a>
+      </div>
 
-        <!-- ACTIONS DESKTOP -->
-        <div class="header-actions">
-            <a href="../index.html" class="header-cta" data-i18n="nav.home">Back</a>
-        </div>
-
-        <!-- HAMBURGER (mobile only) -->
-        <button class="hamburger" id="hamburger-btn" aria-label="Open navigation menu" aria-expanded="false" aria-controls="mobile-nav">
-            <span class="hamburger-line"></span>
-            <span class="hamburger-line"></span>
-            <span class="hamburger-line"></span>
-        </button>
-
+      <!-- HAMBURGER (mobile only) -->
+      <button
+        class="hamburger"
+        id="hamburger-btn"
+        aria-label="Open navigation menu"
+        aria-expanded="false"
+        aria-controls="mobile-nav"
+      >
+        <span class="hamburger-line"></span>
+        <span class="hamburger-line"></span>
+        <span class="hamburger-line"></span>
+      </button>
     </header>
 
     <!-- MOBILE OFF-CANVAS NAV -->
-    <div class="mobile-nav" id="mobile-nav" aria-hidden="true" role="dialog" aria-modal="true" aria-label="Navigation menu">
-        <div class="mobile-nav-header">
-            <a href="../index.html" class="mobile-nav-logo">CDM STORES</a>
-            <button class="mobile-nav-close" id="mobile-nav-close" aria-label="Close menu">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-            </button>
+    <div
+      class="mobile-nav"
+      id="mobile-nav"
+      aria-hidden="true"
+      role="dialog"
+      aria-modal="true"
+      aria-label="Navigation menu"
+    >
+      <div class="mobile-nav-header">
+        <a href="../index.html" class="mobile-nav-logo">CDM STORES</a>
+        <button
+          class="mobile-nav-close"
+          id="mobile-nav-close"
+          aria-label="Close menu"
+        >
+          <svg
+            width="20"
+            height="20"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          >
+            <line x1="18" y1="6" x2="6" y2="18" />
+            <line x1="6" y1="6" x2="18" y2="18" />
+          </svg>
+        </button>
+      </div>
+      <nav class="mobile-nav-links" aria-label="Mobile navigation">
+        <a href="../index.html" class="mobile-nav-link" data-i18n="nav.home"
+          >Home</a
+        >
+        <a
+          href="../index.html#produtos"
+          class="mobile-nav-link"
+          data-i18n="nav.products"
+          >Products</a
+        >
+        <a href="rastreio.html" class="mobile-nav-link" data-i18n="nav.track"
+          >Track Order</a
+        >
+        <a href="checkout.html" class="mobile-nav-link">Checkout</a>
+        <a
+          href="#"
+          class="mobile-nav-link"
+          onclick="
+            event.preventDefault();
+            window.openAuthModal && window.openAuthModal('login');
+          "
+          data-i18n="nav.login"
+          >Login</a
+        >
+        <a
+          href="#"
+          class="mobile-nav-link"
+          onclick="
+            event.preventDefault();
+            window.openAuthModal && window.openAuthModal('register');
+          "
+          data-i18n="nav.signup"
+          >Sign Up</a
+        >
+      </nav>
+      <div class="mobile-nav-footer">
+        <div class="mobile-nav-lang-label">Language</div>
+        <div class="mobile-lang" role="group" aria-label="Language">
+          <button class="mobile-lang-btn" data-lang="pt" aria-pressed="false">
+            PT
+          </button>
+          <span class="mobile-lang-sep">|</span>
+          <button
+            class="mobile-lang-btn active"
+            data-lang="en"
+            aria-pressed="true"
+          >
+            EN
+          </button>
+          <span class="mobile-lang-sep">|</span>
+          <button class="mobile-lang-btn" data-lang="es" aria-pressed="false">
+            ES
+          </button>
         </div>
-        <nav class="mobile-nav-links" aria-label="Mobile navigation">
-            <a href="../index.html" class="mobile-nav-link" data-i18n="nav.home">Home</a>
-            <a href="../index.html#produtos" class="mobile-nav-link" data-i18n="nav.products">Products</a>
-            <a href="rastreio.html" class="mobile-nav-link" data-i18n="nav.track">Track Order</a>
-            <a href="checkout.html" class="mobile-nav-link">Checkout</a>
-        </nav>
-        <div class="mobile-nav-footer">
-            <div class="mobile-nav-lang-label">Language</div>
-            <div class="mobile-lang" role="group" aria-label="Language">
-                <button class="mobile-lang-btn" data-lang="pt" aria-pressed="false">PT</button>
-                <span class="mobile-lang-sep">|</span>
-                <button class="mobile-lang-btn active" data-lang="en" aria-pressed="true">EN</button>
-                <span class="mobile-lang-sep">|</span>
-                <button class="mobile-lang-btn" data-lang="es" aria-pressed="false">ES</button>
-            </div>
-        </div>
+      </div>
     </div>
-    <div class="mobile-nav-overlay" id="mobile-nav-overlay" aria-hidden="true"></div>
+    <div
+      class="mobile-nav-overlay"
+      id="mobile-nav-overlay"
+      aria-hidden="true"
+    ></div>
 
     <section class="checkout">
-        <div class="checkout-card">
-            <h1 data-i18n="checkout.title">Checkout</h1>
-            <p style="color: var(--text-secondary); font-size:0.9rem; margin-bottom:20px;" data-i18n="checkout.subtitle">Complete your purchase securely.</p>
+      <div class="checkout-card">
+        <h1 data-i18n="checkout.title">Checkout</h1>
+        <p
+          style="
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+            margin-bottom: 20px;
+          "
+          data-i18n="checkout.subtitle"
+        >
+          Complete your purchase securely.
+        </p>
 
-            <div class="checkout-info">
-                <p><strong data-i18n="checkout.statusLabel">Status:</strong> <span data-i18n="checkout.statusValue">Select payment method to complete.</span></p>
-                <p id="checkout-selected" data-i18n="checkout.selection" style="margin-top:6px;">Selected product: n/a</p>
-            </div>
-
-            <div id="cart-items" style="margin: 20px 0; padding: 16px; background: var(--bg-subtle); border: 1px solid var(--border); border-radius: var(--radius-md);">
-                <h4 style="margin-bottom:8px; font-size:0.9rem; color:var(--text-secondary);">Cart items</h4>
-                <p id="cart-summary" style="font-size:0.9rem;">Loading...</p>
-            </div>
-
-            <label for="checkout-email" style="display:block; font-size:0.85rem; font-weight:600; margin-bottom:6px; color:var(--text-secondary);">Email for receipt</label>
-            <input type="email" id="checkout-email" placeholder="your@email.com"
-                   style="width:100%; padding:11px 14px; margin-bottom:16px; border:1px solid var(--border); border-radius:var(--radius-sm); font-size:0.9rem; font-family:inherit; transition:border-color 0.2s;"
-                   aria-label="Email for order receipt">
-
-            <button class="btn-hero" id="btn-stripe" onclick="checkoutStripe()" style="width:100%; justify-content:center;">
-                🔒 Pay with Stripe
-            </button>
-
-            <a href="../index.html" class="link-voltar">← Back to store</a>
+        <div class="checkout-info">
+          <p>
+            <strong data-i18n="checkout.statusLabel">Status:</strong>
+            <span data-i18n="checkout.statusValue"
+              >Select payment method to complete.</span
+            >
+          </p>
+          <p
+            id="checkout-selected"
+            data-i18n="checkout.selection"
+            style="margin-top: 6px"
+          >
+            Selected product: n/a
+          </p>
         </div>
+
+        <div
+          id="cart-items"
+          style="
+            margin: 20px 0;
+            padding: 16px;
+            background: var(--bg-subtle);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-md);
+          "
+        >
+          <h4
+            style="
+              margin-bottom: 8px;
+              font-size: 0.9rem;
+              color: var(--text-secondary);
+            "
+          >
+            Cart items
+          </h4>
+          <p id="cart-summary" style="font-size: 0.9rem">Loading...</p>
+        </div>
+
+        <label
+          for="checkout-email"
+          style="
+            display: block;
+            font-size: 0.85rem;
+            font-weight: 600;
+            margin-bottom: 6px;
+            color: var(--text-secondary);
+          "
+          >Email for receipt</label
+        >
+        <input
+          type="email"
+          id="checkout-email"
+          placeholder="your@email.com"
+          style="
+            width: 100%;
+            padding: 11px 14px;
+            margin-bottom: 16px;
+            border: 1px solid var(--border);
+            border-radius: var(--radius-sm);
+            font-size: 0.9rem;
+            font-family: inherit;
+            transition: border-color 0.2s;
+          "
+          aria-label="Email for order receipt"
+        />
+
+        <button
+          class="btn-hero"
+          id="btn-stripe"
+          onclick="checkoutStripe()"
+          style="width: 100%; justify-content: center"
+        >
+          🔒 Pay with Stripe
+        </button>
+
+        <a href="../index.html" class="link-voltar">← Back to store</a>
+      </div>
     </section>
 
     <footer class="footer" role="contentinfo">
-        <div class="footer-bottom">
-            <p data-i18n="footer">© 2026 CDM STORES · All rights reserved.</p>
-        </div>
+      <div class="footer-bottom">
+        <p data-i18n="footer">© 2026 CDM STORES · All rights reserved.</p>
+      </div>
     </footer>
 
     <script src="../js/script.js" defer></script>
     <script src="../frontend-integration.js" defer></script>
     <script>
-        function updateCartDisplay() {
-            const items = cdmStore.cart.items;
-            const summary = document.getElementById('cart-summary');
-            if (items.length === 0) {
-                summary.innerHTML = '<p>Cart is empty — <a href="../index.html">back to store</a></p>';
-                return;
-            }
-            const prices = {1: 89.90, 2: 49.90, 3: 29.90, 4: 149.90};
-            const names  = {1: 'Bluetooth Headphones', 2: 'USB-C Charger 65W', 3: 'Lightning Cable 2m', 4: 'Portable Speaker'};
-            let html = '<ul style="list-style:none;padding:0;margin:0;">';
-            let total = 0;
-            items.forEach(item => {
-                const price = prices[item.product_id] || 0;
-                const name  = names[item.product_id] || `Product #${item.product_id}`;
-                const sub   = price * item.quantity;
-                total += sub;
-                html += `<li style="padding:6px 0;border-bottom:1px solid var(--border);font-size:0.9rem;display:flex;justify-content:space-between;">
+      function updateCartDisplay() {
+        const items = cdmStore.cart.items;
+        const summary = document.getElementById("cart-summary");
+        if (items.length === 0) {
+          summary.innerHTML =
+            '<p>Cart is empty — <a href="../index.html">back to store</a></p>';
+          return;
+        }
+        const prices = { 1: 89.9, 2: 49.9, 3: 29.9, 4: 149.9 };
+        const names = {
+          1: "Bluetooth Headphones",
+          2: "USB-C Charger 65W",
+          3: "Lightning Cable 2m",
+          4: "Portable Speaker",
+        };
+        let html = '<ul style="list-style:none;padding:0;margin:0;">';
+        let total = 0;
+        items.forEach((item) => {
+          const price = prices[item.product_id] || 0;
+          const name = names[item.product_id] || `Product #${item.product_id}`;
+          const sub = price * item.quantity;
+          total += sub;
+          html += `<li style="padding:6px 0;border-bottom:1px solid var(--border);font-size:0.9rem;display:flex;justify-content:space-between;">
                     <span>${name} × ${item.quantity}</span>
                     <strong>$${sub.toFixed(2)}</strong>
                 </li>`;
-            });
-            html += `</ul>
+        });
+        html += `</ul>
             <div style="margin-top:12px;font-size:0.9rem;">
                 <div style="display:flex;justify-content:space-between;padding:6px 0;color:var(--text-secondary);">
                     <span>Subtotal</span><span>$${total.toFixed(2)}</span>
                 </div>
                 <div style="display:flex;justify-content:space-between;padding:6px 0;color:var(--text-secondary);">
-                    <span>Shipping</span><span>${total >= 199 ? 'Free 🎉' : '$9.99'}</span>
+                    <span>Shipping</span><span>${total >= 199 ? "Free 🎉" : "$9.99"}</span>
                 </div>
                 <div style="display:flex;justify-content:space-between;padding:8px 0;font-weight:700;font-size:1.05rem;border-top:2px solid var(--border);margin-top:4px;">
                     <span>Total</span><span>$${(total >= 199 ? total : total + 9.99).toFixed(2)}</span>
                 </div>
             </div>`;
-            summary.innerHTML = html;
+        summary.innerHTML = html;
+      }
+
+      // [ALTA-15 CORRIGIDO] Email nunca exposto em URL — enviado via POST ao backend
+      async function checkoutStripe() {
+        const email = document.getElementById("checkout-email").value;
+        if (!email || !email.includes("@")) {
+          mostrarNotificacao("Please enter a valid email", "warning");
+          return;
         }
 
-        // [ALTA-15 CORRIGIDO] Email nunca exposto em URL — enviado via POST ao backend
-        async function checkoutStripe() {
-            const email = document.getElementById('checkout-email').value;
-            if (!email || !email.includes('@')) {
-                mostrarNotificacao('Please enter a valid email', 'warning');
-                return;
-            }
-
-            const cartItems = JSON.parse(localStorage.getItem('cdm_cart') || '[]');
-            if (!cartItems.length) {
-                mostrarNotificacao('Cart is empty', 'warning');
-            }
-
-            const btn = document.getElementById('btn-stripe');
-            btn.disabled = true;
-            btn.textContent = 'Processing...';
-
-            // Dados completos de produto para Stripe
-            const productData = {
-                1: { name: 'Bluetooth Premium Headphones', price: 89.90, stripeLink: 'https://buy.stripe.com/test_6oE5mTgBi1mP2owbII' },
-                2: { name: 'USB-C Charger 65W',   price: 49.90, stripeLink: 'https://buy.stripe.com/test_cN28zJaBO9tz36E3cc' },
-                3: { name: 'Lightning Cable 2m',       price: 29.90, stripeLink: 'https://buy.stripe.com/test_cN22a95amfUr1MAfZ0' },
-                4: { name: 'Portable Speaker',   price: 149.90, stripeLink: 'https://buy.stripe.com/test_6oE5mTgBi1mP2owbII' }
-            };
-
-            const enrichedItems = cartItems.map(i => {
-                const pid = i.product_id || i.id;
-                const info = productData[pid] || { name: i.name || 'Produto', price: Number(i.price) || 0 };
-                return { product_id: pid, name: info.name, price: info.price, quantity: i.quantity };
-            });
-
-            try {
-                // Criar pedido no backend
-                const orderRes = await fetch('https://cdmstores.com/api/orders', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    credentials: 'include',
-                    body: JSON.stringify({
-                        customer_email: email,
-                        items: enrichedItems.map(i => ({ product_id: i.product_id, quantity: i.quantity }))
-                    })
-                });
-                const orderData = await orderRes.json();
-                if (!orderData.success) throw new Error(orderData.error || 'Error creating order');
-
-                // Criar sessão Stripe (backend aceita payment_url no response)
-                const payRes = await fetch('https://cdmstores.com/api/stripe/create-payment', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    credentials: 'include',
-                    body: JSON.stringify({
-                        orderId: orderData.order_id,
-                        customerEmail: email,
-                        items: enrichedItems.map(i => ({ name: i.name, price: i.price, quantity: i.quantity })),
-                        total: enrichedItems.reduce((s, i) => s + i.price * i.quantity, 0)
-                    })
-                });
-                const payData = await payRes.json();
-                // Backend retorna payment_url (campo correto após fix)
-                const url = payData.payment_url || payData.checkout_url;
-                if (!payData.success || !url) throw new Error(payData.error || 'Error initiating payment');
-
-                window.location.href = url;
-            } catch (err) {
-                console.warn('Backend indisponível, usando link Stripe direto:', err.message);
-                // Fallback: abrir link Stripe direto do primeiro item
-                const firstItem = enrichedItems[0];
-                const pid = firstItem ? firstItem.product_id : 1;
-                const fallbackLink = (productData[pid] || productData[1]).stripeLink;
-                window.open(fallbackLink, '_blank', 'noopener');
-                btn.disabled = false;
-                btn.textContent = '🔒 Pay with Stripe';
-            }
+        const cartItems = JSON.parse(localStorage.getItem("cdm_cart") || "[]");
+        if (!cartItems.length) {
+          mostrarNotificacao("Cart is empty", "warning");
         }
 
-        function mostrarNotificacao(msg, type) {
-            const colors = { success: '#27ae60', error: '#e74c3c', warning: '#f39c12', info: '#2980b9' };
-            const n = document.createElement('div');
-            n.textContent = msg;
-            n.style.cssText = `position:fixed;top:20px;right:20px;z-index:99999;background:${colors[type]||colors.info};color:#fff;padding:14px 20px;border-radius:8px;font-size:14px;font-weight:500;box-shadow:0 4px 16px rgba(0,0,0,.25);max-width:320px;`;
-            document.body.appendChild(n);
-            setTimeout(() => n.remove(), 3500);
-        }
+        const btn = document.getElementById("btn-stripe");
+        btn.disabled = true;
+        btn.textContent = "Processing...";
 
-        document.addEventListener('DOMContentLoaded', updateCartDisplay);
+        // Dados completos de produto para Stripe
+        const productData = {
+          1: {
+            name: "Bluetooth Premium Headphones",
+            price: 89.9,
+            stripeLink: "https://buy.stripe.com/test_6oE5mTgBi1mP2owbII",
+          },
+          2: {
+            name: "USB-C Charger 65W",
+            price: 49.9,
+            stripeLink: "https://buy.stripe.com/test_cN28zJaBO9tz36E3cc",
+          },
+          3: {
+            name: "Lightning Cable 2m",
+            price: 29.9,
+            stripeLink: "https://buy.stripe.com/test_cN22a95amfUr1MAfZ0",
+          },
+          4: {
+            name: "Portable Speaker",
+            price: 149.9,
+            stripeLink: "https://buy.stripe.com/test_6oE5mTgBi1mP2owbII",
+          },
+        };
+
+        const enrichedItems = cartItems.map((i) => {
+          const pid = i.product_id || i.id;
+          const info = productData[pid] || {
+            name: i.name || "Produto",
+            price: Number(i.price) || 0,
+          };
+          return {
+            product_id: pid,
+            name: info.name,
+            price: info.price,
+            quantity: i.quantity,
+          };
+        });
+
+        try {
+          // Criar pedido no backend
+          const orderRes = await fetch("https://cdmstores.com/api/orders", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            credentials: "include",
+            body: JSON.stringify({
+              customer_email: email,
+              items: enrichedItems.map((i) => ({
+                product_id: i.product_id,
+                quantity: i.quantity,
+              })),
+            }),
+          });
+          const orderData = await orderRes.json();
+          if (!orderData.success)
+            throw new Error(orderData.error || "Error creating order");
+
+          // Criar sessão Stripe (backend aceita payment_url no response)
+          const payRes = await fetch(
+            "https://cdmstores.com/api/stripe/create-payment",
+            {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              credentials: "include",
+              body: JSON.stringify({
+                orderId: orderData.order_id,
+                customerEmail: email,
+                items: enrichedItems.map((i) => ({
+                  name: i.name,
+                  price: i.price,
+                  quantity: i.quantity,
+                })),
+                total: enrichedItems.reduce(
+                  (s, i) => s + i.price * i.quantity,
+                  0,
+                ),
+              }),
+            },
+          );
+          const payData = await payRes.json();
+          // Backend retorna payment_url (campo correto após fix)
+          const url = payData.payment_url || payData.checkout_url;
+          if (!payData.success || !url)
+            throw new Error(payData.error || "Error initiating payment");
+
+          window.location.href = url;
+        } catch (err) {
+          console.warn(
+            "Backend indisponível, usando link Stripe direto:",
+            err.message,
+          );
+          // Fallback: abrir link Stripe direto do primeiro item
+          const firstItem = enrichedItems[0];
+          const pid = firstItem ? firstItem.product_id : 1;
+          const fallbackLink = (productData[pid] || productData[1]).stripeLink;
+          window.open(fallbackLink, "_blank", "noopener");
+          btn.disabled = false;
+          btn.textContent = "🔒 Pay with Stripe";
+        }
+      }
+
+      function mostrarNotificacao(msg, type) {
+        const colors = {
+          success: "#27ae60",
+          error: "#e74c3c",
+          warning: "#f39c12",
+          info: "#2980b9",
+        };
+        const n = document.createElement("div");
+        n.textContent = msg;
+        n.style.cssText = `position:fixed;top:20px;right:20px;z-index:99999;background:${colors[type] || colors.info};color:#fff;padding:14px 20px;border-radius:8px;font-size:14px;font-weight:500;box-shadow:0 4px 16px rgba(0,0,0,.25);max-width:320px;`;
+        document.body.appendChild(n);
+        setTimeout(() => n.remove(), 3500);
+      }
+
+      document.addEventListener("DOMContentLoaded", updateCartDisplay);
     </script>
-</body>
+  </body>
 </html>

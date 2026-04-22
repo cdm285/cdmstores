@@ -1,0 +1,12 @@
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "type": "command",
+        "windows": "powershell -NoProfile -ExecutionPolicy Bypass -File .github/hooks/scripts/typecheck-on-edit.ps1",
+        "command": "node .github/hooks/scripts/typecheck-on-edit.mjs",
+        "timeout": 40
+      }
+    ]
+  }
+}
