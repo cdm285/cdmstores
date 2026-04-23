@@ -578,9 +578,7 @@
       async function loadProfile() {
         try {
           const response = await fetch("/api/auth/me", {
-            headers: {
-              Authorization: `Bearer ${localStorage.getItem("auth_token")}`,
-            },
+            credentials: "include",
           });
 
           if (!response.ok) {
@@ -666,10 +664,8 @@
           try {
             const response = await fetch("/api/user/profile", {
               method: "PUT",
-              headers: {
-                Authorization: `Bearer ${localStorage.getItem("auth_token")}`,
-                "Content-Type": "application/json",
-              },
+              headers: { "Content-Type": "application/json" },
+              credentials: "include",
               body: JSON.stringify(formData),
             });
 
@@ -708,10 +704,8 @@
           try {
             const response = await fetch("/api/auth/change-password", {
               method: "POST",
-              headers: {
-                Authorization: `Bearer ${localStorage.getItem("auth_token")}`,
-                "Content-Type": "application/json",
-              },
+              headers: { "Content-Type": "application/json" },
+              credentials: "include",
               body: JSON.stringify({
                 current_password:
                   document.getElementById("currentPassword").value,

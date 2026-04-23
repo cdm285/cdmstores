@@ -566,9 +566,7 @@
       async function loadSettings() {
         try {
           const response = await fetch("/api/auth/me", {
-            headers: {
-              Authorization: `Bearer ${localStorage.getItem("auth_token")}`,
-            },
+            credentials: "include",
           });
 
           if (!response.ok) {
@@ -605,9 +603,7 @@
         try {
           const response = await fetch("/api/auth/2fa/setup", {
             method: "POST",
-            headers: {
-              Authorization: `Bearer ${localStorage.getItem("auth_token")}`,
-            },
+            credentials: "include",
           });
 
           const data = await response.json();
@@ -646,10 +642,8 @@
         try {
           const response = await fetch("/api/auth/2fa/verify-setup", {
             method: "POST",
-            headers: {
-              Authorization: `Bearer ${localStorage.getItem("auth_token")}`,
-              "Content-Type": "application/json",
-            },
+            headers: { "Content-Type": "application/json" },
+            credentials: "include",
             body: JSON.stringify({
               code: code,
               secret: setupData.secret,
@@ -697,10 +691,8 @@
         try {
           const response = await fetch("/api/auth/2fa/disable", {
             method: "POST",
-            headers: {
-              Authorization: `Bearer ${localStorage.getItem("auth_token")}`,
-              "Content-Type": "application/json",
-            },
+            headers: { "Content-Type": "application/json" },
+            credentials: "include",
             body: JSON.stringify({ password }),
           });
 

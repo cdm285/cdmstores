@@ -3,7 +3,7 @@
  * Login, Registro Completo (com endereço) e OAuth Google/Facebook
  */
 
-const API_BASE = 'https://cdmstores.com/api';
+const API_BASE = "https://cdmstores.com/api";
 let currentUser = null;
 // [ALTA-14] Tokens não são armazenados em localStorage.
 // Sessão gerenciada pelo backend via cookies HttpOnly (credentials: 'include').
@@ -19,8 +19,8 @@ class AuthSystem {
   async loadUser() {
     try {
       const res = await fetch(`${API_BASE}/auth/me`, {
-        method: 'GET',
-        credentials: 'include',
+        method: "GET",
+        credentials: "include",
       });
       if (res.ok) {
         const data = await res.json();
@@ -48,40 +48,29 @@ class AuthSystem {
    * CSS
    * ──────────────────────────────────────────────────────────────── */
   injectStyles() {
-    if (document.getElementById('auth-styles')) return;
-    const style = document.createElement('style');
-    style.id = 'auth-styles';
+    if (document.getElementById("auth-styles")) return;
+    const style = document.createElement("style");
+    style.id = "auth-styles";
     style.innerHTML = `
-      /* ── FAB Container ─────────────────────────────────────── */
-      .fab-container {
-        position: fixed;
-        bottom: 20px;
-        right: 20px;
-        z-index: 9999;
-        display: flex;
-        flex-direction: column;
-        gap: 12px;
-        align-items: flex-end;
-      }
-      .fab {
-        width: 56px;
-        height: 56px;
-        border-radius: 50%;
+      /* ── User Nav Button ───────────────────────────────────── */
+      .user-nav-btn {
+        background: linear-gradient(135deg,#00AFFF,#9B4DFF);
+        color: white;
         border: none;
+        border-radius: 50%;
+        width: 34px;
+        height: 34px;
+        font-weight: 700;
+        font-size: 14px;
         cursor: pointer;
-        display: flex;
+        display: inline-flex;
         align-items: center;
         justify-content: center;
-        font-size: 24px;
-        box-shadow: 0 4px 12px rgba(0,0,0,0.3);
-        transition: transform 0.2s, box-shadow 0.2s;
+        transition: opacity 0.2s;
+        font-family: inherit;
+        vertical-align: middle;
       }
-      .fab:hover { transform: scale(1.1); box-shadow: 0 6px 16px rgba(0,0,0,0.4); }
-      .fab-login { background: linear-gradient(135deg,#00AFFF,#9B4DFF); color: white; }
-      .fab-chat  { background: linear-gradient(135deg,#FF6B6B,#FF8E53); color: white; }
-      @media (max-width: 768px) {
-        .fab { width: 50px; height: 50px; font-size: 20px; }
-      }
+      .user-nav-btn:hover { opacity: 0.85; }
 
       /* ── Auth Modal ────────────────────────────────────────── */
       .auth-modal {
@@ -307,9 +296,13 @@ class AuthSystem {
     // FAB removido — acesso via links Login / Sign Up no menu de navegação
   }
 
-  createUserButton() { return; }
+  createUserButton() {
+    return;
+  }
 
-  isMobile() { return window.innerWidth <= 768; }
+  isMobile() {
+    return window.innerWidth <= 768;
+  }
 
   /* ────────────────────────────────────────────────────────────────
    * Botões OAuth HTML
@@ -332,13 +325,13 @@ class AuthSystem {
    * Modal de Autenticação (Login + Registro Completo)
    * ──────────────────────────────────────────────────────────────── */
   createAuthModal() {
-    if (document.getElementById('auth-modal')) return;
-    const modal = document.createElement('div');
-    modal.id = 'auth-modal';
-    modal.className = 'auth-modal';
-    modal.setAttribute('role', 'dialog');
-    modal.setAttribute('aria-modal', 'true');
-    modal.setAttribute('aria-label', 'Autenticação');
+    if (document.getElementById("auth-modal")) return;
+    const modal = document.createElement("div");
+    modal.id = "auth-modal";
+    modal.className = "auth-modal";
+    modal.setAttribute("role", "dialog");
+    modal.setAttribute("aria-modal", "true");
+    modal.setAttribute("aria-label", "Autenticação");
 
     modal.innerHTML = `
       <div class="auth-modal-content">
@@ -351,7 +344,7 @@ class AuthSystem {
           <input type="email" id="login-email" name="email" placeholder="Email" required autocomplete="email">
           <input type="password" id="login-password" name="password" placeholder="Password" required autocomplete="current-password">
           <button type="submit">Sign In</button>
-          ${this.createOAuthButtons('login')}
+          ${this.createOAuthButtons("login")}
           <div class="auth-toggle">
             No account? <button type="button" id="show-register-btn">Create free account</button>
           </div>
@@ -389,7 +382,7 @@ class AuthSystem {
           <input type="text" id="reg-country" placeholder="Country *" value="United States" required autocomplete="country-name">
 
           <button type="submit">Create Account</button>
-          ${this.createOAuthButtons('register')}
+          ${this.createOAuthButtons("register")}
           <div class="auth-toggle">
             Already have an account? <button type="button" id="show-login-btn">Sign In</button>
           </div>
@@ -406,101 +399,149 @@ class AuthSystem {
    * ──────────────────────────────────────────────────────────────── */
   _bindModalEvents(modal) {
     // Fechar
-    modal.querySelector('.auth-modal-close').addEventListener('click', () => modal.classList.remove('active'));
-    modal.addEventListener('click', (e) => { if (e.target === modal) modal.classList.remove('active'); });
-    document.addEventListener('keydown', (e) => { if (e.key === 'Escape') modal.classList.remove('active'); });
+    modal
+      .querySelector(".auth-modal-close")
+      .addEventListener("click", () => modal.classList.remove("active"));
+    modal.addEventListener("click", (e) => {
+      if (e.target === modal) modal.classList.remove("active");
+    });
+    document.addEventListener("keydown", (e) => {
+      if (e.key === "Escape") modal.classList.remove("active");
+    });
 
     // Alternar entre login / registro
-    document.getElementById('show-register-btn')?.addEventListener('click', () => {
-      document.getElementById('login-form').style.display    = 'none';
-      document.getElementById('register-form').style.display = 'block';
-    });
-    document.getElementById('show-login-btn')?.addEventListener('click', () => {
-      document.getElementById('register-form').style.display = 'none';
-      document.getElementById('login-form').style.display    = 'block';
+    document
+      .getElementById("show-register-btn")
+      ?.addEventListener("click", () => {
+        document.getElementById("login-form").style.display = "none";
+        document.getElementById("register-form").style.display = "block";
+      });
+    document.getElementById("show-login-btn")?.addEventListener("click", () => {
+      document.getElementById("register-form").style.display = "none";
+      document.getElementById("login-form").style.display = "block";
     });
 
     // Submit login
-    document.getElementById('login-form').addEventListener('submit', (e) => {
+    document.getElementById("login-form").addEventListener("submit", (e) => {
       e.preventDefault();
       this.login(
-        document.getElementById('login-email').value.trim(),
-        document.getElementById('login-password').value
+        document.getElementById("login-email").value.trim(),
+        document.getElementById("login-password").value,
       );
     });
 
     // Submit cadastro
-    document.getElementById('register-form').addEventListener('submit', (e) => {
+    document.getElementById("register-form").addEventListener("submit", (e) => {
       e.preventDefault();
       this.submitRegister();
     });
 
     // Força da senha em tempo real
-    document.getElementById('reg-password')?.addEventListener('input', (e) => {
-      const el = document.getElementById('reg-strength');
-      const v  = e.target.value;
-      if (!v) { el.textContent = ''; return; }
-      const score = (v.length >= 8 ? 1 : 0) + (/[A-Z]/.test(v) ? 1 : 0) + (/\d/.test(v) ? 1 : 0) + (/[^A-Za-z0-9]/.test(v) ? 1 : 0);
-      if (score <= 1) { el.className = 'auth-password-strength strength-weak';   el.textContent = '🔴 Weak password'; }
-      else if (score === 2) { el.className = 'auth-password-strength strength-medium'; el.textContent = '🟡 Medium password'; }
-      else { el.className = 'auth-password-strength strength-strong'; el.textContent = '🟢 Strong password'; }
+    document.getElementById("reg-password")?.addEventListener("input", (e) => {
+      const el = document.getElementById("reg-strength");
+      const v = e.target.value;
+      if (!v) {
+        el.textContent = "";
+        return;
+      }
+      const score =
+        (v.length >= 8 ? 1 : 0) +
+        (/[A-Z]/.test(v) ? 1 : 0) +
+        (/\d/.test(v) ? 1 : 0) +
+        (/[^A-Za-z0-9]/.test(v) ? 1 : 0);
+      if (score <= 1) {
+        el.className = "auth-password-strength strength-weak";
+        el.textContent = "🔴 Weak password";
+      } else if (score === 2) {
+        el.className = "auth-password-strength strength-medium";
+        el.textContent = "🟡 Medium password";
+      } else {
+        el.className = "auth-password-strength strength-strong";
+        el.textContent = "🟢 Strong password";
+      }
     });
 
     // ZIP code auto format (international)
-    document.getElementById('reg-zipcode')?.addEventListener('input', (e) => {
-      let v = e.target.value.replace(/\s/g, '').slice(0, 12);
+    document.getElementById("reg-zipcode")?.addEventListener("input", (e) => {
+      let v = e.target.value.replace(/\s/g, "").slice(0, 12);
       e.target.value = v;
     });
 
     // Google OAuth — loads GIS SDK on demand, then uses One Tap credential (JWT)
-    const _loadGIS = () => new Promise((resolve) => {
-      if (typeof google !== 'undefined' && google?.accounts?.id) { resolve(true); return; }
-      const existing = document.querySelector('script[src*="accounts.google.com/gsi/client"]');
-      if (existing) {
-        // Already injected but not yet ready — poll briefly
-        let t = 0;
-        const iv = setInterval(() => {
-          t += 100;
-          if (typeof google !== 'undefined' && google?.accounts?.id) { clearInterval(iv); resolve(true); return; }
-          if (t >= 5000) { clearInterval(iv); resolve(false); }
-        }, 100);
-        return;
-      }
-      const s = document.createElement('script');
-      s.src = 'https://accounts.google.com/gsi/client';
-      s.async = true; s.defer = true;
-      s.onload = () => {
-        // Give the SDK a tick to self-initialize
-        setTimeout(() => resolve(typeof google !== 'undefined' && !!google?.accounts?.id), 200);
-      };
-      s.onerror = () => resolve(false);
-      document.head.appendChild(s);
-    });
+    const _loadGIS = () =>
+      new Promise((resolve) => {
+        if (typeof google !== "undefined" && google?.accounts?.id) {
+          resolve(true);
+          return;
+        }
+        const existing = document.querySelector(
+          'script[src*="accounts.google.com/gsi/client"]',
+        );
+        if (existing) {
+          // Already injected but not yet ready — poll briefly
+          let t = 0;
+          const iv = setInterval(() => {
+            t += 100;
+            if (typeof google !== "undefined" && google?.accounts?.id) {
+              clearInterval(iv);
+              resolve(true);
+              return;
+            }
+            if (t >= 5000) {
+              clearInterval(iv);
+              resolve(false);
+            }
+          }, 100);
+          return;
+        }
+        const s = document.createElement("script");
+        s.src = "https://accounts.google.com/gsi/client";
+        s.async = true;
+        s.defer = true;
+        s.onload = () => {
+          // Give the SDK a tick to self-initialize
+          setTimeout(
+            () =>
+              resolve(typeof google !== "undefined" && !!google?.accounts?.id),
+            200,
+          );
+        };
+        s.onerror = () => resolve(false);
+        document.head.appendChild(s);
+      });
 
     const handleGoogle = async (sourceFormErrId) => {
-      const clientId = window.GOOGLE_CLIENT_ID || '';
+      const clientId = window.GOOGLE_CLIENT_ID || "";
       if (!clientId) {
-        this._showError(sourceFormErrId, 'Google Sign-In is currently unavailable. Please use email and password.');
+        this._showError(
+          sourceFormErrId,
+          "Google Sign-In is currently unavailable. Please use email and password.",
+        );
         return;
       }
       // Temporarily disable the button to prevent double-clicks
-      const btnIds = ['google-login-btn', 'google-register-btn'];
-      btnIds.forEach(id => { const b = document.getElementById(id); if (b) b.disabled = true; });
+      const btnIds = ["google-login-btn", "google-register-btn"];
+      btnIds.forEach((id) => {
+        const b = document.getElementById(id);
+        if (b) b.disabled = true;
+      });
 
       const gisReady = await _loadGIS();
 
       if (!gisReady) {
         // GIS failed to load — use Authorization Code redirect (backend must handle callback)
-        const state = (crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).slice(2));
-        sessionStorage.setItem('google_oauth_state', state);
+        const state = crypto.randomUUID
+          ? crypto.randomUUID()
+          : Math.random().toString(36).slice(2);
+        sessionStorage.setItem("google_oauth_state", state);
         const params = new URLSearchParams({
           client_id: clientId,
-          redirect_uri: window.location.origin + '/auth/google/callback',
-          response_type: 'code',
-          scope: 'openid email profile',
+          redirect_uri: window.location.origin + "/auth/google/callback",
+          response_type: "code",
+          scope: "openid email profile",
           state,
-          access_type: 'online',
-          prompt: 'select_account',
+          access_type: "online",
+          prompt: "select_account",
         });
         window.location.href = `https://accounts.google.com/o/oauth2/v2/auth?${params}`;
         return;
@@ -511,44 +552,63 @@ class AuthSystem {
         google.accounts.id.initialize({
           client_id: clientId,
           callback: (r) => this.loginWithGoogle(r),
-          ux_mode: 'popup',
-          context: 'signin',
+          ux_mode: "popup",
+          context: "signin",
         });
         google.accounts.id.prompt((notification) => {
           if (notification.isNotDisplayed() || notification.isSkippedMoment()) {
             // Prompt was blocked (e.g. incognito) — fall back to redirect
-            const state = (crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).slice(2));
-            sessionStorage.setItem('google_oauth_state', state);
+            const state = crypto.randomUUID
+              ? crypto.randomUUID()
+              : Math.random().toString(36).slice(2);
+            sessionStorage.setItem("google_oauth_state", state);
             const params = new URLSearchParams({
               client_id: clientId,
-              redirect_uri: window.location.origin + '/auth/google/callback',
-              response_type: 'code',
-              scope: 'openid email profile',
+              redirect_uri: window.location.origin + "/auth/google/callback",
+              response_type: "code",
+              scope: "openid email profile",
               state,
-              access_type: 'online',
-              prompt: 'select_account',
+              access_type: "online",
+              prompt: "select_account",
             });
             window.location.href = `https://accounts.google.com/o/oauth2/v2/auth?${params}`;
           }
         });
       } catch (_err) {
-        this._showError(sourceFormErrId, 'Failed to open Google Sign-In. Please try again.');
-        btnIds.forEach(id => { const b = document.getElementById(id); if (b) b.disabled = false; });
+        this._showError(
+          sourceFormErrId,
+          "Failed to open Google Sign-In. Please try again.",
+        );
+        btnIds.forEach((id) => {
+          const b = document.getElementById(id);
+          if (b) b.disabled = false;
+        });
       }
     };
-    document.getElementById('google-login-btn')?.addEventListener('click',    () => handleGoogle('login-error'));
-    document.getElementById('google-register-btn')?.addEventListener('click', () => handleGoogle('register-error'));
+    document
+      .getElementById("google-login-btn")
+      ?.addEventListener("click", () => handleGoogle("login-error"));
+    document
+      .getElementById("google-register-btn")
+      ?.addEventListener("click", () => handleGoogle("register-error"));
 
     // Facebook OAuth
     const handleFacebook = () => {
-      if (typeof FB === 'undefined') {
-        alert('Facebook SDK not loaded. Please add the Facebook SDK to the site.');
+      if (typeof FB === "undefined") {
+        alert(
+          "Facebook SDK not loaded. Please add the Facebook SDK to the site.",
+        );
         return;
       }
-      FB.login((res) => { if (res.status === 'connected') this.loginWithFacebook(res); }, { scope: 'email,public_profile' });
+      FB.login(
+        (res) => {
+          if (res.status === "connected") this.loginWithFacebook(res);
+        },
+        { scope: "email,public_profile" },
+      );
     };
-    ['facebook-login-btn', 'facebook-register-btn'].forEach(id => {
-      document.getElementById(id)?.addEventListener('click', handleFacebook);
+    ["facebook-login-btn", "facebook-register-btn"].forEach((id) => {
+      document.getElementById(id)?.addEventListener("click", handleFacebook);
     });
   }
 
@@ -556,33 +616,66 @@ class AuthSystem {
    * Validar e enviar cadastro completo
    * ──────────────────────────────────────────────────────────────── */
   submitRegister() {
-    const g = (id) => (document.getElementById(id)?.value || '').trim();
-    const firstname  = g('reg-firstname');
-    const lastname   = g('reg-lastname');
-    const email      = g('reg-email');
-    const phone      = g('reg-phone').replace(/\D/g, '');
-    const password   = document.getElementById('reg-password')?.value || '';
-    const confirmPwd = document.getElementById('reg-confirm-password')?.value || '';
-    const street     = g('reg-street');
-    const number     = g('reg-number');
-    const complement = g('reg-complement');
-    const city       = g('reg-city');
-    const state      = g('reg-state').toUpperCase();
-    const zipcode    = g('reg-zipcode').replace(/\D/g, '');
-    const country    = g('reg-country') || 'United States';
+    const g = (id) => (document.getElementById(id)?.value || "").trim();
+    const firstname = g("reg-firstname");
+    const lastname = g("reg-lastname");
+    const email = g("reg-email");
+    const phone = g("reg-phone").replace(/\D/g, "");
+    const password = document.getElementById("reg-password")?.value || "";
+    const confirmPwd =
+      document.getElementById("reg-confirm-password")?.value || "";
+    const street = g("reg-street");
+    const number = g("reg-number");
+    const complement = g("reg-complement");
+    const city = g("reg-city");
+    const state = g("reg-state").toUpperCase();
+    const zipcode = g("reg-zipcode").replace(/\D/g, "");
+    const country = g("reg-country") || "United States";
 
-    const err = (msg) => this._showError('register-error', msg);
+    const err = (msg) => this._showError("register-error", msg);
 
-    if (!firstname || !lastname)                               { err('First and last name are required.'); return; }
-    if (!email || !email.includes('@') || !email.includes('.')) { err('Invalid email address.'); return; }
-    if (phone.length < 7)                                      { err('Invalid phone number.'); return; }
-    if (password.length < 8)                                   { err('Password must be at least 8 characters.'); return; }
-    if (!/[A-Z]/.test(password))                               { err('Password must contain at least one uppercase letter.'); return; }
-    if (!/\d/.test(password))                                  { err('Password must contain at least one number.'); return; }
-    if (password !== confirmPwd)                               { err('Passwords do not match.'); return; }
-    if (!street || !number || !city)                           { err('Please fill in all required address fields.'); return; }
+    if (!firstname || !lastname) {
+      err("First and last name are required.");
+      return;
+    }
+    if (!email || !email.includes("@") || !email.includes(".")) {
+      err("Invalid email address.");
+      return;
+    }
+    if (phone.length < 7) {
+      err("Invalid phone number.");
+      return;
+    }
+    if (password.length < 8) {
+      err("Password must be at least 8 characters.");
+      return;
+    }
+    if (!/[A-Z]/.test(password)) {
+      err("Password must contain at least one uppercase letter.");
+      return;
+    }
+    if (!/\d/.test(password)) {
+      err("Password must contain at least one number.");
+      return;
+    }
+    if (password !== confirmPwd) {
+      err("Passwords do not match.");
+      return;
+    }
+    if (!street || !number || !city) {
+      err("Please fill in all required address fields.");
+      return;
+    }
 
-    const address = { street, number, complement, city, state, zipcode, country };
+    const address = {
+      street,
+      number,
+      complement,
+      city,
+      state,
+      zipcode,
+      country,
+    };
     this.register(`${firstname} ${lastname}`, email, password, phone, address);
   }
 
@@ -594,28 +687,31 @@ class AuthSystem {
   /* ────────────────────────────────────────────────────────────────
    * Registro
    * ──────────────────────────────────────────────────────────────── */
-  async register(name, email, password, phone = '', address = {}) {
-    const errEl = document.getElementById('register-error');
+  async register(name, email, password, phone = "", address = {}) {
+    const errEl = document.getElementById("register-error");
     try {
       const response = await fetch(`${API_BASE}/auth/register`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ name, email, password, phone, address })
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ name, email, password, phone, address }),
       });
       const data = await response.json();
       if (!data.success) {
-        if (errEl) errEl.innerHTML = `<div class="auth-error">${_escHtml(data.error || 'Registration failed')}</div>`;
+        if (errEl)
+          errEl.innerHTML = `<div class="auth-error">${_escHtml(data.error || "Registration failed")}</div>`;
         return;
       }
       currentUser = data.user;
-      if (errEl) errEl.innerHTML = `<div class="auth-success">✅ Account created successfully!</div>`;
+      if (errEl)
+        errEl.innerHTML = `<div class="auth-success">✅ Account created successfully!</div>`;
       setTimeout(() => {
-        document.getElementById('auth-modal')?.classList.remove('active');
+        document.getElementById("auth-modal")?.classList.remove("active");
         this.updateUIForLoggedIn();
       }, 1200);
     } catch (_) {
-      if (errEl) errEl.innerHTML = `<div class="auth-error">Connection error. Please try again.</div>`;
+      if (errEl)
+        errEl.innerHTML = `<div class="auth-error">Connection error. Please try again.</div>`;
     }
   }
 
@@ -623,27 +719,30 @@ class AuthSystem {
    * Login
    * ──────────────────────────────────────────────────────────────── */
   async login(email, password) {
-    const errEl = document.getElementById('login-error');
+    const errEl = document.getElementById("login-error");
     try {
       const response = await fetch(`${API_BASE}/auth/login`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ email, password })
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ email, password }),
       });
       const data = await response.json();
       if (!data.success) {
-        if (errEl) errEl.innerHTML = `<div class="auth-error">${_escHtml(data.error || 'Invalid credentials')}</div>`;
+        if (errEl)
+          errEl.innerHTML = `<div class="auth-error">${_escHtml(data.error || "Invalid credentials")}</div>`;
         return;
       }
       currentUser = data.user;
-      if (errEl) errEl.innerHTML = `<div class="auth-success">✅ Login successful!</div>`;
+      if (errEl)
+        errEl.innerHTML = `<div class="auth-success">✅ Login successful!</div>`;
       setTimeout(() => {
-        document.getElementById('auth-modal')?.classList.remove('active');
+        document.getElementById("auth-modal")?.classList.remove("active");
         this.updateUIForLoggedIn();
       }, 600);
     } catch (_) {
-      if (errEl) errEl.innerHTML = `<div class="auth-error">Connection error. Please try again.</div>`;
+      if (errEl)
+        errEl.innerHTML = `<div class="auth-error">Connection error. Please try again.</div>`;
     }
   }
 
@@ -652,10 +751,13 @@ class AuthSystem {
    * ──────────────────────────────────────────────────────────────── */
   async logout() {
     try {
-      await fetch(`${API_BASE}/auth/logout`, { method: 'POST', credentials: 'include' });
+      await fetch(`${API_BASE}/auth/logout`, {
+        method: "POST",
+        credentials: "include",
+      });
     } catch (_) {}
     currentUser = null;
-    document.getElementById('user-panel')?.classList.remove('active');
+    document.getElementById("user-panel")?.classList.remove("active");
     this.updateUIForLoggedOut();
   }
 
@@ -665,17 +767,22 @@ class AuthSystem {
   async loginWithGoogle(response) {
     try {
       const res = await fetch(`${API_BASE}/auth/google`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ idToken: response.credential })
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ idToken: response.credential }),
       });
       const data = await res.json();
-      if (!data.success) { alert(_escHtml(data.error) || 'Google login failed'); return; }
+      if (!data.success) {
+        alert(_escHtml(data.error) || "Google login failed");
+        return;
+      }
       currentUser = data.user;
-      document.getElementById('auth-modal')?.classList.remove('active');
+      document.getElementById("auth-modal")?.classList.remove("active");
       this.updateUIForLoggedIn();
-    } catch (_) { alert('Google login failed. Please try again.'); }
+    } catch (_) {
+      alert("Google login failed. Please try again.");
+    }
   }
 
   /* ────────────────────────────────────────────────────────────────
@@ -684,31 +791,37 @@ class AuthSystem {
   async loginWithFacebook(response) {
     try {
       const res = await fetch(`${API_BASE}/auth/facebook`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
         body: JSON.stringify({
-          accessToken: response.accessToken || response.authResponse?.accessToken,
-          userID: response.userID || response.authResponse?.userID
-        })
+          accessToken:
+            response.accessToken || response.authResponse?.accessToken,
+          userID: response.userID || response.authResponse?.userID,
+        }),
       });
       const data = await res.json();
-      if (!data.success) { alert(_escHtml(data.error) || 'Facebook login failed'); return; }
+      if (!data.success) {
+        alert(_escHtml(data.error) || "Facebook login failed");
+        return;
+      }
       currentUser = data.user;
-      document.getElementById('auth-modal')?.classList.remove('active');
+      document.getElementById("auth-modal")?.classList.remove("active");
       this.updateUIForLoggedIn();
-    } catch (_) { alert('Facebook login failed. Please try again.'); }
+    } catch (_) {
+      alert("Facebook login failed. Please try again.");
+    }
   }
 
   /* ────────────────────────────────────────────────────────────────
    * Painel do Usuário
    * ──────────────────────────────────────────────────────────────── */
   createUserPanel() {
-    if (document.getElementById('user-panel')) return;
-    const panel = document.createElement('div');
-    panel.id = 'user-panel';
-    panel.className = 'user-panel';
-    panel.setAttribute('role', 'menu');
+    if (document.getElementById("user-panel")) return;
+    const panel = document.createElement("div");
+    panel.id = "user-panel";
+    panel.className = "user-panel";
+    panel.setAttribute("role", "menu");
     panel.innerHTML = `
       <div class="user-panel-header" id="user-name">User</div>
       <div class="user-panel-item" onclick="location.href='profile.html'"   role="menuitem" tabindex="0">👤 Profile</div>
@@ -718,14 +831,10 @@ class AuthSystem {
     `;
     document.body.appendChild(panel);
 
-    document.getElementById('fab-login')?.addEventListener('click', (e) => {
-      if (currentUser) {
-        e.stopPropagation();
-        panel.classList.toggle('active');
-      }
-    });
-    document.addEventListener('click', (e) => {
-      if (!panel.contains(e.target)) panel.classList.remove('active');
+    // triggered via user-nav-btn injected by updateUIForLoggedIn()
+    document.addEventListener("click", (e) => {
+      if (!panel.contains(e.target) && e.target.id !== "user-nav-btn")
+        panel.classList.remove("active");
     });
   }
 
@@ -733,51 +842,76 @@ class AuthSystem {
    * Atualizar UI
    * ──────────────────────────────────────────────────────────────── */
   updateUIForLoggedIn() {
-    const fab = document.getElementById('fab-login');
-    if (fab && currentUser) {
-      const initial = currentUser.name?.charAt(0)?.toUpperCase() || '?';
-      fab.textContent = initial;
-      fab.title = `Signed in as ${currentUser.name}`;
+    const initial = currentUser?.name?.charAt(0)?.toUpperCase() || "?";
+    // Hide Login / Sign Up nav links
+    document.querySelectorAll('[data-i18n="nav.login"], [data-i18n="nav.signup"]').forEach(el => {
+      el.style.display = "none";
+    });
+    // Inject (or update) user avatar button in nav
+    let btn = document.getElementById("user-nav-btn");
+    if (!btn) {
+      btn = document.createElement("button");
+      btn.id = "user-nav-btn";
+      btn.className = "user-nav-btn";
+      btn.setAttribute("aria-label", "Minha conta");
+      btn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        document.getElementById("user-panel")?.classList.toggle("active");
+      });
+      const nav = document.querySelector(".header-nav, nav");
+      if (nav) nav.appendChild(btn);
     }
-    const el = document.getElementById('user-name');
-    if (el && currentUser) el.textContent = currentUser.name || 'User';
+    btn.textContent = initial;
+    btn.title = `Signed in as ${currentUser?.name}`;
+    btn.style.display = "";
+    const el = document.getElementById("user-name");
+    if (el && currentUser) el.textContent = currentUser.name || "User";
     window.currentUser = currentUser;
   }
 
   updateUIForLoggedOut() {
-    const fab = document.getElementById('fab-login');
-    if (fab) { fab.innerHTML = '👤'; fab.title = 'Sign In / Login'; }
+    // Restore Login / Sign Up nav links
+    document.querySelectorAll('[data-i18n="nav.login"], [data-i18n="nav.signup"]').forEach(el => {
+      el.style.display = "";
+    });
+    const btn = document.getElementById("user-nav-btn");
+    if (btn) btn.style.display = "none";
     window.currentUser = null;
   }
 
-  getAuthHeaders() { return {}; }
+  getAuthHeaders() {
+    return {};
+  }
 }
 
 /* ── Init ─────────────────────────────────────────────────────────── */
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener("DOMContentLoaded", () => {
   window.authSystem = new AuthSystem();
 
   // Handle Google OAuth redirect callback (authorization code flow)
   const urlParams = new URLSearchParams(window.location.search);
-  const code  = urlParams.get('code');
-  const state = urlParams.get('state');
-  if (code && state && sessionStorage.getItem('google_oauth_state') === state) {
-    sessionStorage.removeItem('google_oauth_state');
+  const code = urlParams.get("code");
+  const state = urlParams.get("state");
+  if (code && state && sessionStorage.getItem("google_oauth_state") === state) {
+    sessionStorage.removeItem("google_oauth_state");
     // Exchange code for session via backend
     fetch(`${API_BASE}/auth/google/callback`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      credentials: 'include',
-      body: JSON.stringify({ code, redirectUri: window.location.origin + '/auth/google/callback' }),
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify({
+        code,
+        redirectUri: window.location.origin + "/auth/google/callback",
+      }),
     })
-      .then(r => r.json())
-      .then(data => {
+      .then((r) => r.json())
+      .then((data) => {
         if (data.success) {
           currentUser = data.user;
           window.currentUser = currentUser;
           window.authSystem?.updateUIForLoggedIn?.();
           // Clean URL without reloading
-          window.history.replaceState({}, '', window.location.pathname);
+          window.history.replaceState({}, "", window.location.pathname);
         }
       })
       .catch(() => {});
@@ -785,16 +919,19 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 /* ── Global helper usado pelos links de nav ──────────────────────── */
-window.openAuthModal = function(tab) {
-  const modal = document.getElementById('auth-modal');
-  if (!modal) { window.authSystem?.initAuthUI(); return; }
-  modal.classList.add('active');
-  if (tab === 'register') {
-    document.getElementById('login-form').style.display    = 'none';
-    document.getElementById('register-form').style.display = 'block';
+window.openAuthModal = function (tab) {
+  const modal = document.getElementById("auth-modal");
+  if (!modal) {
+    window.authSystem?.initAuthUI();
+    return;
+  }
+  modal.classList.add("active");
+  if (tab === "register") {
+    document.getElementById("login-form").style.display = "none";
+    document.getElementById("register-form").style.display = "block";
   } else {
-    document.getElementById('register-form').style.display = 'none';
-    document.getElementById('login-form').style.display    = 'block';
+    document.getElementById("register-form").style.display = "none";
+    document.getElementById("login-form").style.display = "block";
   }
 };
 
@@ -802,6 +939,9 @@ window.currentUser = currentUser;
 
 /* ── Helper: escape HTML ─────────────────────────────────────────── */
 function _escHtml(str) {
-  return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  return String(str)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
 }
-

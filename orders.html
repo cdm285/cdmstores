@@ -507,9 +507,7 @@
       async function loadOrders() {
         try {
           const response = await fetch("/api/orders/user", {
-            headers: {
-              Authorization: `Bearer ${localStorage.getItem("auth_token")}`,
-            },
+            credentials: "include",
           });
 
           if (!response.ok) {
