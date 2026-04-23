@@ -144,21 +144,11 @@ class ChatBot {
           background: linear-gradient(145deg, rgba(12,20,44,0.96), rgba(12,122,255,0.94));
           box-shadow: 0 12px 28px rgba(0,136,255,0.28), 0 0 0 1px rgba(255,255,255,0.14) inset;
           position: relative;
-          animation: chatbotFloat 4.5s ease-in-out infinite;
           transition: transform 0.2s ease, box-shadow 0.2s ease;
         }
         .chatbot-fab-bright:hover {
           transform: translateY(-3px) scale(1.02);
           box-shadow: 0 16px 36px rgba(0,136,255,0.40);
-        }
-        .chatbot-fab-bright::before {
-          content: '';
-          position: absolute;
-          inset: -6px;
-          border-radius: 26px;
-          background: radial-gradient(circle, rgba(0,173,255,0.38), rgba(0,173,255,0) 70%);
-          filter: blur(10px);
-          z-index: -1;
         }
         .chatbot-fab-icon-wrap {
           width: 42px;
@@ -175,10 +165,6 @@ class ChatBot {
           text-transform: uppercase;
           color: #fff;
           font-family: inherit;
-        }
-        @keyframes chatbotFloat {
-          0%, 100% { transform: translateY(0); }
-          50%       { transform: translateY(-4px); }
         }
         @media (max-width: 768px) {
           .fab-container { bottom: 14px; right: 14px; }

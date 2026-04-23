@@ -452,33 +452,92 @@ class AuthSystem {
       e.target.value = v;
     });
 
-    // Google OAuth
-    const handleGoogle = () => {
-      const clientId = window.GOOGLE_CLIENT_ID || '';
-      if (!clientId || typeof google === 'undefined' || !google?.accounts?.id) {
-        this._showError('login-error', 'Google Sign-In not configured. Set window.GOOGLE_CLIENT_ID.');
-        document.getElementById('login-form').style.display = 'block';
-        document.getElementById('register-form').style.display = 'none';
+    // Google OAuth — loads GIS SDK on demand, then uses One Tap credential (JWT)
+    const _loadGIS = () => new Promise((resolve) => {
+      if (typeof google !== 'undefined' && google?.accounts?.id) { resolve(true); return; }
+      const existing = document.querySelector('script[src*="accounts.google.com/gsi/client"]');
+      if (existing) {
+        // Already injected but not yet ready — poll briefly
+        let t = 0;
+        const iv = setInterval(() => {
+          t += 100;
+          if (typeof google !== 'undefined' && google?.accounts?.id) { clearInterval(iv); resolve(true); return; }
+          if (t >= 5000) { clearInterval(iv); resolve(false); }
+        }, 100);
         return;
       }
+      const s = document.createElement('script');
+      s.src = 'https://accounts.google.com/gsi/client';
+      s.async = true; s.defer = true;
+      s.onload = () => {
+        // Give the SDK a tick to self-initialize
+        setTimeout(() => resolve(typeof google !== 'undefined' && !!google?.accounts?.id), 200);
+      };
+      s.onerror = () => resolve(false);
+      document.head.appendChild(s);
+    });
+
+    const handleGoogle = async (sourceFormErrId) => {
+      const clientId = window.GOOGLE_CLIENT_ID || '';
+      if (!clientId) {
+        this._showError(sourceFormErrId, 'Google Sign-In is currently unavailable. Please use email and password.');
+        return;
+      }
+      // Temporarily disable the button to prevent double-clicks
+      const btnIds = ['google-login-btn', 'google-register-btn'];
+      btnIds.forEach(id => { const b = document.getElementById(id); if (b) b.disabled = true; });
+
+      const gisReady = await _loadGIS();
+
+      if (!gisReady) {
+        // GIS failed to load — use Authorization Code redirect (backend must handle callback)
+        const state = (crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).slice(2));
+        sessionStorage.setItem('google_oauth_state', state);
+        const params = new URLSearchParams({
+          client_id: clientId,
+          redirect_uri: window.location.origin + '/auth/google/callback',
+          response_type: 'code',
+          scope: 'openid email profile',
+          state,
+          access_type: 'online',
+          prompt: 'select_account',
+        });
+        window.location.href = `https://accounts.google.com/o/oauth2/v2/auth?${params}`;
+        return;
+      }
+
       try {
-        google.accounts.id.initialize({ client_id: clientId, callback: (r) => this.loginWithGoogle(r) });
+        google.accounts.id.cancel(); // reset any pending prompt
+        google.accounts.id.initialize({
+          client_id: clientId,
+          callback: (r) => this.loginWithGoogle(r),
+          ux_mode: 'popup',
+          context: 'signin',
+        });
         google.accounts.id.prompt((notification) => {
           if (notification.isNotDisplayed() || notification.isSkippedMoment()) {
-            // Fallback: open Google popup manually
-            const authUrl = `https://accounts.google.com/o/oauth2/auth?client_id=${encodeURIComponent(clientId)}&redirect_uri=${encodeURIComponent(window.location.origin)}&response_type=token&scope=email+profile`;
-            window.open(authUrl, 'google-login', 'width=500,height=600');
+            // Prompt was blocked (e.g. incognito) — fall back to redirect
+            const state = (crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).slice(2));
+            sessionStorage.setItem('google_oauth_state', state);
+            const params = new URLSearchParams({
+              client_id: clientId,
+              redirect_uri: window.location.origin + '/auth/google/callback',
+              response_type: 'code',
+              scope: 'openid email profile',
+              state,
+              access_type: 'online',
+              prompt: 'select_account',
+            });
+            window.location.href = `https://accounts.google.com/o/oauth2/v2/auth?${params}`;
           }
         });
-      } catch (err) {
-        this._showError('login-error', 'Failed to initialize Google Sign-In.');
-        document.getElementById('login-form').style.display = 'block';
-        document.getElementById('register-form').style.display = 'none';
+      } catch (_err) {
+        this._showError(sourceFormErrId, 'Failed to open Google Sign-In. Please try again.');
+        btnIds.forEach(id => { const b = document.getElementById(id); if (b) b.disabled = false; });
       }
     };
-    ['google-login-btn', 'google-register-btn'].forEach(id => {
-      document.getElementById(id)?.addEventListener('click', handleGoogle);
-    });
+    document.getElementById('google-login-btn')?.addEventListener('click',    () => handleGoogle('login-error'));
+    document.getElementById('google-register-btn')?.addEventListener('click', () => handleGoogle('register-error'));
 
     // Facebook OAuth
     const handleFacebook = () => {
@@ -697,6 +756,32 @@ class AuthSystem {
 /* ── Init ─────────────────────────────────────────────────────────── */
 document.addEventListener('DOMContentLoaded', () => {
   window.authSystem = new AuthSystem();
+
+  // Handle Google OAuth redirect callback (authorization code flow)
+  const urlParams = new URLSearchParams(window.location.search);
+  const code  = urlParams.get('code');
+  const state = urlParams.get('state');
+  if (code && state && sessionStorage.getItem('google_oauth_state') === state) {
+    sessionStorage.removeItem('google_oauth_state');
+    // Exchange code for session via backend
+    fetch(`${API_BASE}/auth/google/callback`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({ code, redirectUri: window.location.origin + '/auth/google/callback' }),
+    })
+      .then(r => r.json())
+      .then(data => {
+        if (data.success) {
+          currentUser = data.user;
+          window.currentUser = currentUser;
+          window.authSystem?.updateUIForLoggedIn?.();
+          // Clean URL without reloading
+          window.history.replaceState({}, '', window.location.pathname);
+        }
+      })
+      .catch(() => {});
+  }
 });
 
 /* ── Global helper usado pelos links de nav ──────────────────────── */
