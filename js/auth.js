@@ -843,11 +843,13 @@ class AuthSystem {
    * ──────────────────────────────────────────────────────────────── */
   updateUIForLoggedIn() {
     const initial = currentUser?.name?.charAt(0)?.toUpperCase() || "?";
-    // Hide Login / Sign Up nav links
-    document.querySelectorAll('[data-i18n="nav.login"], [data-i18n="nav.signup"]').forEach(el => {
+
+    // ── Desktop nav: hide Login / Sign Up links ──
+    document.querySelectorAll('.header-nav [data-i18n="nav.login"], .header-nav [data-i18n="nav.signup"]').forEach(el => {
       el.style.display = "none";
     });
-    // Inject (or update) user avatar button in nav
+
+    // ── Desktop: inject (or update) user avatar button ──
     let btn = document.getElementById("user-nav-btn");
     if (!btn) {
       btn = document.createElement("button");
@@ -858,24 +860,64 @@ class AuthSystem {
         e.stopPropagation();
         document.getElementById("user-panel")?.classList.toggle("active");
       });
-      const nav = document.querySelector(".header-nav, nav");
+      const nav = document.querySelector(".header-nav");
       if (nav) nav.appendChild(btn);
     }
     btn.textContent = initial;
     btn.title = `Signed in as ${currentUser?.name}`;
     btn.style.display = "";
+
+    // ── Mobile nav: hide Login / Sign Up links ──
+    document.querySelectorAll('#mobile-nav [data-i18n="nav.login"], #mobile-nav [data-i18n="nav.signup"]').forEach(el => {
+      el.style.display = "none";
+    });
+
+    // ── Mobile nav: inject (or update) user section in footer ──
+    let mobileUserBtn = document.getElementById("mobile-user-section");
+    if (!mobileUserBtn) {
+      mobileUserBtn = document.createElement("div");
+      mobileUserBtn.id = "mobile-user-section";
+      mobileUserBtn.className = "mobile-user-section";
+      mobileUserBtn.innerHTML = `
+        <div class="mobile-user-avatar" id="mobile-user-avatar">${initial}</div>
+        <div class="mobile-user-info">
+          <div class="mobile-user-name" id="mobile-user-name">${currentUser?.name || "User"}</div>
+          <div class="mobile-user-links">
+            <a href="profile.html">👤 Profile</a>
+            <a href="orders.html">📦 Orders</a>
+            <a href="addresses.html">📍 Addresses</a>
+            <button onclick="window.authSystem?.logout(); document.getElementById('mobile-nav')?.classList.remove('is-open'); document.getElementById('mobile-nav-overlay')?.classList.remove('is-open'); document.body.classList.remove('nav-open');">🚪 Sign Out</button>
+          </div>
+        </div>
+      `;
+      const footer = document.querySelector(".mobile-nav-footer");
+      if (footer) footer.insertBefore(mobileUserBtn, footer.firstChild);
+    } else {
+      document.getElementById("mobile-user-avatar").textContent = initial;
+      document.getElementById("mobile-user-name").textContent = currentUser?.name || "User";
+    }
+    mobileUserBtn.style.display = "flex";
+
     const el = document.getElementById("user-name");
     if (el && currentUser) el.textContent = currentUser.name || "User";
     window.currentUser = currentUser;
   }
 
   updateUIForLoggedOut() {
-    // Restore Login / Sign Up nav links
-    document.querySelectorAll('[data-i18n="nav.login"], [data-i18n="nav.signup"]').forEach(el => {
+    // ── Desktop ──
+    document.querySelectorAll('.header-nav [data-i18n="nav.login"], .header-nav [data-i18n="nav.signup"]').forEach(el => {
       el.style.display = "";
     });
     const btn = document.getElementById("user-nav-btn");
     if (btn) btn.style.display = "none";
+
+    // ── Mobile ──
+    document.querySelectorAll('#mobile-nav [data-i18n="nav.login"], #mobile-nav [data-i18n="nav.signup"]').forEach(el => {
+      el.style.display = "";
+    });
+    const mobileUserBtn = document.getElementById("mobile-user-section");
+    if (mobileUserBtn) mobileUserBtn.style.display = "none";
+
     window.currentUser = null;
   }
 
@@ -925,6 +967,12 @@ window.openAuthModal = function (tab) {
     window.authSystem?.initAuthUI();
     return;
   }
+  // Close mobile nav if open before showing modal
+  document.getElementById("mobile-nav")?.classList.remove("is-open");
+  document.getElementById("mobile-nav-overlay")?.classList.remove("is-open");
+  document.getElementById("hamburger-btn")?.classList.remove("is-open");
+  document.body.classList.remove("nav-open");
+
   modal.classList.add("active");
   if (tab === "register") {
     document.getElementById("login-form").style.display = "none";

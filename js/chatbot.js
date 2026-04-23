@@ -6,8 +6,8 @@
 
 class ChatBot {
   constructor() {
-    this.isOpen   = false;
-    this.language = localStorage.getItem('cdm_lang') || 'pt';
+    this.isOpen = false;
+    this.language = localStorage.getItem("cdm_lang") || "pt";
     this._init();
   }
 
@@ -19,8 +19,8 @@ class ChatBot {
       this._createModal();
       this._bindEvents();
     };
-    if (document.readyState === 'loading') {
-      document.addEventListener('DOMContentLoaded', setup);
+    if (document.readyState === "loading") {
+      document.addEventListener("DOMContentLoaded", setup);
     } else {
       setup();
     }
@@ -30,32 +30,32 @@ class ChatBot {
    * FAB no container compartilhado (sem conflito de z-index)
    * ────────────────────────────────────────────────────────────── */
   _createFabButton() {
-    if (document.getElementById('chatbot-fab')) return;
+    if (document.getElementById("chatbot-fab")) return;
 
     // Reusar o fab-container do auth.js ou criar um novo
-    let container = document.getElementById('fab-container');
+    let container = document.getElementById("fab-container");
     if (!container) {
-      container = document.createElement('div');
-      container.id = 'fab-container';
-      container.className = 'fab-container';
+      container = document.createElement("div");
+      container.id = "fab-container";
+      container.className = "fab-container";
       document.body.appendChild(container);
     }
 
-    const btn = document.createElement('button');
-    btn.id = 'chatbot-fab';
-    btn.className = 'chatbot-fab-bright';
-    btn.title = 'Abrir chat';
-    btn.setAttribute('aria-label', 'Abrir chat de suporte');
+    const btn = document.createElement("button");
+    btn.id = "chatbot-fab";
+    btn.className = "chatbot-fab-bright";
+    btn.title = "Abrir chat";
+    btn.setAttribute("aria-label", "Abrir chat de suporte");
     btn.innerHTML = `
       <span class="chatbot-fab-icon-wrap" aria-hidden="true">
         <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
       </span>
       <span class="chatbot-fab-label">Chat</span>
     `;
-    btn.addEventListener('click', () => this.toggle());
+    btn.addEventListener("click", () => this.toggle());
 
     // Inserir ANTES do fab-login para chatbot aparecer abaixo do login
-    const loginFab = document.getElementById('fab-login');
+    const loginFab = document.getElementById("fab-login");
     if (loginFab) {
       container.insertBefore(btn, loginFab);
     } else {
@@ -67,13 +67,13 @@ class ChatBot {
    * Modal de chat (posicionado acima do FAB container)
    * ────────────────────────────────────────────────────────────── */
   _createModal() {
-    if (document.getElementById('chatbot-modal')) return;
+    if (document.getElementById("chatbot-modal")) return;
 
-    const modal = document.createElement('div');
-    modal.id = 'chatbot-modal';
-    modal.setAttribute('role', 'dialog');
-    modal.setAttribute('aria-modal', 'true');
-    modal.setAttribute('aria-label', 'Chat de suporte CDM STORES');
+    const modal = document.createElement("div");
+    modal.id = "chatbot-modal";
+    modal.setAttribute("role", "dialog");
+    modal.setAttribute("aria-modal", "true");
+    modal.setAttribute("aria-label", "Chat de suporte CDM STORES");
     modal.innerHTML = `
       <div class="chatbot-header">
         <div class="chatbot-header-info">
@@ -105,19 +105,19 @@ class ChatBot {
     document.body.appendChild(modal);
 
     // Mensagem de boas-vindas
-    this._addMsg(this._welcome(), 'bot');
+    this._addMsg(this._welcome(), "bot");
   }
 
   /* ──────────────────────────────────────────────────────────────
    * CSS injetado
    * ────────────────────────────────────────────────────────────── */
   _injectStyles() {
-    if (document.getElementById('chatbot-styles')) return;
+    if (document.getElementById("chatbot-styles")) return;
 
     // Sempre injetar estilos do FAB independente do auth.js
-    if (!document.getElementById('chatbot-fab-base')) {
-      const base = document.createElement('style');
-      base.id = 'chatbot-fab-base';
+    if (!document.getElementById("chatbot-fab-base")) {
+      const base = document.createElement("style");
+      base.id = "chatbot-fab-base";
       base.innerHTML = `
         .fab-container {
           position: fixed;
@@ -176,8 +176,8 @@ class ChatBot {
       document.head.appendChild(base);
     }
 
-    const s = document.createElement('style');
-    s.id = 'chatbot-styles';
+    const s = document.createElement("style");
+    s.id = "chatbot-styles";
     s.innerHTML = `
       #chatbot-modal {
         position: fixed;
@@ -284,6 +284,31 @@ class ChatBot {
       .chatbot-msg.user { background: linear-gradient(135deg,#00AFFF,#9B4DFF); color: #fff; align-self: flex-end; border-radius: 10px 10px 2px 10px; }
       .chatbot-msg.typing { color: #9ca3af; font-style: italic; }
 
+      /* CTA de autenticação */
+      .chatbot-cta-msg {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        align-items: flex-start;
+      }
+      .chatbot-cta-btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 8px 16px;
+        background: linear-gradient(135deg,#00AFFF,#9B4DFF);
+        color: #fff;
+        border: none;
+        border-radius: 8px;
+        font-size: 13px;
+        font-weight: 700;
+        cursor: pointer;
+        font-family: inherit;
+        transition: opacity 0.2s;
+        text-decoration: none;
+      }
+      .chatbot-cta-btn:hover { opacity: 0.85; }
+
       .chatbot-footer {
         display: flex;
         gap: 8px;
@@ -336,27 +361,39 @@ class ChatBot {
    * Eventos
    * ────────────────────────────────────────────────────────────── */
   _bindEvents() {
-    document.getElementById('chatbot-close-btn')?.addEventListener('click', () => this.toggle());
-    document.getElementById('chatbot-send-btn')?.addEventListener('click', () => this._send());
-    document.getElementById('chatbot-input')?.addEventListener('keypress', (e) => {
-      if (e.key === 'Enter') this._send();
-    });
+    document
+      .getElementById("chatbot-close-btn")
+      ?.addEventListener("click", () => this.toggle());
+    document
+      .getElementById("chatbot-send-btn")
+      ?.addEventListener("click", () => this._send());
+    document
+      .getElementById("chatbot-input")
+      ?.addEventListener("keypress", (e) => {
+        if (e.key === "Enter") this._send();
+      });
 
     // Seletor de idioma
-    document.querySelectorAll('.clang-btn').forEach(btn => {
-      if (btn.dataset.lang === this.language) btn.classList.add('active');
-      btn.addEventListener('click', () => {
+    document.querySelectorAll(".clang-btn").forEach((btn) => {
+      if (btn.dataset.lang === this.language) btn.classList.add("active");
+      btn.addEventListener("click", () => {
         this.language = btn.dataset.lang;
-        localStorage.setItem('cdm_lang', this.language);
-        document.querySelectorAll('.clang-btn').forEach(b => b.classList.toggle('active', b === btn));
+        localStorage.setItem("cdm_lang", this.language);
+        document
+          .querySelectorAll(".clang-btn")
+          .forEach((b) => b.classList.toggle("active", b === btn));
       });
     });
 
     // Sincronizar idioma quando script.js muda
-    window.addEventListener('storage', (e) => {
-      if (e.key === 'cdm_lang' && e.newValue) {
+    window.addEventListener("storage", (e) => {
+      if (e.key === "cdm_lang" && e.newValue) {
         this.language = e.newValue;
-        document.querySelectorAll('.clang-btn').forEach(b => b.classList.toggle('active', b.dataset.lang === this.language));
+        document
+          .querySelectorAll(".clang-btn")
+          .forEach((b) =>
+            b.classList.toggle("active", b.dataset.lang === this.language),
+          );
       }
     });
   }
@@ -365,55 +402,133 @@ class ChatBot {
    * Toggle
    * ────────────────────────────────────────────────────────────── */
   toggle() {
-    const modal = document.getElementById('chatbot-modal');
+    const modal = document.getElementById("chatbot-modal");
     this.isOpen = !this.isOpen;
-    modal?.classList.toggle('active', this.isOpen);
-    if (this.isOpen) document.getElementById('chatbot-input')?.focus();
+    modal?.classList.toggle("active", this.isOpen);
+    if (this.isOpen) document.getElementById("chatbot-input")?.focus();
   }
 
   /* ──────────────────────────────────────────────────────────────
    * Enviar mensagem
    * ────────────────────────────────────────────────────────────── */
+  /* ── Detecção de intenção de auth ──────────────────────────── */
+  _authIntent(msg) {
+    const lower = msg.toLowerCase();
+    const loginPat  = /\b(login|entrar|sign.?in|acessar|logar|minha conta|j\u00e1 tenho conta)\b/i;
+    const signupPat = /\b(cadastr|registr|criar conta|sign.?up|nova conta|me inscrever|inscrever|inscrição)\b/i;
+    if (loginPat.test(lower))  return "login";
+    if (signupPat.test(lower)) return "register";
+    return null;
+  }
+
+  /* ── Mensagem com botão CTA ────────────────────────────── */
+  _addCTAMsg(text, btnLabel, action) {
+    const body = document.getElementById("chatbot-body");
+    if (!body) return;
+    const wrap = document.createElement("div");
+    wrap.className = "chatbot-msg bot chatbot-cta-msg";
+    const p = document.createElement("span");
+    p.textContent = text;
+    const btn = document.createElement("button");
+    btn.className = "chatbot-cta-btn";
+    btn.textContent = btnLabel;
+    btn.addEventListener("click", () => {
+      action();
+      // Fechar chat após abrir o modal
+      setTimeout(() => this.toggle(), 300);
+    });
+    wrap.appendChild(p);
+    wrap.appendChild(btn);
+    body.appendChild(wrap);
+    body.scrollTop = body.scrollHeight;
+  }
+
   async _send() {
-    const input = document.getElementById('chatbot-input');
-    const msg   = input?.value.trim();
+    const input = document.getElementById("chatbot-input");
+    const msg = input?.value.trim();
     if (!msg) return;
-    input.value = '';
+    input.value = "";
 
-    this._addMsg(msg, 'user');
+    this._addMsg(msg, "user");
 
-    const typingId = 'typing-' + Date.now();
-    this._addMsg('...', 'bot typing', typingId);
+    const typingId = "typing-" + Date.now();
+    this._addMsg("...", "bot typing", typingId);
 
     try {
       // Tentar backend IA primeiro
-      const res = await fetch('https://cdmstores.com/api/chat', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: msg, language: this.language, user_id: this._uid() })
+      const res = await fetch("https://cdmstores.com/api/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          message: msg,
+          language: this.language,
+          user_id: this._uid(),
+        }),
       });
       this._removeMsg(typingId);
       const data = await res.json();
       if (data.success) {
-        this._addMsg(data.response, 'bot');
+        this._addMsg(data.response, "bot");
         if (data.action) this._handleAction(data);
       } else {
-        this._addMsg(this._localReply(msg), 'bot');
+        // Verificar intent de auth antes do fallback local
+        const intent = this._authIntent(msg);
+        if (intent) {
+          this._triggerAuthCTA(intent);
+        } else {
+          this._addMsg(this._localReply(msg), "bot");
+        }
       }
     } catch (_) {
       // Fallback local
       this._removeMsg(typingId);
-      this._addMsg(this._localReply(msg), 'bot');
+      const intent = this._authIntent(msg);
+      if (intent) {
+        this._triggerAuthCTA(intent);
+      } else {
+        this._addMsg(this._localReply(msg), "bot");
+      }
     }
+  }
+
+  /* ── Acionar CTA de autenticação ────────────────────────── */
+  _triggerAuthCTA(tab) {
+    const l = this.language;
+    const msgs = {
+      login: {
+        pt: "Claro! Vou te levar para o login agora. 🔑",
+        en: "Sure! Let me take you to the login. 🔑",
+        es: "\u00a1Claro! Te llevo al inicio de sesi\u00f3n ahora. 🔑",
+      },
+      register: {
+        pt: "Perfeito! Vou te levar para criar sua conta. 🚀",
+        en: "Great! Let me take you to create your account. 🚀",
+        es: "\u00a1Perfecto! Te llevo a crear tu cuenta. 🚀",
+      },
+    };
+    const btnLabels = {
+      login:    { pt: "🔑 Abrir Login",         en: "🔑 Open Login",        es: "🔑 Abrir inicio de sesi\u00f3n" },
+      register: { pt: "🚀 Criar minha conta",  en: "🚀 Create my account", es: "🚀 Crear mi cuenta" },
+    };
+    const text     = (msgs[tab][l]      || msgs[tab].en);
+    const btnLabel = (btnLabels[tab][l] || btnLabels[tab].en);
+
+    this._addCTAMsg(text, btnLabel, () => {
+      if (typeof window.openAuthModal === "function") {
+        window.openAuthModal(tab);
+      } else {
+        window.location.href = tab === "register" ? "/signup.html" : "/?login=1";
+      }
+    });
   }
 
   /* ──────────────────────────────────────────────────────────────
    * Adicionar mensagem ao DOM
    * ────────────────────────────────────────────────────────────── */
   _addMsg(text, cls, id) {
-    const body = document.getElementById('chatbot-body');
+    const body = document.getElementById("chatbot-body");
     if (!body) return;
-    const el = document.createElement('div');
+    const el = document.createElement("div");
     el.className = `chatbot-msg ${cls}`;
     if (id) el.id = id;
     el.textContent = text;
@@ -429,7 +544,13 @@ class ChatBot {
    * Resposta offline / fallback local
    * ────────────────────────────────────────────────────────────── */
   _welcome() {
-    return { pt: 'Olá! 😊 Sou o assistente da CDM STORES. Como posso ajudar?', en: 'Hi! 😊 I\'m the CDM STORES assistant. How can I help?', es: '¡Hola! 😊 Soy el asistente de CDM STORES. ¿En qué puedo ayudar?' }[this.language] || 'Olá!';
+    return (
+      {
+        pt: "Olá! 😊 Sou o assistente da CDM STORES. Como posso ajudar?",
+        en: "Hi! 😊 I'm the CDM STORES assistant. How can I help?",
+        es: "¡Hola! 😊 Soy el asistente de CDM STORES. ¿En qué puedo ayudar?",
+      }[this.language] || "Olá!"
+    );
   }
 
   _localReply(msg) {
@@ -437,40 +558,68 @@ class ChatBot {
     const l = this.language;
     const r = {
       pt: {
-        rastreio: '📦 Use a aba Rastreio e cole seu código (ex: CDM123456BR). Acompanhe em tempo real!',
-        pagamento: '💳 Aceitamos Stripe, cartão crédito/débito. Totalmente seguro (PCI-DSS).',
-        frete: '🚚 Entregamos internacionalmente. Frete grátis acima de $199. Prazo: 5–10 dias úteis.',
-        produto: '🛍️ Temos Fone Bluetooth ($89.90), Carregador USB-C ($49.90) e mais!',
-        carrinho: '🛒 Clique no ícone 🛒 para ver seu carrinho e finalizar a compra.',
-        suporte: '📞 Estamos disponíveis 24/7. Use o chat ou entre em contato!',
-        padrao: '😊 Pode me contar mais? Posso ajudar com produtos, rastreio, pagamento e suporte!'
+        rastreio:
+          "📦 Use a aba Rastreio e cole seu código (ex: CDM123456BR). Acompanhe em tempo real!",
+        pagamento:
+          "💳 Aceitamos Stripe, cartão crédito/débito. Totalmente seguro (PCI-DSS).",
+        frete:
+          "🚚 Entregamos internacionalmente. Frete grátis acima de $199. Prazo: 5–10 dias úteis.",
+        produto:
+          "🛍️ Temos Fone Bluetooth ($89.90), Carregador USB-C ($49.90) e mais!",
+        carrinho:
+          "🛒 Clique no ícone 🛒 para ver seu carrinho e finalizar a compra.",
+        suporte: "📞 Estamos disponíveis 24/7. Use o chat ou entre em contato!",
+        padrao:
+          "😊 Pode me contar mais? Posso ajudar com produtos, rastreio, pagamento e suporte!",
       },
       en: {
-        rastreio: '📦 Use the Tracking tab with your code (ex: CDM123456BR). Real-time tracking!',
-        pagamento: '💳 We accept Stripe with credit/debit cards. Fully secure (PCI-DSS).',
-        frete: '🚚 We ship internationally. Free shipping on orders over $199. Estimated 5–10 business days.',
-        produto: '🛍️ We have Bluetooth Headphones ($89.90), USB-C Charger ($49.90) and more!',
-        carrinho: '🛒 Click the 🛒 icon to view your cart and checkout.',
-        suporte: '📞 We\'re available 24/7. Use chat or contact us!',
-        padrao: '😊 Tell me more? I can help with products, tracking, payment and support!'
+        rastreio:
+          "📦 Use the Tracking tab with your code (ex: CDM123456BR). Real-time tracking!",
+        pagamento:
+          "💳 We accept Stripe with credit/debit cards. Fully secure (PCI-DSS).",
+        frete:
+          "🚚 We ship internationally. Free shipping on orders over $199. Estimated 5–10 business days.",
+        produto:
+          "🛍️ We have Bluetooth Headphones ($89.90), USB-C Charger ($49.90) and more!",
+        carrinho: "🛒 Click the 🛒 icon to view your cart and checkout.",
+        suporte: "📞 We're available 24/7. Use chat or contact us!",
+        padrao:
+          "😊 Tell me more? I can help with products, tracking, payment and support!",
       },
       es: {
-        rastreio: '📦 Usa la pestaña Rastreo con tu código (ej: CDM123456BR). ¡Seguimiento en tiempo real!',
-        pagamento: '💳 Aceptamos Stripe con tarjeta crédito/débito. Totalmente seguro (PCI-DSS).',
-        frete: '🚚 Enviamos internacionalmente. Envío gratis en pedidos sobre $199. Plazo: 5–10 días hábiles.',
-        produto: '🛍️ Tenemos Auriculares Bluetooth ($89.90), Cargador USB-C ($49.90) ¡y más!',
-        carrinho: '🛒 Haz clic en el icono 🛒 para ver tu carrito y finalizar la compra.',
-        suporte: '📞 Estamos disponibles 24/7. ¡Usa el chat o contáctanos!',
-        padrao: '😊 ¿Puedes contarme más? ¡Puedo ayudarte con productos, rastreo, pago y soporte!'
-      }
+        rastreio:
+          "📦 Usa la pestaña Rastreo con tu código (ej: CDM123456BR). ¡Seguimiento en tiempo real!",
+        pagamento:
+          "💳 Aceptamos Stripe con tarjeta crédito/débito. Totalmente seguro (PCI-DSS).",
+        frete:
+          "🚚 Enviamos internacionalmente. Envío gratis en pedidos sobre $199. Plazo: 5–10 días hábiles.",
+        produto:
+          "🛍️ Tenemos Auriculares Bluetooth ($89.90), Cargador USB-C ($49.90) ¡y más!",
+        carrinho:
+          "🛒 Haz clic en el icono 🛒 para ver tu carrito y finalizar la compra.",
+        suporte: "📞 Estamos disponibles 24/7. ¡Usa el chat o contáctanos!",
+        padrao:
+          "😊 ¿Puedes contarme más? ¡Puedo ayudarte con productos, rastreo, pago y soporte!",
+      },
     };
     const t = r[l] || r.pt;
-    if (/rastreio|rastrear|tracking|track|c.digo|pedido|entrega/i.test(lower)) return t.rastreio;
-    if (/pagamento|payment|pagar|pay|cart.o|stripe|pix|pre.o|valor/i.test(lower)) return t.pagamento;
-    if (/frete|envio|shipping|quando|prazo|entrega/i.test(lower)) return t.frete;
-    if (/produto|product|comprar|buy|fone|carregador|cabo|headphone|charger/i.test(lower)) return t.produto;
+    if (/rastreio|rastrear|tracking|track|c.digo|pedido|entrega/i.test(lower))
+      return t.rastreio;
+    if (
+      /pagamento|payment|pagar|pay|cart.o|stripe|pix|pre.o|valor/i.test(lower)
+    )
+      return t.pagamento;
+    if (/frete|envio|shipping|quando|prazo|entrega/i.test(lower))
+      return t.frete;
+    if (
+      /produto|product|comprar|buy|fone|carregador|cabo|headphone|charger/i.test(
+        lower,
+      )
+    )
+      return t.produto;
     if (/carrinho|cart|adicionar|checkout/i.test(lower)) return t.carrinho;
-    if (/suporte|support|ajuda|help|contato|atendimento/i.test(lower)) return t.suporte;
+    if (/suporte|support|ajuda|help|contato|atendimento/i.test(lower))
+      return t.suporte;
     return t.padrao;
   }
 
@@ -479,32 +628,48 @@ class ChatBot {
    * ────────────────────────────────────────────────────────────── */
   _handleAction(data) {
     switch (data.action) {
-      case 'add_to_cart':
-        if (data.product_id && typeof adicionarCarrinho === 'function') {
-          adicionarCarrinho(data.product_id, data.product_name || 'Produto', Number(data.product_price) || 0);
+      case "add_to_cart":
+        if (data.product_id && typeof adicionarCarrinho === "function") {
+          adicionarCarrinho(
+            data.product_id,
+            data.product_name || "Produto",
+            Number(data.product_price) || 0,
+          );
         }
         break;
-      case 'coupon_applied':
+      case "coupon_applied":
         if (data.coupon_valid && data.discount) {
-          localStorage.setItem('cdm_discount', String(data.discount));
-          if (typeof calcularTotalLocal === 'function') calcularTotalLocal();
+          localStorage.setItem("cdm_discount", String(data.discount));
+          if (typeof calcularTotalLocal === "function") calcularTotalLocal();
         }
         break;
-      case 'escalate_to_human':
-        this._addMsg('🤝 Vou conectar você a um agente humano em breve!', 'bot');
+      case "open_login":
+        this._triggerAuthCTA("login");
         break;
-      case 'whatsapp_link':
-        if (data.link && /^https:\/\/(wa\.me|api\.whatsapp\.com)/.test(data.link)) {
-          const a = document.createElement('a');
+      case "open_register":
+        this._triggerAuthCTA("register");
+        break;
+      case "escalate_to_human":
+        this._addMsg(
+          "🤝 Vou conectar você a um agente humano em breve!",
+          "bot",
+        );
+        break;
+      case "whatsapp_link":
+        if (
+          data.link &&
+          /^https:\/\/(wa\.me|api\.whatsapp\.com)/.test(data.link)
+        ) {
+          const a = document.createElement("a");
           a.href = data.link;
-          a.target = '_blank';
-          a.rel = 'noopener noreferrer';
-          a.textContent = '📲 Abrir WhatsApp →';
-          a.style.cssText = 'color:#25D366;font-weight:600;';
-          const el = document.createElement('div');
-          el.className = 'chatbot-msg bot';
+          a.target = "_blank";
+          a.rel = "noopener noreferrer";
+          a.textContent = "📲 Abrir WhatsApp →";
+          a.style.cssText = "color:#25D366;font-weight:600;";
+          const el = document.createElement("div");
+          el.className = "chatbot-msg bot";
           el.appendChild(a);
-          document.getElementById('chatbot-body')?.appendChild(el);
+          document.getElementById("chatbot-body")?.appendChild(el);
         }
         break;
     }
@@ -512,8 +677,11 @@ class ChatBot {
 
   /* ── User ID anônimo ──────────────────────────────────────────── */
   _uid() {
-    let id = localStorage.getItem('cdm_anon_id');
-    if (!id) { id = 'anon_' + Math.random().toString(36).slice(2, 10); localStorage.setItem('cdm_anon_id', id); }
+    let id = localStorage.getItem("cdm_anon_id");
+    if (!id) {
+      id = "anon_" + Math.random().toString(36).slice(2, 10);
+      localStorage.setItem("cdm_anon_id", id);
+    }
     return id;
   }
 }
