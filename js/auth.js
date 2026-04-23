@@ -10,7 +10,8 @@ let currentUser = null;
 
 class AuthSystem {
   constructor() {
-    this.loadUser().then(() => this.initAuthUI());
+    this.initAuthUI();  // sync — cria modal imediatamente
+    this.loadUser();   // async — preenche dados da sessão
   }
 
   /* ────────────────────────────────────────────────────────────────
@@ -42,6 +43,36 @@ class AuthSystem {
     this.createFloatingButtons();
     this.createAuthModal();
     this.createUserPanel();
+    this._bindMobileNavAuthLinks();
+  }
+
+  /* ────────────────────────────────────────────────────────────────
+   * Bind links de Login/Sign Up no menu mobile via JS (belt+suspenders)
+   * ──────────────────────────────────────────────────────────────── */
+  _bindMobileNavAuthLinks() {
+    const bind = () => {
+      document.querySelectorAll('#mobile-nav [data-i18n="nav.login"]').forEach(el => {
+        if (el.dataset.authBound) return;
+        el.dataset.authBound = '1';
+        el.addEventListener('click', (e) => {
+          e.preventDefault();
+          window.openAuthModal('login');
+        });
+      });
+      document.querySelectorAll('#mobile-nav [data-i18n="nav.signup"]').forEach(el => {
+        if (el.dataset.authBound) return;
+        el.dataset.authBound = '1';
+        el.addEventListener('click', (e) => {
+          e.preventDefault();
+          window.openAuthModal('register');
+        });
+      });
+    };
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', bind);
+    } else {
+      bind();
+    }
   }
 
   /* ────────────────────────────────────────────────────────────────
@@ -71,6 +102,7 @@ class AuthSystem {
         vertical-align: middle;
       }
       .user-nav-btn:hover { opacity: 0.85; }
+      @media (max-width: 768px) { .user-nav-btn { display: none !important; } }
 
       /* ── Auth Modal ────────────────────────────────────────── */
       .auth-modal {
@@ -78,7 +110,7 @@ class AuthSystem {
         position: fixed;
         inset: 0;
         background: rgba(0,0,0,0.55);
-        z-index: 10000;
+        z-index: 12500;
         align-items: center;
         justify-content: center;
         padding: 16px;

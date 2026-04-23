@@ -468,8 +468,16 @@ class ChatBot {
       this._removeMsg(typingId);
       const data = await res.json();
       if (data.success) {
-        this._addMsg(data.response, "bot");
-        if (data.action) this._handleAction(data);
+        // Auth intent: mostrar CTA em vez do texto do backend
+        const intent = this._authIntent(msg);
+        const isAuthAction = data.action === "open_login" || data.action === "open_register";
+        if (intent || isAuthAction) {
+          const tab = isAuthAction ? (data.action === "open_register" ? "register" : "login") : intent;
+          this._triggerAuthCTA(tab);
+        } else {
+          this._addMsg(data.response, "bot");
+          if (data.action) this._handleAction(data);
+        }
       } else {
         // Verificar intent de auth antes do fallback local
         const intent = this._authIntent(msg);
